@@ -315,10 +315,10 @@ FEATURED = [
     Spec('overpowers_stamina', 'skills', 'Stamina overpowers', 'Shown in the game as STAMINA OVERPOWERS. Tested on PS5: the game keeps an edited value.', 'tested', 'count', OVERPOWERS, 'stamina', LUCIA_JASON),
     Spec('overpowers_focus', 'skills', 'Focus overpowers', 'Shown in the game as FOCUS OVERPOWERS.', 'caution', 'count', OVERPOWERS, 'focus', LUCIA_JASON),
     Spec('buffs_health', 'skills', 'Health buffs', 'Shown in the game as HEALTH BUFFS. Tested on PS5: the game keeps an edited value.', 'tested', 'count', BUFFS, 'health', LUCIA_JASON),
-    Spec('buffs_stamina', 'skills', 'Stamina buffs', 'Shown in the game as STAMINA BUFFS.', 'caution', 'count', BUFFS, 'stamina', LUCIA_JASON),
+    Spec('buffs_stamina', 'skills', 'Stamina buffs', 'Shown in the game as STAMINA BUFFS. Tested on PS5: the game keeps an edited value.', 'tested', 'count', BUFFS, 'stamina', LUCIA_JASON),
     Spec('buffs_focus', 'skills', 'Focus buffs', 'Shown in the game as FOCUS BUFFS.', 'caution', 'count', BUFFS, 'focus', LUCIA_JASON),
-    Spec('workouts', 'skills', 'Workouts completed', 'Gym workouts finished.', 'caution', 'count', 'numworkoutscompleted', 0, LUCIA_JASON),
-    Spec('meditations', 'skills', 'Meditations', 'Meditation sessions.', 'caution', 'count', 'totalmeditations', 0, LUCIA_JASON),
+    Spec('workouts', 'skills', 'Workouts completed', 'Gym workouts finished. Tested on PS5: the game keeps an edited value and counts on from it.', 'tested', 'count', 'numworkoutscompleted', 0, LUCIA_JASON),
+    Spec('meditations', 'skills', 'Meditations', 'Meditation sessions. Tested on PS5: the game keeps an edited value.', 'tested', 'count', 'totalmeditations', 0, LUCIA_JASON),
     Spec('time_played', 'time', 'Time played', 'Shown in the game as TIME PLAYED. The total is Lucia plus Jason.', 'caution', 'ms', 'totalplayingtimems', 0, LUCIA_JASON),
     Spec('time_onfoot', 'time', 'Time on foot', 'Time spent out of vehicles.', 'caution', 'ms', 'time', 'travelledfoot', LUCIA_JASON),
     Spec('time_invehicle', 'time', 'Time in vehicles', 'Time spent in any vehicle.', 'caution', 'ms', 'time', 'invehicle', LUCIA_JASON),
@@ -371,7 +371,7 @@ FEATURED = [
     Spec('collectible_cards', 'trophies', 'Collectible cards', 'Cards collected.', 'danger', 'count', 'numcollected', 'collectiblecards', (0,)),
     Spec('collectible_sets', 'trophies', 'Complete collectible sets', 'Finished collectible sets.', 'danger', 'count', 'numcollected', 'allsets', (0,)),
     Spec('vaults', 'trophies', 'Vaults robbed', 'Shown in the game as VAULTS ROBBED.', 'danger', 'count', 'robbedvaults', 0, (0,)),
-] + [Spec('gadget_' + q, 'gadgets', label, 'Marks the gadget as obtained. It may not put the gadget in your inventory.', 'tested' if q == 'headphones' else 'caution', 'flag', 'acquired', q, (0, 1, 2))
+] + [Spec('gadget_' + q, 'gadgets', label, 'Marks the gadget as obtained. It may not put the gadget in your inventory.', 'tested' if q in ('headphones', 'metaldetector', 'masks') else 'caution', 'flag', 'acquired', q, (0, 1, 2))
      for q, label in (('metaldetector', 'Metal detector'), ('binoculars', 'Binoculars'), ('flashlight', 'Flashlight'),
                       ('masks', 'Masks'), ('headphones', 'Headphones'))]
 

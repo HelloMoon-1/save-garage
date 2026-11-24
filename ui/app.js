@@ -445,7 +445,7 @@
       const worst = list.every(f => f.risk === 'danger') ? 'danger' : list.every(f => f.risk === 'tested') ? 'tested' : 'caution';
       return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
     }).join('');
-    return `<div class="callout" style="margin-bottom:24px">Health and stamina overpowers, health buffs, money-earned records and the headphones flag have been tested on a PS5 and are kept by the game. Labels follow the game’s own stats screens. The others haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
+    return `<div class="callout" style="margin-bottom:24px">Health and stamina overpowers and buffs, workouts, meditations, money-earned records and the metal detector, masks and headphones flags have been tested on a PS5 and are kept by the game. Labels follow the game’s own stats screens. The others haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
   }
 
   // ---- all stats browser
