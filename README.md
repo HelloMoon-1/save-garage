@@ -34,12 +34,15 @@ your original save, and the original is backed up on your computer before anythi
 
 ## How to use it
 
-1. **Download and start Save Garage.** Get the zip for your system from [Releases](../../releases/latest), unzip
-   it and run `SaveGarage`. Your browser opens the editor at `http://127.0.0.1:7283`.
-   - Windows: allow it through the firewall on private networks when asked. The PS5 needs to reach your PC.
-   - Mac: allow access to devices on your local network. If macOS won't open the app, go to
-     System Settings, then Privacy & Security, and click Open Anyway.
-   - Linux: see [Linux notes](#linux-notes).
+1. **Download and start Save Garage** from [Releases](../../releases/latest). Your browser opens the editor at
+   `http://127.0.0.1:7283`. Keep the small Save Garage window open while you use it.
+   - **Windows:** unzip `SaveGarage-…-windows-x64.zip` and double-click **Start Save Garage.bat**. Everything it
+     needs is inside the folder. If SmartScreen appears, click More info, then Run anyway. When Windows Firewall asks
+     about Python, allow it on private networks: the PS5 needs to reach your PC.
+   - **Mac:** unzip `SaveGarage-…-macos.zip` and double-click **Start Save Garage.command**. The first time, right-click
+     it and choose Open. It needs Python 3.9 or newer ([python.org](https://www.python.org/downloads/macos/)) and sets
+     itself up on the first start. Allow access to devices on your local network when asked.
+   - **Linux:** unpack `SaveGarage-…-linux-x64.tar.gz` and run `./SaveGarage --open`. See [Linux notes](#linux-notes).
 2. **Connect.** Click Find my PS5, or type its IP address.
 3. **Pair (once per console).** Click Start pairing, then on the PS5 go to Settings, then System, then System
    Software, then Data Transfer, and pick **Save Garage Pairing**. The PS5 says it can't transfer data. That's
@@ -112,8 +115,11 @@ python3 -m venv .venv
 .venv/bin/python engine/main.py --open             # Windows: .venv\Scripts\python engine\main.py --open
 ```
 
-Options: `--port N` (default 7283), `--host ADDRESS`, `--allow NETWORKS`, `--no-browser`. Release builds are made by
-[GitHub Actions](.github/workflows/release.yml) from this source with the scripts in [scripts/](scripts).
+Options: `--port N` (default 7283), `--host ADDRESS`, `--allow NETWORKS`, `--no-browser`.
+
+Release files are built on Linux with [`scripts/package_release.sh`](scripts/package_release.sh): a portable Windows
+folder with the official embeddable Python, a Mac launcher, and a self-contained Linux build, plus `SHA256SUMS.txt`.
+`scripts/build_windows.bat` and `scripts/build_macos.sh` make single-folder builds with PyInstaller on those systems.
 
 ## Credits and license
 

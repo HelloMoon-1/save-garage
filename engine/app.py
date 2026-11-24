@@ -7,6 +7,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import money, garlic, savedit
 
 FROZEN = getattr(sys, 'frozen', False)
+# Desktop mode (packaged builds, or the portable launchers set SAVEGARAGE_DESKTOP=1): per-user data folder,
+# a Quit button in the UI and an automatic exit when the page has been closed for a while.
+DESKTOP = FROZEN or os.environ.get('SAVEGARAGE_DESKTOP') == '1'
 ROOT = Path(getattr(sys, '_MEIPASS', None) or Path(__file__).resolve().parent.parent)
 VENDOR, UI = ROOT / 'vendor', ROOT / 'ui'
 MAC = sys.platform == 'darwin'
@@ -17,7 +20,7 @@ elif os.name == 'nt':
     APP_SUPPORT = Path(os.environ.get('LOCALAPPDATA', str(Path.home())))
 else:
     APP_SUPPORT = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share')
-DATA = APP_SUPPORT / 'SaveGarage' if FROZEN else ROOT / 'data'
+DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
 VERSION = '1.0.0'
@@ -638,7 +641,7 @@ def public_state():
             s['console']['sameSubnet'] = same_subnet(s['console']['host'])
         s['job'] = json.loads(json.dumps(JOB)); s['job']['log'] = s['job']['log'][-40:]
         s['titles'] = GTA_TITLES
-        s['canQuit'] = FROZEN
+        s['canQuit'] = DESKTOP
         s['version'] = VERSION
         return s
 
@@ -779,7 +782,7 @@ def idle_watch():
 def main():
     import webbrowser
     url = 'http://%s:%d' % (BIND if BIND not in ('', '0.0.0.0') else '127.0.0.1', PORT)
-    open_ui = (FROZEN or '--open' in sys.argv) and not os.environ.get('SAVEGARAGE_NO_BROWSER')
+    open_ui = (DESKTOP or '--open' in sys.argv) and not os.environ.get('SAVEGARAGE_NO_BROWSER')
     if already_running():                       # already running: just open the page again
         if open_ui:
             webbrowser.open(url)
@@ -787,7 +790,7 @@ def main():
     DATA.mkdir(parents=True, exist_ok=True)
     srv = ThreadingHTTPServer((BIND, PORT), H)
     print('Save Garage running: ' + url, flush=True)
-    if FROZEN and (MAC or os.name == 'nt'):        # windowless desktop builds: quit when the page has been gone a while
+    if DESKTOP and (MAC or os.name == 'nt'):       # desktop builds: quit when the page has been gone a while
         threading.Thread(target=idle_watch, daemon=True).start()
     if open_ui:
         webbrowser.open(url)
