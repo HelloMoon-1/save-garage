@@ -454,7 +454,7 @@
     if (t.index) return t.index;
     const n = t.names;
     const ql = n.qual_labels || {};
-    const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? ql[i].toLowerCase() : `#${i}`))), on = i => n.owner[i] || `#${i}`;
+    const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? (ql[i] === ql[i].toUpperCase() ? ql[i].toLowerCase() : ql[i]) : `#${i}`))), on = i => n.owner[i] || `#${i}`;
     const labels = t.labels || {};
     const pretty = l => l ? (l.charAt(0) + l.slice(1).toLowerCase()).replace(/\b(lucia|jason)\b/g, w => w[0].toUpperCase() + w.slice(1)) : '';
     const prot = new Set((t.protected[MONEY_GROUP] || []).map(String));
