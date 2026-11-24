@@ -23,7 +23,7 @@ else:
 DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -329,24 +329,6 @@ def slot_featured(slot):
     return cached(('featured', slot['file']), lambda: savedit.featured(savedit.section(slot_bytes(slot), money.SEC_STAT)))
 
 
-def seen_max():
-    """Highest value of each featured stat and ammo type across every slot of this download."""
-    def build():
-        stats, ammo = {}, {}
-        for s in STATE['slots']:
-            for f in slot_featured(s):
-                for e in f['entries']:
-                    if e['type'] != 'bool':
-                        k = '%s:%d' % (f['id'], e['owner'])
-                        stats[k] = max(stats.get(k, 0), e['value'])
-            for a in s.get('ammo') or []:
-                ammo[a['type']] = max(ammo.get(a['type'], 0), a['value'])
-        for t, v in savedit.AMMO_SEEN_MAX.items():
-            ammo[t] = max(ammo.get(t, 0), v)
-        return {'stats': stats, 'ammo': ammo}
-    return cached(('seen',), build)
-
-
 def varying_keys():
     """Stat keys whose value differs between the slots of this download (a sign the game actually uses them)."""
     def build():
@@ -366,7 +348,7 @@ def slot_weapons(slot):
 
 def slot_detail(slot):
     return {'file': slot['file'], 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
-            'seen': seen_max(), 'applied': slot.get('applied'), 'modified': slot['modified']}
+            'applied': slot.get('applied'), 'modified': slot['modified']}
 
 
 def slot_stats(slot):

@@ -396,7 +396,6 @@
 
   // ---- ammo
   function panelAmmo(s, d) {
-    const seen = d.seen?.ammo || {};
     const by = inv => d.ammo.filter(a => a.inv === inv);
     const block = (inv, who) => {
       const rows = by(inv);
@@ -404,37 +403,37 @@
       const carried = (d.weapons || []).filter(w => w.inv === inv), unnamed = carried.filter(w => !w.label).length;
       const guns = carried.filter(w => w.label).map(w => `<li>${esc(w.label)}${w.kind ? ` <span class="kind">${esc(w.kind)}</span>` : ''}</li>`).join('')
         + (unnamed ? `<li class="kind">${unnamed} more not identified yet</li>` : '');
-      return `<div class="group"><div class="section-head"><h3>${who}</h3><button class="btn small" data-act="fillall" data-scope="ammo-${inv}">Fill all to the highest seen</button></div>
+      return `<div class="group"><div class="section-head"><h3>${who}</h3><div class="head-actions"><button class="btn small" data-act="fillall" data-scope="ammo-${inv}">Refill all</button><button class="btn small" data-act="maxall" data-scope="ammo-${inv}">Max all</button></div></div>
         ${guns ? `<p class="note">Weapons carried</p><ul class="weapons">${guns}</ul>` : ''}
         <div class="fields">${rows.map(a => {
-          const top = seen[a.type] || a.value;
-          return `<div class="field"><div class="name">${esc(a.label)}<span class="help">Highest seen in a real save: ${nf.format(top)}.</span></div>
-            <div class="inputs" data-scope="ammo-${inv}">${cell({kind: 'ammo', key: `${a.inv}:${a.idx}`, label: a.type.startsWith('thrown') ? 'How many' : 'Rounds', value: a.value, display: String(a.value), unit: 'count', type: 'int', min: 1, max: 9999,
-              attrs: `data-inv="${a.inv}" data-idx="${a.idx}" data-label="${esc(a.label + ', ' + who)}" data-top="${top}"`,
-              extra: `<button class="btn small" data-act="fill" data-to="${top}">Fill</button>`})}</div></div>`;
+          const help = a.full ? `A full load is ${nf.format(a.full)}. Can go up to ${nf.format(a.max)}.` : `Can go up to ${nf.format(a.max)}. The game’s full load for this isn’t known yet.`;
+          return `<div class="field"><div class="name">${esc(a.label)}<span class="help">${help}</span></div>
+            <div class="inputs" data-scope="ammo-${inv}">${cell({kind: 'ammo', key: `${a.inv}:${a.idx}`, label: a.type.startsWith('thrown') ? 'How many' : 'Rounds', value: a.value, display: String(a.value), unit: 'count', type: 'int', min: 1, max: a.max,
+              attrs: `data-inv="${a.inv}" data-idx="${a.idx}" data-label="${esc(a.label + ', ' + who)}" data-full="${a.full || ''}" data-max="${a.max}"`,
+              extra: (a.full ? `<button class="btn small" data-act="fill" data-to="${a.full}">Full</button>` : '') + `<button class="btn small" data-act="fill" data-to="${a.max}">Max</button>`})}</div></div>`;
         }).join('')}</div></div>`;
     };
     return `<div class="section-head"><h2>Ammo</h2>${riskTag('tested')}
-        <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Edited amounts up to the highest seen are kept by the game.</p></div>
+        <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Amounts up to a full load have been tested on a PS5 and the game keeps them. Larger amounts haven’t been tried yet: the game may cut them back to a full load when it loads the save.</p></div>
       ${d.ammo.length ? block(0, 'Lucia') + block(1, 'Jason') : '<div class="empty">Neither character is carrying ammo in this save.</div>'}`;
   }
 
   // ---- featured stats
   function panelStats(s, d) {
-    const seen = d.seen?.stats || {};
     const unitOf = f => ({percent: ['percent', 'float', 0.01, '%'], ms: ['ms', null, 0.01, 'hours'], distance: ['distance', 'float', 0.01, 'km'],
                           money: ['count', null, 1, '$'], count: ['count', null, 1, ''], level: ['count', null, 1, ''], flag: ['flag', 'bool', 1, '']})[f.unit] || ['count', null, 1, ''];
     const rows = f => {
       const [unit, forced, step, unitLabel] = unitOf(f);
       const allSame = list => list.every(x => x.risk === f.risk);
       const own = f.risk === 'danger' && f.category !== 'trophies' ? riskTag('danger') : f.risk === 'tested' && !allSame(d.featured.filter(x => x.category === f.category)) ? riskTag('tested') : '';
-      return `<div class="field"><div class="name">${esc(f.label)} ${own}<span class="help">${esc(f.help)}</span></div>
+      const typed = f.entries.find(e => e.type !== 'bool');
+      const limit = typed ? limitOf(typed.type, f.unit).text : '';
+      return `<div class="field"><div class="name">${esc(f.label)} ${own}<span class="help">${esc(f.help)}${limit ? ' ' + esc(limit) : ''}</span></div>
         <div class="inputs" data-spec="${esc(f.id)}">${f.entries.filter(e => !(f.autoTotal && e.owner === 0)).map(e => {
           const type = forced || e.type;
-          const top = seen[`${f.id}:${e.owner}`];
-          return cell({kind: 'stat', key: `${e.group}:${e.row}`, narrow: true, label: OWNER[e.owner] + (unitLabel ? `, ${unitLabel}` : '') + (top != null && f.unit === 'level' ? `, highest seen ${top}` : ''),
+          return cell({kind: 'stat', key: `${e.group}:${e.row}`, narrow: true, label: OWNER[e.owner] + (unitLabel ? `, ${unitLabel}` : ''),
             value: e.value, display: type === 'bool' ? '' : toDisplay(e.value, unit), unit, type: type === 'bool' ? 'bool' : (e.type === 'float' ? 'float' : 'int'),
-            step: e.type === 'float' || unit === 'ms' ? step : 1, max: TYPE_MAX[e.type],
+            step: e.type === 'float' || unit === 'ms' ? step : 1, max: e.type === 'bool' ? null : limitOf(e.type, f.unit).max,
             attrs: `data-group="${esc(e.group)}" data-row="${e.row}" data-base="${e.base}" data-qual="${e.qual}" data-owner="${e.owner}" data-label="${esc(f.label + ' (' + OWNER[e.owner] + ')')}"`});
         }).join('')}${f.autoTotal ? (() => { const t = f.entries.find(e => e.owner === 0); return `<div class="cell auto narrow"><span class="lbl">Total, updates itself</span>
           <span class="with-unit"><input type="number" disabled value="${esc(toDisplay(t.value, unit))}" data-total="${esc(f.id)}" data-orig="${t.value}"></span><span class="was"></span></div>`; })() : ''}
@@ -504,11 +503,21 @@
       else if (x.type === 'bool') input = `<label class="toggle"><input type="checkbox" ${attrs} data-type="bool" data-unit="flag" data-orig="${x.v ? 1 : 0}" ${(dr ? dr.newValue : x.v) ? 'checked' : ''}> ${(dr ? dr.newValue : x.v) ? 'true' : 'false'}</label>`;
       else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${TYPE_MAX[x.type]}" step="${x.type === 'float' ? 'any' : 1}"
         data-init="${esc(String(x.v))}" data-orig="${esc(JSON.stringify(x.v))}" value="${esc(String(dr ? dr.newValue : x.v))}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}</td><td>${input}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>${esc(rangeOf(x.type))}</small>`}</td><td>${input}</td></tr>`;
     }).join('')}</tbody></table>${list.length > shown.length ? `<div class="more"><button class="btn small" data-act="more">Show more (${nf.format(list.length - shown.length)} left)</button></div>` : ''}`;
   }
 
   const fmtRaw = (v, t) => t === 'float' ? nf2.format(v) : nf.format(v);
+  const compact = new Intl.NumberFormat('en', {notation: 'compact', maximumFractionDigits: 1});
+  const rangeOf = t => t === 'float' ? 'any number' : t === 'int64' ? 'up to 9 quadrillion' : `up to ${compact.format(TYPE_MAX[t])}`;
+
+  // what a featured stat can hold, in the units the field shows (max) and in words (text)
+  function limitOf(type, unit) {
+    if (unit === 'percent') return {max: 100, text: 'Up to 100%.'};
+    const raw = TYPE_MAX[type], shown = unit === 'ms' ? Math.floor(raw / 3600000) : unit === 'distance' ? raw / 1000 : raw;
+    if (type === 'float' || type === 'int64') return {max: shown, text: 'No practical limit.'};
+    return {max: shown, text: unit === 'ms' ? `Holds up to ${nf.format(shown)} hours.` : `Holds up to ${unit === 'money' ? '$' : ''}${nf.format(shown)}.`};
+  }
 
   // ---- trophies
   function panelTrophies() {
@@ -528,7 +537,7 @@
     if (!s) return;
     const file = s.file;
     if (S.tab !== 'money' && S.tab !== 'trophies' && !S.detail[file]) {
-      try { S.detail[file] = await api('/api/slot?file=' + encodeURIComponent(file)); } catch (e) { S.detail[file] = {failed: e.code || 'request_failed', featured: [], ammo: [], seen: {}}; }
+      try { S.detail[file] = await api('/api/slot?file=' + encodeURIComponent(file)); } catch (e) { S.detail[file] = {failed: e.code || 'request_failed', featured: [], ammo: []}; }
       S.mainKey = ''; renderMain(); return;
     }
     if (S.tab === 'all' && !S.stats[file]) {
@@ -752,10 +761,11 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
-    if (a === 'fillall') {
-      for (const w of $$(`[data-scope="${b.dataset.scope}"]`)) {
+    if (a === 'fillall' || a === 'maxall') {
+      for (const w of $$(`.inputs[data-scope="${b.dataset.scope}"]`)) {
         const input = w.querySelector('input[type="number"]');
-        if (input && input.dataset.top) { input.value = input.dataset.top; onEdit(input); }
+        const to = input && (a === 'fillall' ? input.dataset.full : input.dataset.max);
+        if (to) { input.value = to; onEdit(input); }
       }
       return;
     }

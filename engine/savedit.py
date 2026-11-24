@@ -225,10 +225,12 @@ def _sentence(text):
 # What the game calls each ammo type, from its text.
 AMMO_LABELS = {t: _sentence(itemnames.ITEM_LABELS.get(h, t.capitalize() + ' ammo')) for h, t in AMMO_ITEMS.items()}
 SLOT_AMMO = joaat('slotid_ammo')
-# Highest amounts seen in real saves. The game probably cuts anything above its own limit back on load.
-AMMO_SEEN_MAX = {'rifle': 300, 'smg': 300, 'minigun': 300, 'sporting': 200, 'marksman': 120, 'pistol': 100,
-                 'revolver': 100, 'shotgun': 100}
-AMMO_MAX = 9999
+# A full load of each ammo type: the game won't sell or refill past these, and nothing in it raises them. Pistol,
+# shotgun, tactical rifle, assault rifle and sniper are published figures; the rest are what a full refill of every
+# standard type leaves in a real save. The full amount of grenades, sticky bombs, RPG and speargun ammo isn't known.
+AMMO_FULL = {'pistol': 100, 'shotgun': 100, 'marksman': 120, 'rifle': 300, 'sniper': 80,
+             'revolver': 100, 'smg': 300, 'mg': 200, 'minigun': 300, 'sporting': 200}
+AMMO_MAX = 9999          # the most Save Garage writes. Amounts above a full load haven't been tried on a PS5.
 
 
 def ammo(sec_txt):
@@ -240,7 +242,8 @@ def ammo(sec_txt):
         for r, item in enumerate(v['item']):
             if item & M32 in AMMO_ITEMS and v['slot'][r] & M32 == SLOT_AMMO:
                 t = AMMO_ITEMS[item & M32]
-                out.append({'inv': n, 'idx': r, 'type': t, 'label': AMMO_LABELS[t], 'value': v['qty'][r]})
+                out.append({'inv': n, 'idx': r, 'type': t, 'label': AMMO_LABELS[t], 'value': v['qty'][r],
+                            'full': AMMO_FULL.get(t), 'max': AMMO_MAX})
     return out
 
 
