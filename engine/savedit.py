@@ -365,6 +365,7 @@ FEATURED = [
     Spec('stunt_jumps', 'trophies', 'Stunt jumps', 'Stunt jumps completed.', 'danger', 'count', 'stuntscompleted', 'stuntjumps', (0,)),
     Spec('base_jumps', 'trophies', 'Base jumps', 'Base jumps completed.', 'danger', 'count', 'stuntscompleted', 'basejumps', (0,)),
     Spec('knife_flights', 'trophies', 'Knife flights', 'Knife flights completed.', 'danger', 'count', 'stuntscompleted', 'knifeflights', (0,)),
+    Spec('under_bridges', 'trophies', 'Under the bridge', 'Under-the-bridge flights completed.', 'danger', 'count', 'stuntscompleted', 'underthebridge', (0,)),
     Spec('challenges', 'trophies', 'Challenges completed', 'All challenges together.', 'danger', 'count', 'challengescompleted', 0, (0,)),
     Spec('discoverables', 'trophies', 'Discoverables found', 'Places and things discovered.', 'danger', 'count', 'discoverablesfound', 0, (0,)),
     Spec('collectibles', 'trophies', 'Collectibles collected', 'The collectibles counter.', 'danger', 'count', 'numcollected', 'collectibles', (0,)),
@@ -426,6 +427,33 @@ def _h(x):
     return joaat(x) if isinstance(x, str) else x
 
 
+# The most each featured stat should be set to: the game's own total where it has one (from its stats screens and
+# 100% checklist), otherwise a limit far above what a long playthrough reaches and far below where a counter could
+# overflow as the game keeps adding to it. Raw units: milliseconds, metres, dollars or a count.
+HOUR, KM = 3600000, 1000
+DEFAULT_MAX = {'percent': 100, 'ms': 9999 * HOUR, 'distance': 99999 * KM, 'money': 99999999, 'count': 99999}
+SPEC_MAX = {
+    'side_tasks': (100, 'the number of optional tasks in the game'),
+    'overpowers_health': (999, ''), 'overpowers_stamina': (999, ''), 'overpowers_focus': (999, ''),
+    'buffs_health': (9999, ''), 'buffs_stamina': (9999, ''), 'buffs_focus': (9999, ''),
+    'workouts': (9999, ''), 'meditations': (999, ''),
+    'shots': (9999999, ''), 'deaths': (9999, ''), 'busted': (9999, ''),
+    'carjackings': (9999, ''), 'holdups': (9999, ''), 'fish': (9999, ''), 'photo_animal': (9999, ''), 'rentals': (9999, ''),
+    'taxis': (9999, ''), 'masks': (9999, ''), 'armor': (9999, ''),
+    'fenced_packages': (999, ''), 'fenced_doubloons': (999, ''), 'fenced_meteorites': (999, ''),
+    'stunts_total': (397, 'the number of stunts in the game'),
+    'stunt_jumps': (130, 'the number of stunt jumps in the game'),
+    'base_jumps': (25, 'the number of base jumps in the game'),
+    'knife_flights': (40, 'the number of knife flights in the game'),
+    'under_bridges': (202, 'the number of under-the-bridge flights in the game'),
+    'challenges': (80, 'the number of challenges in the game'),
+    'discoverables': (999, ''), 'collectibles': (999, ''),
+    'collectible_cards': (480, 'the number of cards in the game'),
+    'collectible_sets': (18, 'the number of card sets in the game'),
+    'vaults': (8, 'the number of bank vaults in the game'),
+}
+
+
 def featured(sec_txt):
     """Featured stats present in this save, with the exact rows to edit."""
     groups, tables = stat_rows(sec_txt)
@@ -454,8 +482,9 @@ def featured(sec_txt):
             continue
         vals = {e['owner']: e['value'] for e in entries}
         auto = (entries[0]['type'] != 'bool' and {0, 1, 2} <= set(vals) and _same(entries[0]['type'], vals[0], vals[1] + vals[2]))
+        cap, why = SPEC_MAX.get(spec.id, (DEFAULT_MAX.get(spec.unit), ''))
         out.append({'id': spec.id, 'category': spec.category, 'label': spec.label, 'help': spec.help, 'risk': spec.risk,
-                    'unit': spec.unit, 'autoTotal': bool(auto), 'entries': entries})
+                    'unit': spec.unit, 'autoTotal': bool(auto), 'entries': entries, 'max': cap, 'maxWhy': why})
     return out
 
 

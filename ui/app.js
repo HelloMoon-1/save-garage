@@ -426,14 +426,13 @@
       const [unit, forced, step, unitLabel] = unitOf(f);
       const allSame = list => list.every(x => x.risk === f.risk);
       const own = f.risk === 'danger' && f.category !== 'trophies' ? riskTag('danger') : f.risk === 'tested' && !allSame(d.featured.filter(x => x.category === f.category)) ? riskTag('tested') : '';
-      const typed = f.entries.find(e => e.type !== 'bool');
-      const limit = typed ? limitOf(typed.type, f.unit).text : '';
+      const limit = maxText(f);
       return `<div class="field"><div class="name">${esc(f.label)} ${own}<span class="help">${esc(f.help)}${limit ? ' ' + esc(limit) : ''}</span></div>
         <div class="inputs" data-spec="${esc(f.id)}">${f.entries.filter(e => !(f.autoTotal && e.owner === 0)).map(e => {
           const type = forced || e.type;
           return cell({kind: 'stat', key: `${e.group}:${e.row}`, narrow: true, label: OWNER[e.owner] + (unitLabel ? `, ${unitLabel}` : ''),
             value: e.value, display: type === 'bool' ? '' : toDisplay(e.value, unit), unit, type: type === 'bool' ? 'bool' : (e.type === 'float' ? 'float' : 'int'),
-            step: e.type === 'float' || unit === 'ms' ? step : 1, max: e.type === 'bool' ? null : limitOf(e.type, f.unit).max,
+            step: e.type === 'float' || unit === 'ms' ? step : 1, max: e.type === 'bool' || f.max == null ? null : maxShown(f),
             attrs: `data-group="${esc(e.group)}" data-row="${e.row}" data-base="${e.base}" data-qual="${e.qual}" data-owner="${e.owner}" data-label="${esc(f.label + ' (' + OWNER[e.owner] + ')')}"`});
         }).join('')}${f.autoTotal ? (() => { const t = f.entries.find(e => e.owner === 0); return `<div class="cell auto narrow"><span class="lbl">Total, updates itself</span>
           <span class="with-unit"><input type="number" disabled value="${esc(toDisplay(t.value, unit))}" data-total="${esc(f.id)}" data-orig="${t.value}"></span><span class="was"></span></div>`; })() : ''}
@@ -501,22 +500,27 @@
       let input;
       if (x.locked) input = `<span class="lock">${esc(fmtRaw(x.v, x.type))}, managed by the Money tab</span>`;
       else if (x.type === 'bool') input = `<label class="toggle"><input type="checkbox" ${attrs} data-type="bool" data-unit="flag" data-orig="${x.v ? 1 : 0}" ${(dr ? dr.newValue : x.v) ? 'checked' : ''}> ${(dr ? dr.newValue : x.v) ? 'true' : 'false'}</label>`;
-      else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${TYPE_MAX[x.type]}" step="${x.type === 'float' ? 'any' : 1}"
+      else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${capOf(x)}" step="${x.type === 'float' ? 'any' : 1}"
         data-init="${esc(String(x.v))}" data-orig="${esc(JSON.stringify(x.v))}" value="${esc(String(dr ? dr.newValue : x.v))}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>${esc(rangeOf(x.type))}</small>`}</td><td>${input}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>up to ${esc(compact.format(capOf(x)))}</small>`}</td><td>${input}</td></tr>`;
     }).join('')}</tbody></table>${list.length > shown.length ? `<div class="more"><button class="btn small" data-act="more">Show more (${nf.format(list.length - shown.length)} left)</button></div>` : ''}`;
   }
 
   const fmtRaw = (v, t) => t === 'float' ? nf2.format(v) : nf.format(v);
   const compact = new Intl.NumberFormat('en', {notation: 'compact', maximumFractionDigits: 1});
-  const rangeOf = t => t === 'float' ? 'any number' : t === 'int64' ? 'up to 9 quadrillion' : `up to ${compact.format(TYPE_MAX[t])}`;
+  // All stats: a cap far below where a counter could overflow as the game keeps adding to it (the meaning of most of
+  // these stats is unknown, so this guards against the worst breakage, not against every bad value)
+  const SAFE_MAX = {int64: 999999999999, int32: 9999999, u32: 9999999, int16: 9999, u8: 99, float: 999999999};
+  // a stat already holding more than the cap isn't a simple counter (often an id or a set of flags): keep the type's range
+  const capOf = x => Math.abs(x.v) > (SAFE_MAX[x.type] ?? Infinity) ? TYPE_MAX[x.type] : (SAFE_MAX[x.type] ?? TYPE_MAX[x.type]);
 
-  // what a featured stat can hold, in the units the field shows (max) and in words (text)
-  function limitOf(type, unit) {
-    if (unit === 'percent') return {max: 100, text: 'Up to 100%.'};
-    const raw = TYPE_MAX[type], shown = unit === 'ms' ? Math.floor(raw / 3600000) : unit === 'distance' ? raw / 1000 : raw;
-    if (type === 'float' || type === 'int64') return {max: shown, text: 'No practical limit.'};
-    return {max: shown, text: unit === 'ms' ? `Holds up to ${nf.format(shown)} hours.` : `Holds up to ${unit === 'money' ? '$' : ''}${nf.format(shown)}.`};
+  // featured stats: the reasonable max in the units the field shows, and in words
+  const maxShown = f => f.unit === 'ms' ? Math.floor(f.max / 3600000) : f.unit === 'distance' ? Math.floor(f.max / 1000) : f.max;
+  function maxText(f) {
+    if (f.max == null) return '';
+    const n = nf.format(maxShown(f));
+    const shown = f.unit === 'percent' ? `${n}%` : f.unit === 'ms' ? `${n} hours` : f.unit === 'distance' ? `${n} km` : f.unit === 'money' ? `$${n}` : n;
+    return `Max ${shown}${f.maxWhy ? ', ' + f.maxWhy : ''}.`;
   }
 
   // ---- trophies
