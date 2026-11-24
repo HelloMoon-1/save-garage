@@ -17,9 +17,9 @@ your browser, and the PS5 takes it back the same way.
 |---|---|---|
 | **Money** | Bank account, Family Savings and cash for Lucia and Jason. Goes past the BuckMe limits: up to about $2,000,000 in the bank and in Family Savings, $20,000 cash. | Tested on PS5 |
 | **Ammo** | Every ammo type each character is carrying, with one-click fill, plus the list of weapons each one carries. | Tested on PS5 |
-| **Stats** | 77 stats in plain English: story completion, side tasks, health and stamina, workouts, time and distance on foot and in vehicles, money earned, wanted levels, kills, rentals, gadgets and more. | Partly tested on PS5: fitness levels, money earned and gadget flags |
+| **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. | Partly tested on PS5: overpowers, buffs, money earned and gadget flags |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Can break your save |
-| **All stats** | Every one of the 23,760 stats in the save, searchable. Most have no known name yet. | Can break your save |
+| **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for many more. | Can break your save |
 | **Trophies** | Not editable. The Trophies page in the app explains what a save edit can and can't do for them. | |
 
 Every edit in the app carries one of those labels, so you always know how safe it is. Edits are always applied to

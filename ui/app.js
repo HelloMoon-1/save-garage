@@ -17,8 +17,8 @@
                 mg: 'Machine gun', minigun: 'Minigun', sporting: 'Sporting', thrown_grenade: 'Grenades'};
   const CATS = [
     ['progress', 'Progress', 'Percentages and counters from the stats screen.'],
-    ['fitness', 'Fitness', 'Health and stamina for each character. The total updates itself to Lucia plus Jason.'],
-    ['time', 'Time and distance', 'Play time and how you got around. Times are in hours.'],
+    ['skills', 'Skills', 'Overpowers and buffs for health, stamina and focus, plus workouts and meditations. The total updates itself to Lucia plus Jason.'],
+    ['time', 'Time and distance', 'Time played and how you got around. Times are in hours.'],
     ['earnings', 'Money earned', 'Records of money you earned. Changing these does not add money. Use the Money tab for that.'],
     ['wanted', 'Wanted levels', 'How often and how long the police were after you. Times are in hours.'],
     ['records', 'Records', 'Combat, vehicle and other counters.'],
@@ -63,7 +63,7 @@
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
     slot: null, tab: 'money', detail: {}, stats: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
-    find: {q: '', varies: true, named: false, limit: 150}, lastJob: '', localError: null};
+    find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
 
   // ------------------------------------------------------------ api
   async function api(path, body) {
@@ -365,7 +365,7 @@
 
   function toDisplay(raw, unit) {
     if (unit === 'ms') return (raw / 3600000).toFixed(2);
-    if (unit === 'distance') return (raw / 1000).toFixed(3);
+    if (unit === 'distance') return (raw / 1000).toFixed(2);
     if (unit === 'percent') return Number(raw).toFixed(2);
     if (unit === 'raw-float') return String(Number(raw));
     return String(raw);
@@ -422,7 +422,7 @@
   // ---- featured stats
   function panelStats(s, d) {
     const seen = d.seen?.stats || {};
-    const unitOf = f => ({percent: ['percent', 'float', 0.01, '%'], ms: ['ms', null, 0.01, 'hours'], distance: ['distance', 'float', 0.001, 'km'],
+    const unitOf = f => ({percent: ['percent', 'float', 0.01, '%'], ms: ['ms', null, 0.01, 'hours'], distance: ['distance', 'float', 0.01, 'km'],
                           money: ['count', null, 1, '$'], count: ['count', null, 1, ''], level: ['count', null, 1, ''], flag: ['flag', 'bool', 1, '']})[f.unit] || ['count', null, 1, ''];
     const rows = f => {
       const [unit, forced, step, unitLabel] = unitOf(f);
@@ -446,7 +446,7 @@
       const worst = list.every(f => f.risk === 'danger') ? 'danger' : list.every(f => f.risk === 'tested') ? 'tested' : 'caution';
       return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
     }).join('');
-    return `<div class="callout" style="margin-bottom:24px">Fitness levels, money-earned records and the headphones flag have been tested on a PS5 and are kept by the game. The others haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
+    return `<div class="callout" style="margin-bottom:24px">Health and stamina overpowers, health buffs, money-earned records and the headphones flag have been tested on a PS5 and are kept by the game. Labels follow the game’s own stats screens. The others haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
   }
 
   // ---- all stats browser
@@ -454,36 +454,41 @@
     const t = S.stats[file];
     if (t.index) return t.index;
     const n = t.names;
-    const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || `#${i}`)), on = i => n.owner[i] || `#${i}`;
+    const ql = n.qual_labels || {};
+    const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? ql[i].toLowerCase() : `#${i}`))), on = i => n.owner[i] || `#${i}`;
+    const labels = t.labels || {};
+    const pretty = l => l ? (l.charAt(0) + l.slice(1).toLowerCase()).replace(/\b(lucia|jason)\b/g, w => w[0].toUpperCase() + w.slice(1)) : '';
     const prot = new Set((t.protected[MONEY_GROUP] || []).map(String));
     const rows = [];
     for (const g of t.groups) {
       const vary = new Set(g.varies);
       for (let r = 0; r < g.value.length; r++) {
         const name = bn(g.base[r]) + (qn(g.qual[r]) ? '.' + qn(g.qual[r]) : '');
+        const game = pretty(labels[`${g.key}:${r}`]);
         rows.push({g: g.key, type: g.type, r, b: g.base[r], q: g.qual[r], o: g.owner[r], v: g.value[r], vary: vary.has(r),
-          named: !!(n.base[g.base[r]] || n.qual[g.qual[r]]), name, owner: on(g.owner[r]),
-          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (name + ' ' + on(g.owner[r]) + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
+          named: !!(n.base[g.base[r]] || n.qual[g.qual[r]] || game), game, name, owner: on(g.owner[r]),
+          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + on(g.owner[r]) + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
       }
     }
-    rows.sort((a, b) => (b.named - a.named) || (a.named ? a.name.localeCompare(b.name) : a.b - b.b || a.q - b.q) || a.o - b.o);
+    rows.sort((a, b) => (!!b.game - !!a.game) || (b.named - a.named) || (a.game || a.name).localeCompare(b.game || b.name) || a.b - b.b || a.q - b.q || a.o - b.o);
     return (t.index = rows);
   }
 
   function filteredStats(file) {
     const f = S.find;
     const words = f.q.toLowerCase().split(/\s+/).filter(Boolean);
-    return statIndex(file).filter(x => (!f.varies || x.vary) && (!f.named || x.named) && words.every(w => x.text.includes(w)));
+    return statIndex(file).filter(x => (!f.varies || x.vary) && (!f.named || x.named) && (!f.game || x.game) && words.every(w => x.text.includes(w)));
   }
 
   function panelAll(s) {
     const f = S.find;
     return `<div class="section-head"><h2>All stats</h2>${riskTag('danger')}
-        <p>Every stat in this save, ${nf.format(statIndex(s.file).length)} in all. Most names are unknown and shown as numbers. Names in the list were matched by their hash and are very likely right.
+        <p>Every stat in this save, ${nf.format(statIndex(s.file).length)} in all. Stats the game shows on its stats screens use the game’s own wording; other names were matched by their hash and are very likely right, and the rest are shown as numbers.
         Stats the game uses usually change between your saves, so that filter is on by default. Change one thing at a time.</p></div>
       <div class="finder"><input type="search" placeholder="Search, for example kills, time running, or #103" value="${esc(f.q)}" data-find="q" aria-label="Search stats">
         <label><input type="checkbox" data-find="varies" ${f.varies ? 'checked' : ''}> Only stats that change between my saves</label>
-        <label><input type="checkbox" data-find="named" ${f.named ? 'checked' : ''}> Only named stats</label></div>
+        <label><input type="checkbox" data-find="named" ${f.named ? 'checked' : ''}> Only named stats</label>
+        <label><input type="checkbox" data-find="game" ${f.game ? 'checked' : ''}> Only stats the game shows</label></div>
       <div id="allrows">${allRows(s)}</div>`;
   }
 
@@ -499,7 +504,7 @@
       else if (x.type === 'bool') input = `<label class="toggle"><input type="checkbox" ${attrs} data-type="bool" data-unit="flag" data-orig="${x.v ? 1 : 0}" ${(dr ? dr.newValue : x.v) ? 'checked' : ''}> ${(dr ? dr.newValue : x.v) ? 'true' : 'false'}</label>`;
       else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${TYPE_MAX[x.type]}" step="${x.type === 'float' ? 'any' : 1}"
         data-init="${esc(String(x.v))}" data-orig="${esc(JSON.stringify(x.v))}" value="${esc(String(dr ? dr.newValue : x.v))}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.name)}<small>#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}</td><td>${input}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}</td><td>${input}</td></tr>`;
     }).join('')}</tbody></table>${list.length > shown.length ? `<div class="more"><button class="btn small" data-act="more">Show more (${nf.format(list.length - shown.length)} left)</button></div>` : ''}`;
   }
 
@@ -795,7 +800,7 @@
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.dataset.edit && el.type === 'checkbox') onEdit(el);
-    if (el.dataset.find === 'varies' || el.dataset.find === 'named') {
+    if (el.dataset.find === 'varies' || el.dataset.find === 'named' || el.dataset.find === 'game') {
       S.find[el.dataset.find] = el.checked; S.find.limit = 150;
       const box = $('#allrows'); if (box) box.innerHTML = allRows(slotOf(S.slot));
     }

@@ -15,6 +15,7 @@ Stats section layout (worked out from real saves, see research notes):
 import json, math, re
 from collections import namedtuple
 
+import gamelabels
 import money
 import statnames
 
@@ -287,19 +288,25 @@ Spec = namedtuple('Spec', 'id category label help risk unit base qual owners')
 LUCIA_JASON = (0, 1, 2)
 STARS = lambda n: '%d star%s' % (n, '' if n == 1 else 's')
 TROPHY_NOTE = ''          # the shared warning for trophy counters is shown once, in the UI's section intro
+OVERPOWERS, BUFFS = 0xdef0d42f, 0x53f5b035          # shown in the game as OVERPOWERS and BUFFS (names not cracked yet)
+# Labels and rows below follow the game's own stats screens, matched value for value against a real save.
 FEATURED = [
-    Spec('story_pct', 'progress', 'Story completion', 'The percentage on the stats screen. Changing it does not unlock or skip missions.', 'caution', 'percent', 0xd3526971, 'story', (0,)),
-    Spec('styles_pct', 'progress', 'Second completion percentage', 'Shown next to story completion. Likely outfits and styles collected.', 'caution', 'percent', 0xd3526971, 'styles', (0,)),
+    Spec('overall_pct', 'progress', '100% completion', 'Overall completion, shown in the game as 100% COMPLETION. Changing it does not unlock anything.', 'caution', 'percent', 'totalprogressmade', 0, (0,)),
+    Spec('story_pct', 'progress', 'Story completion', 'The story part of 100% completion. Changing it does not unlock or skip missions.', 'caution', 'percent', 'totalprogressmade', 'story', (0,)),
+    Spec('styles_pct', 'progress', 'Styles completion', 'The styles part of 100% completion.', 'caution', 'percent', 'totalprogressmade', 'styles', (0,)),
     Spec('side_tasks', 'progress', 'Side tasks completed', 'Side tasks finished.', 'caution', 'count', 'sidetaskscompleted', 0, LUCIA_JASON),
-    Spec('health_level', 'fitness', 'Health level', 'Health skill level. Tested on PS5: the game keeps an edited level.', 'tested', 'level', 0xdef0d42f, 'health', LUCIA_JASON),
-    Spec('stamina_level', 'fitness', 'Stamina level', 'Stamina skill level. Tested on PS5: the game keeps an edited level.', 'tested', 'level', 0xdef0d42f, 'stamina', LUCIA_JASON),
-    Spec('health_points', 'fitness', 'Health points', 'Points earned toward the next health level.', 'tested', 'count', 0x53f5b035, 'health', LUCIA_JASON),
-    Spec('stamina_points', 'fitness', 'Stamina points', 'Points earned toward the next stamina level.', 'caution', 'count', 0x53f5b035, 'stamina', LUCIA_JASON),
-    Spec('workouts', 'fitness', 'Workouts completed', 'Gym workouts finished.', 'caution', 'count', 'numworkoutscompleted', 0, LUCIA_JASON),
-    Spec('meditations', 'fitness', 'Meditations', 'Meditation sessions.', 'caution', 'count', 'totalmeditations', 0, LUCIA_JASON),
+    Spec('overpowers_health', 'skills', 'Health overpowers', 'Shown in the game as HEALTH OVERPOWERS. Tested on PS5: the game keeps an edited value.', 'tested', 'count', OVERPOWERS, 'health', LUCIA_JASON),
+    Spec('overpowers_stamina', 'skills', 'Stamina overpowers', 'Shown in the game as STAMINA OVERPOWERS. Tested on PS5: the game keeps an edited value.', 'tested', 'count', OVERPOWERS, 'stamina', LUCIA_JASON),
+    Spec('overpowers_focus', 'skills', 'Focus overpowers', 'Shown in the game as FOCUS OVERPOWERS.', 'caution', 'count', OVERPOWERS, 'focus', LUCIA_JASON),
+    Spec('buffs_health', 'skills', 'Health buffs', 'Shown in the game as HEALTH BUFFS. Tested on PS5: the game keeps an edited value.', 'tested', 'count', BUFFS, 'health', LUCIA_JASON),
+    Spec('buffs_stamina', 'skills', 'Stamina buffs', 'Shown in the game as STAMINA BUFFS.', 'caution', 'count', BUFFS, 'stamina', LUCIA_JASON),
+    Spec('buffs_focus', 'skills', 'Focus buffs', 'Shown in the game as FOCUS BUFFS.', 'caution', 'count', BUFFS, 'focus', LUCIA_JASON),
+    Spec('workouts', 'skills', 'Workouts completed', 'Gym workouts finished.', 'caution', 'count', 'numworkoutscompleted', 0, LUCIA_JASON),
+    Spec('meditations', 'skills', 'Meditations', 'Meditation sessions.', 'caution', 'count', 'totalmeditations', 0, LUCIA_JASON),
+    Spec('time_played', 'time', 'Time played', 'Shown in the game as TIME PLAYED. The total is Lucia plus Jason.', 'caution', 'ms', 'totalplayingtimems', 0, LUCIA_JASON),
     Spec('time_onfoot', 'time', 'Time on foot', 'Time spent out of vehicles.', 'caution', 'ms', 'time', 'travelledfoot', LUCIA_JASON),
     Spec('time_invehicle', 'time', 'Time in vehicles', 'Time spent in any vehicle.', 'caution', 'ms', 'time', 'invehicle', LUCIA_JASON),
-    Spec('dist_total', 'time', 'Distance travelled', 'All distance, on foot and in vehicles.', 'caution', 'distance', 'dist', 'travelled', LUCIA_JASON),
+    Spec('dist_total', 'time', 'Distance travelled', 'All distance, on foot and in vehicles. The game-wide figure includes vehicles; the per-character ones are on foot.', 'caution', 'distance', 'dist', 'travelled', LUCIA_JASON),
     Spec('dist_onfoot', 'time', 'Distance on foot', 'Distance covered out of vehicles.', 'caution', 'distance', 'dist', 'travelledfoot', LUCIA_JASON),
     Spec('dist_invehicle', 'time', 'Distance in vehicles', 'Distance covered in any vehicle.', 'caution', 'distance', 'dist', 'invehicle', LUCIA_JASON),
 ] + [Spec('time_' + q, 'time', 'Time spent ' + label, 'Recorded time for this activity.', 'caution', 'ms', 'time', q, LUCIA_JASON)
@@ -309,36 +316,45 @@ FEATURED = [
     Spec('earned_' + q, 'earnings', label, 'A record of money earned. It does not add money: use the Money tab for that.', 'tested', 'money', 0xd5188146, q, LUCIA_JASON)
     for q, label in (('buckme', 'Earned through BuckMe'), ('tasks', 'Earned from tasks'), ('robberies', 'Earned from robberies'),
                      ('safe', 'Taken from safes'), ('till', 'Taken from tills'), ('pickups', 'Picked up'))] + [
-    Spec('wanted_any', 'wanted', 'Wanted levels escaped', 'How often you got away from the police.', 'caution', 'count', 'evadedwantedlevel', 'any', LUCIA_JASON),
-] + [Spec('wanted_l%d' % n, 'wanted', 'Escaped at ' + STARS(n), 'How often you got away at this wanted level.', 'caution', 'count', 'evadedwantedlevel', 'level%d' % n, LUCIA_JASON) for n in range(1, 7)] + [
+    Spec('times_wanted', 'wanted', 'Times wanted', 'Shown in the game as TIMES WANTED.', 'caution', 'count', 'reachedwantedlevel', 'level1', LUCIA_JASON),
+    Spec('stars_gained', 'wanted', 'Wanted stars gained', 'Shown in the game as TOTAL WANTED STARS GAINED.', 'caution', 'count', 'reachedwantedlevel', 'any', LUCIA_JASON),
+    Spec('stars_lost', 'wanted', 'Wanted stars lost', 'Shown in the game as WANTED STARS LOST.', 'caution', 'count', 'evadedwantedlevel', 'any', LUCIA_JASON),
+] + [Spec('evaded_l%d' % n, 'wanted', '%d-star wanted levels evaded' % n, 'How often you got away at this wanted level.', 'caution', 'count', 'evadedwantedlevel', 'level%d' % n, LUCIA_JASON) for n in range(1, 7)] + [
     Spec('wanted_time_any', 'wanted', 'Time wanted', 'Total time with a wanted level.', 'caution', 'ms', 'timeinwantedlevel', 'any', LUCIA_JASON),
 ] + [Spec('wanted_time_l%d' % n, 'wanted', 'Time at ' + STARS(n), 'Total time spent at this wanted level.', 'caution', 'ms', 'timeinwantedlevel', 'level%d' % n, LUCIA_JASON) for n in range(1, 7)] + [
-    Spec('kills', 'records', 'Kills', 'Combat record.', 'caution', 'count', 'kills', 0, LUCIA_JASON),
+    Spec('weapon_kills', 'records', 'Weapon kills', 'Shown in the game as WEAPON KILLS.', 'caution', 'count', 'kills', 'armed', LUCIA_JASON),
+    Spec('runover_kills', 'records', 'Hit and run kills', 'Shown in the game as HIT & RUN KILLS.', 'caution', 'count', 'kills', 'runover', LUCIA_JASON),
+    Spec('driveby_kills', 'records', 'Drive-by kills', 'Shown in the game as DRIVE-BY KILLS.', 'caution', 'count', 'kills', 'driveby', LUCIA_JASON),
+    Spec('vehicleweapon_kills', 'records', 'Weaponized vehicle kills', 'Shown in the game as WEAPONIZED VEHICLE KILLS.', 'caution', 'count', 'kills', 'vehicleweapon', LUCIA_JASON),
+    Spec('kills', 'records', 'Kills, all kinds', 'Every kill together.', 'caution', 'count', 'kills', 0, LUCIA_JASON),
     Spec('headshots', 'records', 'Headshots', 'Combat record.', 'caution', 'count', 'headshots', 0, LUCIA_JASON),
-    Spec('shots', 'records', 'Shots fired', 'Combat record.', 'caution', 'count', 'shots', 0, LUCIA_JASON),
-    Spec('deaths', 'records', 'Deaths', 'How often you were killed.', 'caution', 'count', 'deaths', 0, LUCIA_JASON),
+    Spec('shots', 'records', 'Shots fired', 'Shown in the game as SHOTS FIRED.', 'caution', 'count', 'numused', 'ammo', LUCIA_JASON),
+    Spec('deaths', 'records', 'Deaths', 'Shown in the game as TOTAL DEATHS.', 'caution', 'count', 'deaths', 0, LUCIA_JASON),
     Spec('busted', 'records', 'Times busted', 'How often you were arrested.', 'caution', 'count', 'busted', 0, LUCIA_JASON),
+    Spec('stolen', 'records', 'Vehicles stolen', 'Shown in the game as VEHICLES STOLEN.', 'caution', 'count', 'stolen', 'vehicle', LUCIA_JASON),
+    Spec('stolen_slimjim', 'records', 'Vehicles stolen with a slim jim', 'Shown in the game as VEHICLES STOLEN WITH SLIM JIM.', 'caution', 'count', 'stolenvehiclesbymethod', 'slimjim', LUCIA_JASON),
+    Spec('stolen_window', 'records', 'Vehicles stolen by breaking a window', 'Shown in the game as VEHICLES STOLEN BY BREAKING WINDOW.', 'caution', 'count', 'stolenvehiclesbymethod', 'smashedwindow', LUCIA_JASON),
     Spec('carjackings', 'records', 'Carjackings', 'Vehicle record.', 'caution', 'count', 'carjackings', 0, LUCIA_JASON),
     Spec('holdups', 'records', 'Holdups', 'Store holdups.', 'caution', 'count', 'holdups', 0, LUCIA_JASON),
-    Spec('fish', 'records', 'Fish caught', 'Fishing record.', 'caution', 'count', 'kills', 'fish', LUCIA_JASON),
+    Spec('fish', 'records', 'Fish caught', 'Shown in the game as FISH CAUGHT.', 'caution', 'count', 'totalcaught', 'fish', LUCIA_JASON),
     Spec('photo_animal', 'records', 'Animals photographed', 'Wildlife photos taken.', 'caution', 'count', 'photographed', 'animal', LUCIA_JASON),
-    Spec('rentals', 'records', 'Vehicle rentals', 'Vehicles rented.', 'caution', 'count', 'numpurchased', 'rentals', LUCIA_JASON),
+    Spec('rentals', 'records', 'Vehicles rented', 'Shown in the game as VEHICLES RENTED.', 'caution', 'count', 'numpurchased', 'rentals', LUCIA_JASON),
     Spec('taxis', 'records', 'Taxi rides', 'Taxis paid for.', 'caution', 'count', 'numpurchased', 'taxis', LUCIA_JASON),
-    Spec('masks', 'records', 'Masks used', 'How often you put on a mask.', 'caution', 'count', 'numtimesused', 'masks', LUCIA_JASON),
-    Spec('armor', 'records', 'Armor used', 'How often you put on body armor.', 'caution', 'count', 'numtimesused', 'armor', LUCIA_JASON),
+    Spec('masks', 'records', 'Masks equipped', 'Shown in the game as MASKS EQUIPPED.', 'caution', 'count', 'numtimesused', 'masks', LUCIA_JASON),
+    Spec('armor', 'records', 'Armor equipped', 'Shown in the game as ARMOR EQUIPPED.', 'caution', 'count', 'numtimesused', 'armor', LUCIA_JASON),
     Spec('fenced_packages', 'records', 'Packages fenced', 'Items sold to fences.', 'caution', 'count', 'fenced', 'packages', LUCIA_JASON),
     Spec('fenced_doubloons', 'records', 'Doubloons fenced', 'Items sold to fences.', 'caution', 'count', 'fenced', 'doubloons', LUCIA_JASON),
     Spec('fenced_meteorites', 'records', 'Meteorites fenced', 'Items sold to fences.', 'caution', 'count', 'fenced', 'meteorites', LUCIA_JASON),
-    Spec('stunts_total', 'trophies', 'Stunts completed', 'All stunts together.' + TROPHY_NOTE, 'danger', 'count', 'stuntscompleted', 'totalstunts', (0,)),
-    Spec('stunt_jumps', 'trophies', 'Stunt jumps', 'Stunt jumps completed.' + TROPHY_NOTE, 'danger', 'count', 'stuntscompleted', 'stuntjumps', (0,)),
-    Spec('base_jumps', 'trophies', 'Base jumps', 'Base jumps completed.' + TROPHY_NOTE, 'danger', 'count', 'stuntscompleted', 'basejumps', (0,)),
-    Spec('knife_flights', 'trophies', 'Knife flights', 'Knife flights completed.' + TROPHY_NOTE, 'danger', 'count', 'stuntscompleted', 'knifeflights', (0,)),
-    Spec('challenges', 'trophies', 'Challenges completed', 'All challenges together.' + TROPHY_NOTE, 'danger', 'count', 'challengescompleted', 0, (0,)),
-    Spec('discoverables', 'trophies', 'Discoverables found', 'Places and things discovered.' + TROPHY_NOTE, 'danger', 'count', 'discoverablesfound', 0, (0,)),
-    Spec('collectibles', 'trophies', 'Collectibles collected', 'The collectibles counter.' + TROPHY_NOTE, 'danger', 'count', 'numcollected', 'collectibles', (0,)),
-    Spec('collectible_cards', 'trophies', 'Collectible cards', 'Cards collected.' + TROPHY_NOTE, 'danger', 'count', 'numcollected', 'collectiblecards', (0,)),
-    Spec('collectible_sets', 'trophies', 'Complete collectible sets', 'Finished collectible sets.' + TROPHY_NOTE, 'danger', 'count', 'numcollected', 'allsets', (0,)),
-    Spec('vaults', 'trophies', 'Vaults robbed', 'Vaults robbed so far.' + TROPHY_NOTE, 'danger', 'count', 'robbedvaults', 0, (0,)),
+    Spec('stunts_total', 'trophies', 'Stunt completions, repeats included', 'Counts a stunt again each time you redo it. The game shows unique stunts, from the completion percentage.', 'danger', 'count', 'stuntscompleted', 'totalstunts', (0,)),
+    Spec('stunt_jumps', 'trophies', 'Stunt jumps', 'Stunt jumps completed.', 'danger', 'count', 'stuntscompleted', 'stuntjumps', (0,)),
+    Spec('base_jumps', 'trophies', 'Base jumps', 'Base jumps completed.', 'danger', 'count', 'stuntscompleted', 'basejumps', (0,)),
+    Spec('knife_flights', 'trophies', 'Knife flights', 'Knife flights completed.', 'danger', 'count', 'stuntscompleted', 'knifeflights', (0,)),
+    Spec('challenges', 'trophies', 'Challenges completed', 'All challenges together.', 'danger', 'count', 'challengescompleted', 0, (0,)),
+    Spec('discoverables', 'trophies', 'Discoverables found', 'Places and things discovered.', 'danger', 'count', 'discoverablesfound', 0, (0,)),
+    Spec('collectibles', 'trophies', 'Collectibles collected', 'The collectibles counter.', 'danger', 'count', 'numcollected', 'collectibles', (0,)),
+    Spec('collectible_cards', 'trophies', 'Collectible cards', 'Cards collected.', 'danger', 'count', 'numcollected', 'collectiblecards', (0,)),
+    Spec('collectible_sets', 'trophies', 'Complete collectible sets', 'Finished collectible sets.', 'danger', 'count', 'numcollected', 'allsets', (0,)),
+    Spec('vaults', 'trophies', 'Vaults robbed', 'Shown in the game as VAULTS ROBBED.', 'danger', 'count', 'robbedvaults', 0, (0,)),
 ] + [Spec('gadget_' + q, 'gadgets', label, 'Marks the gadget as obtained. It may not put the gadget in your inventory.', 'tested' if q == 'headphones' else 'caution', 'flag', 'acquired', q, (0, 1, 2))
      for q, label in (('metaldetector', 'Metal detector'), ('binoculars', 'Binoculars'), ('flashlight', 'Flashlight'),
                       ('masks', 'Masks'), ('headphones', 'Headphones'))]
@@ -422,7 +438,16 @@ def featured(sec_txt):
 def stats_table(sec_txt):
     """Every stat row (compact columns) with readable names, for the full stats browser."""
     groups, tables = stat_rows(sec_txt)
+    A, Q, O = tables['base'], tables['qual'], tables['owner']
+    labels = {}
+    for g, G in groups.items():
+        for r in range(len(G['value'])):
+            lab = gamelabels.GAME_LABELS.get((A[G['base'][r]], Q[G['qual'][r]], O[G['owner'][r]]))
+            if lab:
+                labels['%s:%d' % (g, r)] = lab
+    names = table_names(tables)
+    names['qual_labels'] = {i: gamelabels.QUALIFIER_LABELS[h] for i, h in enumerate(Q) if h in gamelabels.QUALIFIER_LABELS}
     return {'groups': [{'key': g, 'type': G['type'], 'base': G['base'], 'qual': G['qual'], 'owner': G['owner'], 'value': G['value']}
                        for g, G in groups.items() if G['value']],
-            'names': table_names(tables),
+            'names': names, 'labels': labels,
             'protected': {MONEY_GROUP: list(MONEY_BASES)}}
