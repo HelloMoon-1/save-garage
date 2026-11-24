@@ -16,6 +16,7 @@ import json, math, re
 from collections import namedtuple
 
 import gamelabels
+import itemnames
 import money
 import statnames
 
@@ -210,8 +211,19 @@ def _apply_stats(txt, changes):
 
 # ---------------------------------------------------------------- ammo
 AMMO_TYPES = ('pistol', 'revolver', 'smg', 'rifle', 'shotgun', 'sniper', 'marksman', 'mg', 'minigun', 'sporting',
-              'thrown_grenade')
+              'thrown_grenade', 'thrown_bomb', 'launched_rpg')
 AMMO_ITEMS = {joaat('ammo_' + t): t for t in AMMO_TYPES}
+AMMO_ITEMS[0x785b097b] = 'speargun'          # its ID isn't known as a name, but the game's text calls it Speargun Ammo
+
+
+def _sentence(text):
+    """'Assault Rifle Ammo' -> 'Assault rifle ammo'. Words in capitals, such as SMG, stay as they are."""
+    words = text.split(' ')
+    return ' '.join(words[:1] + [w.lower() if w[:1].isupper() and w[1:].islower() else w for w in words[1:]])
+
+
+# What the game calls each ammo type, from its text.
+AMMO_LABELS = {t: _sentence(itemnames.ITEM_LABELS.get(h, t.capitalize() + ' ammo')) for h, t in AMMO_ITEMS.items()}
 SLOT_AMMO = joaat('slotid_ammo')
 # Highest amounts seen in real saves. The game probably cuts anything above its own limit back on load.
 AMMO_SEEN_MAX = {'rifle': 300, 'smg': 300, 'minigun': 300, 'sporting': 200, 'marksman': 120, 'pistol': 100,
@@ -227,7 +239,8 @@ def ammo(sec_txt):
         v = money._inventory(sec_txt, n)
         for r, item in enumerate(v['item']):
             if item & M32 in AMMO_ITEMS and v['slot'][r] & M32 == SLOT_AMMO:
-                out.append({'inv': n, 'idx': r, 'type': AMMO_ITEMS[item & M32], 'value': v['qty'][r]})
+                t = AMMO_ITEMS[item & M32]
+                out.append({'inv': n, 'idx': r, 'type': t, 'label': AMMO_LABELS[t], 'value': v['qty'][r]})
     return out
 
 
@@ -247,7 +260,7 @@ def _apply_ammo(txt, changes):
         if nv == a['value']:
             continue
         txt = money._set(txt, money._qty_span(txt, a['inv']), a['idx'], a['value'], nv)
-        log.append({'what': 'ammo', 'inv': a['inv'], 'type': a['type'], 'from': a['value'], 'to': nv})
+        log.append({'what': 'ammo', 'inv': a['inv'], 'type': a['type'], 'label': a['label'], 'from': a['value'], 'to': nv})
     return txt, log
 
 
@@ -361,11 +374,10 @@ FEATURED = [
 
 
 # ---------------------------------------------------------------- weapons each character carries (read only)
-import itemnames
 _ITEMS = {joaat(n): n for n in itemnames.ITEM_NAMES}
 _WEAPON_GROUP = {'pistol': 'pistol', 'revolver': 'revolver', 'smg': 'SMG', 'autorifle': 'rifle', 'tacrifle': 'tactical rifle', 'shotgun': 'shotgun',
                  'sniper': 'sniper rifle', 'launched': 'launcher'}
-_WEAPON_WORD = {'fiftycal': '.50', 'combatpdw': 'combat PDW', 'combatmg': 'combat MG', 'pumpaction': 'pump-action', 'sbs': 'short-barrel',
+_WEAPON_WORD = {'fiftycal': '.50', 'combatpdw': 'combat PDW', 'combatmg': 'combat MG', 'pumpaction': 'pump-action', 'sbs': 'short-barrel', 'gpmg': 'GPMG',
                 'hunter': 'hunting', 'unarmed': 'fists'}
 
 
@@ -377,13 +389,14 @@ def weapon_label(name):
     group, word = parts[1], parts[2] if len(parts) > 3 or parts[1] != 'unarmed' else 'unarmed'
     variant = parts[3] if len(parts) > 3 else 'default'
     text = ' '.join(x for x in (_WEAPON_WORD.get(word, word), _WEAPON_GROUP.get(group, '')) if x)
-    if variant not in ('default', group):
+    if variant not in ('default', group) and variant not in text:
         text += ' (%s)' % variant
     return text[:1].upper() + text[1:]
 
 
 def weapons(sec_txt):
-    """Weapons in each protagonist's weapon list: [{inv, id, name, label}]. inv 0 = Lucia, inv 1 = Jason."""
+    """Weapons in each protagonist's weapon list: [{inv, id, name, label, kind}]. inv 0 = Lucia, inv 1 = Jason.
+    label is what the game calls the weapon; kind is the type of weapon when the label doesn't say it."""
     root = json.loads(sec_txt)['$0x7a47cb05']['$0xd3f59a5e']['$0x789bdd41']
     out = []
     for n in range(min(2, len(root))):
@@ -394,7 +407,15 @@ def weapons(sec_txt):
                 continue
             seen.add(h)
             name = _ITEMS.get(h)
-            out.append({'inv': n, 'id': '%08x' % h, 'name': name, 'label': weapon_label(name) if name else 'Unknown weapon'})
+            if name == 'weaponspec_unarmed_default':
+                continue
+            kind = weapon_label(name) if name else ''
+            label = itemnames.ITEM_LABELS.get(h)
+            if not label:                     # '' when the weapon isn't known yet
+                label, kind = kind, ''
+            elif kind.split(' ')[0].lower() in label.lower().replace(' ', ''):
+                kind = ''
+            out.append({'inv': n, 'id': '%08x' % h, 'name': name, 'label': label, 'kind': kind})
     return out
 
 

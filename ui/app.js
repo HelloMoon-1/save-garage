@@ -13,8 +13,6 @@
   const MONEY_GROUP = '$0x97232209';
   const PS5_TRANSFER = 'Settings, then System, then System Software, then Data Transfer';
   const PS5_DELETE = 'Settings, then Saved Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete';
-  const AMMO = {pistol: 'Pistol', revolver: 'Revolver', smg: 'SMG', rifle: 'Rifle', shotgun: 'Shotgun', sniper: 'Sniper', marksman: 'Marksman',
-                mg: 'Machine gun', minigun: 'Minigun', sporting: 'Sporting', thrown_grenade: 'Grenades'};
   const CATS = [
     ['progress', 'Progress', 'Percentages and counters from the stats screen.'],
     ['skills', 'Skills', 'Overpowers and buffs for health, stamina and focus, plus workouts and meditations. The total updates itself to Lucia plus Jason.'],
@@ -403,14 +401,16 @@
     const block = (inv, who) => {
       const rows = by(inv);
       if (!rows.length) return '';
-      const guns = (d.weapons || []).filter(w => w.inv === inv).map(w => `<li>${esc(w.label)}</li>`).join('');
+      const carried = (d.weapons || []).filter(w => w.inv === inv), unnamed = carried.filter(w => !w.label).length;
+      const guns = carried.filter(w => w.label).map(w => `<li>${esc(w.label)}${w.kind ? ` <span class="kind">${esc(w.kind)}</span>` : ''}</li>`).join('')
+        + (unnamed ? `<li class="kind">${unnamed} more not identified yet</li>` : '');
       return `<div class="group"><div class="section-head"><h3>${who}</h3><button class="btn small" data-act="fillall" data-scope="ammo-${inv}">Fill all to the highest seen</button></div>
         ${guns ? `<p class="note">Weapons carried</p><ul class="weapons">${guns}</ul>` : ''}
         <div class="fields">${rows.map(a => {
           const top = seen[a.type] || a.value;
-          return `<div class="field"><div class="name">${esc(AMMO[a.type] || a.type)}<span class="help">Highest seen in a real save: ${nf.format(top)}.</span></div>
-            <div class="inputs" data-scope="ammo-${inv}">${cell({kind: 'ammo', key: `${a.inv}:${a.idx}`, label: 'Rounds', value: a.value, display: String(a.value), unit: 'count', type: 'int', min: 1, max: 9999,
-              attrs: `data-inv="${a.inv}" data-idx="${a.idx}" data-label="${esc((AMMO[a.type] || a.type) + ' ammo, ' + who)}" data-top="${top}"`,
+          return `<div class="field"><div class="name">${esc(a.label)}<span class="help">Highest seen in a real save: ${nf.format(top)}.</span></div>
+            <div class="inputs" data-scope="ammo-${inv}">${cell({kind: 'ammo', key: `${a.inv}:${a.idx}`, label: a.type.startsWith('thrown') ? 'How many' : 'Rounds', value: a.value, display: String(a.value), unit: 'count', type: 'int', min: 1, max: 9999,
+              attrs: `data-inv="${a.inv}" data-idx="${a.idx}" data-label="${esc(a.label + ', ' + who)}" data-top="${top}"`,
               extra: `<button class="btn small" data-act="fill" data-to="${top}">Fill</button>`})}</div></div>`;
         }).join('')}</div></div>`;
     };
@@ -466,8 +466,8 @@
         const name = bn(g.base[r]) + (qn(g.qual[r]) ? '.' + qn(g.qual[r]) : '');
         const game = pretty(labels[`${g.key}:${r}`]);
         rows.push({g: g.key, type: g.type, r, b: g.base[r], q: g.qual[r], o: g.owner[r], v: g.value[r], vary: vary.has(r),
-          named: !!(n.base[g.base[r]] || n.qual[g.qual[r]] || game), game, name, owner: on(g.owner[r]),
-          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + on(g.owner[r]) + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
+          named: !!(n.base[g.base[r]] || n.qual[g.qual[r]] || game), game, name, owner: on(g.owner[r]), qlab: n.qual[g.qual[r]] ? ql[g.qual[r]] || '' : '',
+          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + (ql[g.qual[r]] || '') + ' ' + on(g.owner[r]) + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
       }
     }
     rows.sort((a, b) => (!!b.game - !!a.game) || (b.named - a.named) || (a.game || a.name).localeCompare(b.game || b.name) || a.b - b.b || a.q - b.q || a.o - b.o);
@@ -504,7 +504,7 @@
       else if (x.type === 'bool') input = `<label class="toggle"><input type="checkbox" ${attrs} data-type="bool" data-unit="flag" data-orig="${x.v ? 1 : 0}" ${(dr ? dr.newValue : x.v) ? 'checked' : ''}> ${(dr ? dr.newValue : x.v) ? 'true' : 'false'}</label>`;
       else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${TYPE_MAX[x.type]}" step="${x.type === 'float' ? 'any' : 1}"
         data-init="${esc(String(x.v))}" data-orig="${esc(JSON.stringify(x.v))}" value="${esc(String(dr ? dr.newValue : x.v))}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}</td><td>${input}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}</td><td>${input}</td></tr>`;
     }).join('')}</tbody></table>${list.length > shown.length ? `<div class="more"><button class="btn small" data-act="more">Show more (${nf.format(list.length - shown.length)} left)</button></div>` : ''}`;
   }
 

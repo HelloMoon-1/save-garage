@@ -19,7 +19,7 @@ The whole app state, polled about once a second by the UI.
     "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
     "subtitle": "Mission name",
     "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 1985000}],
-    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "value": 280}],
+    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
     "applied": {"money": [], "ammo": [], "stats": []} | null
@@ -33,8 +33,11 @@ The whole app state, polled about once a second by the UI.
 
 ## GET /api/slot?file=…
 
-Editor data for one save: featured stats with the exact rows to edit, ammo, and the highest value of each seen
-across all downloaded saves.
+Editor data for one save: featured stats with the exact rows to edit, ammo, the weapons each character carries,
+and the highest value of each seen across all downloaded saves. Each weapon is
+`{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:
+`label` is what the game calls it (empty while the weapon isn't identified) and `kind` is the type of weapon when the
+label doesn't say it.
 
 ## GET /api/stats?file=…
 

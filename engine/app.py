@@ -379,9 +379,6 @@ def slot_stats(slot):
     return cached(('stats', slot['file']), build)
 
 
-AMMO_LABEL = {'smg': 'SMG', 'mg': 'MG', 'thrown_grenade': 'grenade'}
-
-
 def summarize(plog):
     out = []
     for x in plog:
@@ -389,7 +386,7 @@ def summarize(plog):
         if w == 'money':
             out.append({'kind': x.get('kind'), 'from': x.get('from'), 'to': x.get('to')})
         elif w == 'ammo':
-            out.append({'kind': 'ammo', 'label': '%s ammo (%s)' % (AMMO_LABEL.get(x['type'], x['type']), 'Lucia' if x['inv'] == 0 else 'Jason'),
+            out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
         elif w == 'stat':
             out.append({'kind': 'stat', 'label': x.get('label') or 'Stat', 'from': x['from'], 'to': x['to']})
