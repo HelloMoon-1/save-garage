@@ -291,9 +291,9 @@ FEATURED = [
     Spec('story_pct', 'progress', 'Story completion', 'The percentage on the stats screen. Changing it does not unlock or skip missions.', 'caution', 'percent', 0xd3526971, 'story', (0,)),
     Spec('styles_pct', 'progress', 'Second completion percentage', 'Shown next to story completion. Likely outfits and styles collected.', 'caution', 'percent', 0xd3526971, 'styles', (0,)),
     Spec('side_tasks', 'progress', 'Side tasks completed', 'Side tasks finished.', 'caution', 'count', 'sidetaskscompleted', 0, LUCIA_JASON),
-    Spec('health_level', 'fitness', 'Health level', 'Health skill level. Not tested yet: the game may recalculate it from health points.', 'caution', 'level', 0xdef0d42f, 'health', LUCIA_JASON),
-    Spec('stamina_level', 'fitness', 'Stamina level', 'Stamina skill level. Not tested yet: the game may recalculate it from stamina points.', 'caution', 'level', 0xdef0d42f, 'stamina', LUCIA_JASON),
-    Spec('health_points', 'fitness', 'Health points', 'Points earned toward the next health level.', 'caution', 'count', 0x53f5b035, 'health', LUCIA_JASON),
+    Spec('health_level', 'fitness', 'Health level', 'Health skill level. Tested on PS5: the game keeps an edited level.', 'tested', 'level', 0xdef0d42f, 'health', LUCIA_JASON),
+    Spec('stamina_level', 'fitness', 'Stamina level', 'Stamina skill level. Tested on PS5: the game keeps an edited level.', 'tested', 'level', 0xdef0d42f, 'stamina', LUCIA_JASON),
+    Spec('health_points', 'fitness', 'Health points', 'Points earned toward the next health level.', 'tested', 'count', 0x53f5b035, 'health', LUCIA_JASON),
     Spec('stamina_points', 'fitness', 'Stamina points', 'Points earned toward the next stamina level.', 'caution', 'count', 0x53f5b035, 'stamina', LUCIA_JASON),
     Spec('workouts', 'fitness', 'Workouts completed', 'Gym workouts finished.', 'caution', 'count', 'numworkoutscompleted', 0, LUCIA_JASON),
     Spec('meditations', 'fitness', 'Meditations', 'Meditation sessions.', 'caution', 'count', 'totalmeditations', 0, LUCIA_JASON),
@@ -306,7 +306,7 @@ FEATURED = [
      for q, label in (('walking', 'walking'), ('jogging', 'jogging'), ('running', 'running'), ('sprinting', 'sprinting'),
                       ('swimming', 'swimming'), ('underwater', 'underwater'), ('aircraft', 'flying'), ('watercraft', 'on boats'),
                       ('stealth', 'in stealth'), ('cover', 'in cover'), ('parachute', 'parachuting'), ('dancing', 'dancing'))] + [
-    Spec('earned_' + q, 'earnings', label, 'A record of money earned. It does not add money: use the Money tab for that.', 'caution', 'money', 0xd5188146, q, LUCIA_JASON)
+    Spec('earned_' + q, 'earnings', label, 'A record of money earned. It does not add money: use the Money tab for that.', 'tested', 'money', 0xd5188146, q, LUCIA_JASON)
     for q, label in (('buckme', 'Earned through BuckMe'), ('tasks', 'Earned from tasks'), ('robberies', 'Earned from robberies'),
                      ('safe', 'Taken from safes'), ('till', 'Taken from tills'), ('pickups', 'Picked up'))] + [
     Spec('wanted_any', 'wanted', 'Wanted levels escaped', 'How often you got away from the police.', 'caution', 'count', 'evadedwantedlevel', 'any', LUCIA_JASON),
@@ -339,7 +339,7 @@ FEATURED = [
     Spec('collectible_cards', 'trophies', 'Collectible cards', 'Cards collected.' + TROPHY_NOTE, 'danger', 'count', 'numcollected', 'collectiblecards', (0,)),
     Spec('collectible_sets', 'trophies', 'Complete collectible sets', 'Finished collectible sets.' + TROPHY_NOTE, 'danger', 'count', 'numcollected', 'allsets', (0,)),
     Spec('vaults', 'trophies', 'Vaults robbed', 'Vaults robbed so far.' + TROPHY_NOTE, 'danger', 'count', 'robbedvaults', 0, (0,)),
-] + [Spec('gadget_' + q, 'gadgets', label, 'Marks the gadget as obtained. It may not put the gadget in your inventory.', 'caution', 'flag', 'acquired', q, (0, 1, 2))
+] + [Spec('gadget_' + q, 'gadgets', label, 'Marks the gadget as obtained. It may not put the gadget in your inventory.', 'tested' if q == 'headphones' else 'caution', 'flag', 'acquired', q, (0, 1, 2))
      for q, label in (('metaldetector', 'Metal detector'), ('binoculars', 'Binoculars'), ('flashlight', 'Flashlight'),
                       ('masks', 'Masks'), ('headphones', 'Headphones'))]
 

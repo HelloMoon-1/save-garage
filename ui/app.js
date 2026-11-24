@@ -414,8 +414,8 @@
               extra: `<button class="btn small" data-act="fill" data-to="${top}">Fill</button>`})}</div></div>`;
         }).join('')}</div></div>`;
     };
-    return `<div class="section-head"><h2>Ammo</h2>${riskTag('caution')}
-        <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Amounts above the highest seen will probably be cut back by the game when the save loads.</p></div>
+    return `<div class="section-head"><h2>Ammo</h2>${riskTag('tested')}
+        <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Edited amounts up to the highest seen are kept by the game.</p></div>
       ${d.ammo.length ? block(0, 'Lucia') + block(1, 'Jason') : '<div class="empty">Neither character is carrying ammo in this save.</div>'}`;
   }
 
@@ -426,7 +426,8 @@
                           money: ['count', null, 1, '$'], count: ['count', null, 1, ''], level: ['count', null, 1, ''], flag: ['flag', 'bool', 1, '']})[f.unit] || ['count', null, 1, ''];
     const rows = f => {
       const [unit, forced, step, unitLabel] = unitOf(f);
-      const own = f.risk === 'danger' && f.category !== 'trophies' ? riskTag('danger') : '';
+      const allSame = list => list.every(x => x.risk === f.risk);
+      const own = f.risk === 'danger' && f.category !== 'trophies' ? riskTag('danger') : f.risk === 'tested' && !allSame(d.featured.filter(x => x.category === f.category)) ? riskTag('tested') : '';
       return `<div class="field"><div class="name">${esc(f.label)} ${own}<span class="help">${esc(f.help)}</span></div>
         <div class="inputs" data-spec="${esc(f.id)}">${f.entries.filter(e => !(f.autoTotal && e.owner === 0)).map(e => {
           const type = forced || e.type;
@@ -442,10 +443,10 @@
     const cats = CATS.map(([id, name, help]) => {
       const list = d.featured.filter(f => f.category === id);
       if (!list.length) return '';
-      const worst = list.some(f => f.risk === 'danger') && list.every(f => f.risk === 'danger') ? 'danger' : 'caution';
+      const worst = list.every(f => f.risk === 'danger') ? 'danger' : list.every(f => f.risk === 'tested') ? 'tested' : 'caution';
       return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
     }).join('');
-    return `<div class="callout" style="margin-bottom:24px">These edits haven’t been tried on a PS5 yet. Change a few things, send the save, and check it loads before changing more.</div>${cats}`;
+    return `<div class="callout" style="margin-bottom:24px">Fitness levels, money-earned records and the headphones flag have been tested on a PS5 and are kept by the game. The others haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
   }
 
   // ---- all stats browser
