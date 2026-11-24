@@ -471,6 +471,7 @@ def stats_table(sec_txt):
                 labels['%s:%d' % (g, r)] = lab
     names = table_names(tables)
     names['qual_labels'] = {i: gamelabels.QUALIFIER_LABELS[h] for i, h in enumerate(Q) if h in gamelabels.QUALIFIER_LABELS}
+    names['owner_labels'] = {i: gamelabels.OWNER_LABELS[h] for i, h in enumerate(O) if i > 2 and h in gamelabels.OWNER_LABELS}
     return {'groups': [{'key': g, 'type': G['type'], 'base': G['base'], 'qual': G['qual'], 'owner': G['owner'], 'value': G['value']}
                        for g, G in groups.items() if G['value']],
             'names': names, 'labels': labels,

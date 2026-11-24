@@ -453,8 +453,8 @@
     const t = S.stats[file];
     if (t.index) return t.index;
     const n = t.names;
-    const ql = n.qual_labels || {};
-    const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? (ql[i] === ql[i].toUpperCase() ? ql[i].toLowerCase() : ql[i]) : `#${i}`))), on = i => n.owner[i] || `#${i}`;
+    const ql = n.qual_labels || {}, ol = n.owner_labels || {};
+    const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? (ql[i] === ql[i].toUpperCase() ? ql[i].toLowerCase() : ql[i]) : `#${i}`))), on = i => ol[i] || n.owner[i] || `#${i}`;
     const labels = t.labels || {};
     const pretty = l => l ? (l.charAt(0) + l.slice(1).toLowerCase()).replace(/\b(lucia|jason)\b/g, w => w[0].toUpperCase() + w.slice(1)) : '';
     const prot = new Set((t.protected[MONEY_GROUP] || []).map(String));
@@ -466,7 +466,7 @@
         const game = pretty(labels[`${g.key}:${r}`]);
         rows.push({g: g.key, type: g.type, r, b: g.base[r], q: g.qual[r], o: g.owner[r], v: g.value[r], vary: vary.has(r),
           named: !!(n.base[g.base[r]] || n.qual[g.qual[r]] || game), game, name, owner: on(g.owner[r]), qlab: n.qual[g.qual[r]] ? ql[g.qual[r]] || '' : '',
-          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + (ql[g.qual[r]] || '') + ' ' + on(g.owner[r]) + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
+          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + (ql[g.qual[r]] || '') + ' ' + on(g.owner[r]) + ' ' + (n.owner[g.owner[r]] || '') + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
       }
     }
     rows.sort((a, b) => (!!b.game - !!a.game) || (b.named - a.named) || (a.game || a.name).localeCompare(b.game || b.name) || a.b - b.b || a.q - b.q || a.o - b.o);
