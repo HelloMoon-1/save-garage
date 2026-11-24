@@ -7,3 +7,7 @@ __pycache__/
 *.spec
 .venv/
 .DS_Store
+# research notes, scratch work and save data never belong in this repo
+research*/
+dev_scratch/
+backups/

@@ -360,9 +360,13 @@ def varying_keys():
     return cached(('varies',), build)
 
 
+def slot_weapons(slot):
+    return cached(('weapons', slot['file']), lambda: savedit.weapons(savedit.section(slot_bytes(slot), money.SEC_INV)))
+
+
 def slot_detail(slot):
-    return {'file': slot['file'], 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'seen': seen_max(),
-            'applied': slot.get('applied'), 'modified': slot['modified']}
+    return {'file': slot['file'], 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
+            'seen': seen_max(), 'applied': slot.get('applied'), 'modified': slot['modified']}
 
 
 def slot_stats(slot):

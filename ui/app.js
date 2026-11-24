@@ -22,6 +22,7 @@
     ['earnings', 'Money earned', 'Records of money you earned. Changing these does not add money. Use the Money tab for that.'],
     ['wanted', 'Wanted levels', 'How often and how long the police were after you. Times are in hours.'],
     ['records', 'Records', 'Combat, vehicle and other counters.'],
+    ['trophies', 'Trophy counters', 'Counters behind some of the trophies. Raising one may make the game award the trophy the next time the counter goes up, and trophy sites such as PSNProfiles may flag that. The things a counter counts are not changed, so the numbers can stop matching.'],
     ['gadgets', 'Gadgets', 'Flags for gadgets you picked up.']];
   const TYPE_MAX = {int32: 2147483647, u32: 4294967295, int64: 9007199254740991, int16: 32767, u8: 127, float: 1e12};
   const STAGE = {
@@ -402,7 +403,9 @@
     const block = (inv, who) => {
       const rows = by(inv);
       if (!rows.length) return '';
+      const guns = (d.weapons || []).filter(w => w.inv === inv).map(w => `<li>${esc(w.label)}</li>`).join('');
       return `<div class="group"><div class="section-head"><h3>${who}</h3><button class="btn small" data-act="fillall" data-scope="ammo-${inv}">Fill all to the highest seen</button></div>
+        ${guns ? `<p class="note">Weapons carried</p><ul class="weapons">${guns}</ul>` : ''}
         <div class="fields">${rows.map(a => {
           const top = seen[a.type] || a.value;
           return `<div class="field"><div class="name">${esc(AMMO[a.type] || a.type)}<span class="help">Highest seen in a real save: ${nf.format(top)}.</span></div>
@@ -423,7 +426,8 @@
                           money: ['count', null, 1, '$'], count: ['count', null, 1, ''], level: ['count', null, 1, ''], flag: ['flag', 'bool', 1, '']})[f.unit] || ['count', null, 1, ''];
     const rows = f => {
       const [unit, forced, step, unitLabel] = unitOf(f);
-      return `<div class="field"><div class="name">${esc(f.label)} ${f.risk === 'danger' ? riskTag('danger') : ''}<span class="help">${esc(f.help)}</span></div>
+      const own = f.risk === 'danger' && f.category !== 'trophies' ? riskTag('danger') : '';
+      return `<div class="field"><div class="name">${esc(f.label)} ${own}<span class="help">${esc(f.help)}</span></div>
         <div class="inputs" data-spec="${esc(f.id)}">${f.entries.filter(e => !(f.autoTotal && e.owner === 0)).map(e => {
           const type = forced || e.type;
           const top = seen[`${f.id}:${e.owner}`];
@@ -438,7 +442,8 @@
     const cats = CATS.map(([id, name, help]) => {
       const list = d.featured.filter(f => f.category === id);
       if (!list.length) return '';
-      return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag('caution')}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
+      const worst = list.some(f => f.risk === 'danger') && list.every(f => f.risk === 'danger') ? 'danger' : 'caution';
+      return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
     }).join('');
     return `<div class="callout" style="margin-bottom:24px">These edits haven’t been tried on a PS5 yet. Change a few things, send the save, and check it loads before changing more.</div>${cats}`;
   }
