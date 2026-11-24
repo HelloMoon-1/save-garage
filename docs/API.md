@@ -1,0 +1,60 @@
+# Local API
+
+Save Garage serves its web UI and a JSON API from the same address, `http://127.0.0.1:7283` by default. Requests
+are accepted only from allowed client networks (this computer by default) with a matching `Host` header, and POST
+bodies are JSON. Long tasks run in the background: a POST returns at once and progress appears in `state.job`.
+
+## GET /api/state
+
+The whole app state, polled about once a second by the UI.
+
+```jsonc
+{
+  "console": {"host": "192.168.1.20", "name": "PS5", "hostId": "AABBCCDDEEFF", "firmware": "14230000", "sameSubnet": true} | null,
+  "paired": true,
+  "network": {"ok": true, "proxy": false} | null,     // set after POST /api/network
+  "hasSession": true,                                 // a save has been downloaded
+  "readyToUpload": false,                             // edits are saved and waiting to be sent
+  "slots": [{
+    "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
+    "subtitle": "Mission name",
+    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 1985000}],
+    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "value": 280}],
+    "modified": false,
+    "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
+    "applied": {"money": [], "ammo": [], "stats": []} | null
+  }],
+  "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
+          "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "log": []},
+  "version": "1.0.0",
+  "canQuit": false                                    // true in the desktop builds
+}
+```
+
+## GET /api/slot?file=…
+
+Editor data for one save: featured stats with the exact rows to edit, ammo, and the highest value of each seen
+across all downloaded saves.
+
+## GET /api/stats?file=…
+
+Every stat in the save as compact columns per typed group (`base`, `qual`, `owner`, `value`), the readable names
+that are known, the rows that change between the downloaded saves (`varies`) and the protected rows.
+
+## POST endpoints
+
+| Path | Body | What it does |
+|---|---|---|
+| `/api/network` | none | Checks that GarlicSaves is reachable |
+| `/api/discover` | none | Searches the network for PS5 consoles |
+| `/api/console` | `{"host": "192.168.1.20"}` | Selects a console |
+| `/api/pair` | none | Starts pairing (once per console) |
+| `/api/download` | none | Downloads, backs up and decrypts the GTA VI saves |
+| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send |
+| `/api/restore` | none | Puts the original saves back, ready to send |
+| `/api/upload` | none | Starts sending the save back to the PS5 |
+| `/api/cancel` | none | Stops the current task |
+| `/api/quit` | none | Closes Save Garage (refused while a transfer is running) |
+
+Each edit names the value it replaces (`value`) and the new one (`newValue`); an edit whose `value` no longer matches
+the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail": "…"}`.

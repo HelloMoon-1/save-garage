@@ -1,0 +1,339 @@
+"""Read and edit money in decrypted GTA VI JSAV saves.
+
+How money is stored (each part checked on a real PS5, November 2026):
+
+  Inventories[n] (n = 0 / 1, the two protagonists) have a main list of six parallel arrays:
+    Guids / ParentGuidIndices / ItemIds / SlotIds / Quantities / EquippedFlags
+  ParentGuidIndices index into ParentGuids; ParentGuids[index] is the parent item's Guid.
+  Every row must also be registered in the Items array as (row << 4) | 1; the game ignores unregistered rows.
+
+  Money is the item currency_cash and its quantity is the amount. It sits in a money box, and boxes hang under an account:
+
+    bank_checking - money box - currency_cash      checking
+    bank_savings  - money box - currency_cash      Family Savings; the game adds a box for each savings goal
+    wallet        - money box - currency_cash      cash (slot slotid_currency_cash_20000)
+
+  The game's limit is the total capacity of the boxes: an amount above it is cut back when the save loads.
+  Going past the limit means adding boxes under the account. Item and slot ids are joaat hashes of their names.
+
+  Three mirrors must change too or the numbers disagree: the stats block (ids 262 checking, 274 cash plus checking,
+  275 Family Savings), the last checking-ledger entry and the last savings-ledger entry.
+"""
+import json, struct
+
+
+def joaat(name):
+    h = 0
+    for c in name.encode():
+        h = (h + c) & 0xffffffff; h = (h + (h << 10)) & 0xffffffff; h ^= h >> 6
+    h = (h + (h << 3)) & 0xffffffff; h ^= h >> 11
+    return (h + (h << 15)) & 0xffffffff
+
+
+MONEY_CAT = joaat('currency_cash')                      # 2084597891
+BOX_SLOT = joaat('slotid_currency_cash_container')      # slot a money box takes under an account
+CASH_SLOT = joaat('slotid_currency_cash_20000')         # 4163145158
+CASH_MAX = 20000
+# The three large boxes (box item, money slot, capacity). Ids follow the pattern of the first two savings boxes; the game's unlock catalog lists all three.
+# They work under the savings and the checking account (on a PS5: savings 2,000,000, checking 1,985,000).
+BIG_BOXES = ((0xa61b8949, joaat('slotid_currency_cash_400000'), 400000),
+             (0x6ab81283, joaat('slotid_currency_cash_500000'), 500000),
+             (0x88e64edf, joaat('slotid_currency_cash_1000000'), 1000000))
+ACCOUNTS = {
+    # The second checking box's slot name is unknown; only its id and capacity are. The account also has an empty box 0x26457c8e (probably 15,000), left alone.
+    'bank': (joaat('bank_checking'), ((0x33894998, 2177639769, 85000),) + BIG_BOXES),
+    'savings': (joaat('bank_savings'), ((0xcfefdcf1, joaat('slotid_currency_cash_5000'), 5000),
+                                        (0xb84a2da6, joaat('slotid_currency_cash_95000'), 95000)) + BIG_BOXES),
+}
+STAT_CASH = (552, 3273)
+STAT_CHECKING, STAT_CASH_PLUS_CHECKING, STAT_SAVINGS = 262, 274, 275
+SEC_INV, SEC_STAT, SEC_LEDGER = 0xd3f59a5e, 0x0635cbd9, 0x6296c122
+K_MAIN, K_GUID, K_PARENT, K_ITEM, K_SLOT, K_QTY, K_FLAG = '$0xfc8f2620', '$0xb4bfeab1', '$0xc5730137', '$0xbe8e255c', '$0x12ae4287', '$0xe3fead7a', '$0x63b44f39'
+K_ITEMS, K_PARENTS = '$0xabb1e011', '$0xd558e4da'
+K_SUBLISTS = ('$0x6ebbccb1', '$0xc500ddf4', '$0x9098d12e', '$0x1085013f')
+LEDGER_CHECKING, LEDGER_SAVINGS = '$0x1e1e8a08', '$0xf4a14422'
+K_ENTRY, K_OWNER, K_DELTA, K_BALANCE = '$0x9d8e7980', '$0x6d0bd92f', '$0xa662d8be', '$0x818f6f6d'
+
+
+class SaveError(Exception):
+    pass
+
+
+def _load(b):
+    if b[:4] != b'JSAV':
+        raise SaveError('not_jsav')
+    n = sum(struct.unpack_from('<II', b, 8))
+    ents = [list(struct.unpack_from('<IIIII', b, 16 + 20 * i)) for i in range(n)]
+    secs = [b[e[3]:e[3] + e[4]] for e in ents]
+    gaps = [b[ents[i][3] + ents[i][4]:ents[i + 1][3]] for i in range(n - 1)]
+    end = ents[-1][3] + ents[-1][4]
+    return ents, secs, gaps, b[:ents[0][3]], b[end:end + 4]
+
+
+def _rebuild(head, ents, secs, gaps, tail, min_len):
+    out = bytearray(head)
+    for i, s in enumerate(secs):
+        json.loads(s)
+        ents[i][3], ents[i][4] = len(out), len(s); out += s
+        if i < len(secs) - 1:
+            out += gaps[i]
+    out += tail
+    for i, e in enumerate(ents):
+        struct.pack_into('<IIIII', out, 16 + 20 * i, *e)
+    out += b'\0' * ((-len(out)) % 16)
+    if len(out) < min_len:
+        out += b'\0' * (min_len - len(out))
+    return bytes(out)
+
+
+def _sec(ents, h):
+    for i, e in enumerate(ents):
+        if e[0] == h:
+            return i
+    raise SaveError('layout_changed')
+
+
+# ---- edit bytes in place instead of re-serialising JSON: the game is format-sensitive, so the original text stays as it was ----
+
+def _main(txt, nth):
+    """Start of the nth inventory's main list."""
+    p = txt.index(b'"$0x789bdd41":')
+    for _ in range(nth + 1):
+        p = txt.index(b'"%s":' % K_MAIN.encode(), p + 1)
+    return p
+
+
+def _array_end(txt, nth, key):
+    """Position of the closing bracket of the first `key` array in the nth inventory, from the main list on."""
+    return txt.index(b']', txt.index(b'"%s":' % key.encode(), _main(txt, nth)))
+
+
+def _append(txt, nth, key, value):
+    e = _array_end(txt, nth, key)
+    return txt[:e] + b',' + value + txt[e:]
+
+
+def _set(txt, span, idx, old, new):
+    it = txt[span[0]:span[1]].split(b',')
+    if it[idx] != str(old).encode():
+        raise SaveError('verify_failed')
+    it[idx] = str(new).encode()
+    return txt[:span[0]] + b','.join(it) + txt[span[1]:]
+
+
+def _qty_span(txt, nth):
+    e = _array_end(txt, nth, K_QTY)
+    return txt.rindex(b'[', 0, e) + 1, e
+
+
+def _stat_span(txt):
+    p = txt.index(b'"$0x97232209":'); p = txt.index(b'"$0x450ce2f0":', p)
+    s = txt.index(b'[', p) + 1
+    return s, txt.index(b']', s)
+
+
+def _ledger_set(txt, list_key, entry_id, delta, balance, new_delta, new_balance):
+    s = txt.index(b'"%s":[' % list_key.encode()); e = txt.index(b']', s)
+    k = txt.rfind(b'"%s":%d,' % (K_ENTRY.encode(), entry_id), s, e)
+    old = b'"%s":%d,"%s":%d}' % (K_DELTA.encode(), delta, K_BALANCE.encode(), balance)
+    k = txt.find(old, k, e) if k >= 0 else -1
+    if k < 0:
+        raise SaveError('ledger_not_found')
+    return txt[:k] + b'"%s":%d,"%s":%d}' % (K_DELTA.encode(), new_delta, K_BALANCE.encode(), new_balance) + txt[k + len(old):]
+
+
+# ---- read ----
+
+def _data(x):
+    return (x.get('$data') or []) if isinstance(x, dict) else (x or [])
+
+
+def _inventory(sec_txt, nth):
+    inv = json.loads(sec_txt)['$0x7a47cb05']['$0xd3f59a5e']['$0x789bdd41'][nth]
+    f = inv.get(K_MAIN) or {}
+    v = {'guid': _data(f.get(K_GUID)), 'parent': _data(f.get(K_PARENT)), 'item': _data(f.get(K_ITEM)), 'slot': _data(f.get(K_SLOT)),
+         'qty': _data(f.get(K_QTY)), 'parents': _data(inv.get(K_PARENTS))}
+    v['used'] = set(v['guid']) | set(v['parents'])
+    for k in K_SUBLISTS:
+        v['used'] |= set(_data((inv.get(k) or {}).get(K_GUID)))
+    return v
+
+
+def _children(v, row):
+    """Rows of the items under row `row`."""
+    g = v['guid'][row]
+    if g not in v['parents']:
+        return []
+    p = v['parents'].index(g)
+    return [r for r in range(len(v['guid'])) if v['parent'][r] == p and r != row]
+
+
+def _account(v, kind):
+    """Money boxes under an account: [{box, box_row, money_row or None, qty, cap or None}], or None without the account."""
+    root_item, table = ACCOUNTS[kind]
+    if root_item not in v['item']:
+        return None
+    caps = {box: cap for box, _, cap in table}
+    out = []
+    for r in _children(v, v['item'].index(root_item)):
+        if v['slot'][r] != BOX_SLOT:
+            continue
+        m = next((c for c in _children(v, r) if v['item'][c] == MONEY_CAT), None)
+        out.append({'box': v['item'][r], 'box_row': r, 'money_row': m, 'qty': v['qty'][m] if m is not None else 0, 'cap': caps.get(v['item'][r])})
+    return out
+
+
+def scan(b):
+    ents, secs, _, _, _ = _load(b)
+    inv_txt = secs[_sec(ents, SEC_INV)]
+    n_inv = len(json.loads(inv_txt)['$0x7a47cb05']['$0xd3f59a5e']['$0x789bdd41'])
+    items = []
+    for n in range(n_inv):
+        v = _inventory(inv_txt, n)
+        if not v['qty']:
+            continue
+        seen = set()
+        for kind in ('bank', 'savings'):
+            boxes = _account(v, kind)
+            rows = [x['money_row'] for x in boxes or [] if x['money_row'] is not None]
+            if not rows:
+                continue
+            seen |= set(rows)
+            items.append({'inv': n, 'idx': rows[0], 'type': v['slot'][rows[0]], 'kind': kind, 'value': sum(x['qty'] for x in boxes),
+                          'max': sum(cap for _, _, cap in ACCOUNTS[kind][1]) + sum(x['qty'] for x in boxes if x['cap'] is None)})
+        for k, q in enumerate(v['qty']):
+            if v['item'][k] == MONEY_CAT and k not in seen:
+                cash = v['slot'][k] == CASH_SLOT
+                items.append(dict({'inv': n, 'idx': k, 'type': v['slot'][k], 'kind': 'cash' if cash else 'other', 'value': q}, **({'max': CASH_MAX} if cash else {})))
+    items.sort(key=lambda x: (x['inv'], x['idx']))
+    st = json.loads(secs[_sec(ents, SEC_STAT)])['$0x7a47cb05']['$0x0635cbd9']['$0x97232209']
+    stats = st['$0x450ce2f0']['$data']
+    info = {'items': items, 'stats': stats, 'statIds': st['$0x92f37a48']['$data'], 'statChars': st['$0x46be9d78']['$data'],
+            'statCash': [stats[i] for i in STAT_CASH], 'ledger': None, 'savings': None, 'ledgers': {}}
+    try:
+        book = json.loads(secs[_sec(ents, SEC_LEDGER)])['$0x24d043f2']['$0x6296c122']['$0x45a134ec']
+        for l in book[LEDGER_CHECKING]:                     # both protagonists' checking entries are mixed; take the last one of each
+            info['ledgers'][l[K_OWNER] - 0xc0000002] = {'entry': l[K_ENTRY], 'amount': l[K_DELTA], 'balance': l[K_BALANCE]}
+        info['ledger'] = info['ledgers'].get(0)
+        l = book[LEDGER_SAVINGS][-1]
+        info['savings'] = {'entry': l[K_ENTRY], 'amount': l[K_DELTA], 'balance': l[K_BALANCE]}
+    except Exception:
+        pass
+    return info
+
+
+def same_item(item, change):
+    return item.get('src', 'inv') == change.get('src', 'inv') and item['inv'] == change['inv'] and item['idx'] == change['idx']
+
+
+# ---- edit ----
+
+def _fresh_guid(v):
+    g = max(v['guid']) + 1
+    while g in v['used']:
+        g += 1
+    v['used'].add(g)
+    return g
+
+
+def _add_row(txt, nth, v, parent_idx, item, slot, qty):
+    """Add a row to the main list and register it in Items; returns (new text, row, Guid)."""
+    g = _fresh_guid(v); row = len(v['guid'])
+    for key, val in ((K_GUID, g), (K_PARENT, parent_idx), (K_ITEM, item), (K_SLOT, slot), (K_QTY, qty)):
+        txt = _append(txt, nth, key, b'%d' % val)
+    txt = _append(txt, nth, K_FLAG, b'false')
+    txt = _append(txt, nth, K_ITEMS, b'%d' % ((row << 4) | 1))
+    return txt, row, g
+
+
+def _parent_index(txt, nth, guid):
+    """Index of a Guid in ParentGuids, appended when missing."""
+    v = _inventory(txt, nth)
+    if guid in v['parents']:
+        return txt, v['parents'].index(guid)
+    return _append(txt, nth, K_PARENTS, b'%d' % guid), len(v['parents'])
+
+
+def _set_account(txt, nth, kind, target):
+    """Set an account total to target: fill existing boxes first, then add boxes from smallest to largest."""
+    root_item, table = ACCOUNTS[kind]
+    boxes = _account(_inventory(txt, nth), kind)
+    left = target - sum(x['qty'] for x in boxes if x['cap'] is None)
+    if left < 0:
+        raise SaveError('out_of_range')
+    for box, slot, cap in table:
+        amount = min(cap, left); left -= amount
+        v = _inventory(txt, nth)
+        cur = next((x for x in _account(v, kind) if x['box'] == box), None)
+        if cur and cur['money_row'] is not None:
+            if cur['qty'] != amount:
+                txt = _set(txt, _qty_span(txt, nth), cur['money_row'], cur['qty'], amount)
+            continue
+        if not amount:
+            continue
+        if cur:
+            box_guid = v['guid'][cur['box_row']]
+        else:
+            txt, root_idx = _parent_index(txt, nth, v['guid'][v['item'].index(root_item)])
+            txt, _, box_guid = _add_row(txt, nth, _inventory(txt, nth), root_idx, box, BOX_SLOT, 1)
+        txt, box_idx = _parent_index(txt, nth, box_guid)
+        txt, _, _ = _add_row(txt, nth, _inventory(txt, nth), box_idx, MONEY_CAT, slot, amount)
+    if left:
+        raise SaveError('out_of_range')
+    return txt
+
+
+def patch(b, changes):
+    """changes: [{inv, idx, value (old), newValue}] -> (new file bytes, log). Values above the limit are written as the limit."""
+    ents, secs, gaps, head, tail = _load(b)
+    info = scan(b); log = []
+    i_inv, i_stat = _sec(ents, SEC_INV), _sec(ents, SEC_STAT)
+
+    def stat(si, old, new):
+        secs[i_stat] = _set(secs[i_stat], _stat_span(secs[i_stat]), si, old, new)
+
+    for ch in changes:
+        it = next((x for x in info['items'] if same_item(x, ch)), None)
+        if not it or it['value'] != ch['value']:
+            raise SaveError('stale_item')
+        nv = int(round(ch['newValue']))
+        if not 0 <= nv <= 2147483647:
+            raise SaveError('out_of_range')
+        nv = min(nv, it.get('max', nv)); old = it['value']
+        if nv == old:
+            continue
+        if it['kind'] in ACCOUNTS:
+            secs[i_inv] = _set_account(secs[i_inv], it['inv'], it['kind'], nv)
+        else:
+            secs[i_inv] = _set(secs[i_inv], _qty_span(secs[i_inv], it['inv']), it['idx'], old, nv)
+        log.append({'what': 'inventory', 'kind': it['kind'], 'from': old, 'to': nv})
+        ids, chars, vals = info['statIds'], info['statChars'], info['stats']
+        if it['kind'] == 'bank':
+            for si, sid in enumerate(ids):                  # stats owners 1 / 2 are inventories 0 / 1
+                if chars[si] != it['inv'] + 1:
+                    continue
+                if sid == STAT_CHECKING and vals[si] == old:
+                    stat(si, old, nv); log.append({'what': 'stat_bank'})
+                elif sid == STAT_CASH_PLUS_CHECKING and vals[si] >= old:
+                    stat(si, vals[si], vals[si] - old + nv); log.append({'what': 'stat_bank'})
+            led = info['ledgers'].get(it['inv'])
+            if led:     # the last ledger entry's balance must equal checking; also fixes mismatches left by older inventory-only edits
+                i_led = _sec(ents, SEC_LEDGER)
+                secs[i_led] = _ledger_set(secs[i_led], LEDGER_CHECKING, led['entry'], led['amount'], led['balance'], led['amount'] + nv - led['balance'], nv)
+                log.append({'what': 'ledger'})
+            else:
+                log.append({'what': 'ledger_skipped'})
+        elif it['kind'] == 'savings':
+            for si, sid in enumerate(ids):
+                if sid == STAT_SAVINGS and vals[si] == old:
+                    stat(si, old, nv); log.append({'what': 'stat_savings'})
+            sav = info['savings']
+            if sav:
+                i_led = _sec(ents, SEC_LEDGER)
+                secs[i_led] = _ledger_set(secs[i_led], LEDGER_SAVINGS, sav['entry'], sav['amount'], sav['balance'], sav['amount'] + nv - sav['balance'], nv)
+                log.append({'what': 'savings_ledger'})
+        elif it['kind'] == 'cash':
+            for j, si in enumerate(STAT_CASH):
+                if info['statCash'][j] == old:
+                    stat(si, old, nv); log.append({'what': 'stat_cash'})
+    return _rebuild(head, ents, secs, gaps, tail, len(b)), log

@@ -1,0 +1,9 @@
+# runtime data: saves, backups and pairing files never belong in git
+data/
+build_out/
+dist/
+__pycache__/
+*.pyc
+*.spec
+.venv/
+.DS_Store
