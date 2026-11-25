@@ -281,3 +281,5 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .weapons { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 6px 0 16px; }
 .weapons li { padding: 4px 10px; border-radius: var(--r-button); background: var(--dusk-2); border: 1px solid var(--hairline); font-size: 13px; color: var(--text-2); }
 .weapons .kind { color: var(--text-3); }
+
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }

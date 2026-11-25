@@ -45,6 +45,8 @@
     save_bad_value: 'One of the new values isn’t valid for its field.',
     save_out_of_range: 'One of the new values is outside the allowed range.',
     save_bad_time: 'The time of day needs an hour from 0 to 23 and a minute from 0 to 59.',
+    save_read_only: 'That part of the save is read-only.',
+    save_not_editable: 'Only numbers and true/false values can be changed.',
     save_bad_request: 'The edit didn’t match this save. Reload the page and try again.',
     no_change: 'Nothing changed. Edit a value first.',
     port_in_use: 'Ports 1004 to 1006 are already in use. Close any other save-transfer tool or another copy of Save Garage.',
@@ -61,7 +63,7 @@
 
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
-    slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, world: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
+    slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, world: {}, sd: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
     find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
 
   // ------------------------------------------------------------ api
@@ -128,7 +130,7 @@
     const jobKey = job.id + ':' + job.status;
     const sig = slotsSig(st);
     if (sig !== S.sig) {                         // new download: forget per-save data
-      S.sig = sig; S.detail = {}; S.stats = {}; S.comp = {}; S.world = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
+      S.sig = sig; S.detail = {}; S.stats = {}; S.comp = {}; S.world = {}; S.sd = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
       const slots = sortedSlots(st);
       S.slot = slots.length ? slots[0].file : null;
     }
@@ -294,7 +296,7 @@
     const st = S.state;
     const s = slotOf(S.slot);
     if (!s) return '<div class="empty">No story saves were found in this download.</div>';
-    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['trophies', 'Trophies']];
+    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1>${esc(missionName(s))}</h1>
         <p>${moneySummary(s) || 'No money balances in this save'}.${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
@@ -317,6 +319,8 @@
     if (S.tab === 'all' && S.stats[s.file]?.failed) return `<div class="callout danger">${esc(ERR[S.stats[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`;
     if (S.tab === 'ammo') return panelAmmo(s, d);
     if (S.tab === 'stats') return panelStats(s, d);
+    if (S.tab === 'data') return S.sd[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.sd[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
+      : S.sd[s.file] ? panelData(s) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'world') return S.world[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.world[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
       : S.world[s.file] ? panelWorld(s) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'completion') return S.comp[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.comp[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
@@ -331,20 +335,25 @@
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
-    const d = {money: {}, ammo: {}, stats: {}, world: {}};
+    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}};
     const a = s.applied || {};
     if (a.world) d.world = {...a.world};
+    for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
     for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
     for (const c of a.ammo || []) d.ammo[`${c.inv}:${c.idx}`] = c;
     for (const c of a.stats || []) d.stats[`${c.group}:${c.row}`] = c;
     S.drafts[s.file] = d;
   }
 
-  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}});
-  const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})}});
-  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length;
+  const rawKey = (sec, path) => sec + ':' + JSON.stringify(path);
+  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}});
+  const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
+                           raw: Object.values(d.raw || {})});
+  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
+                         + Object.keys(d.raw || {}).length;
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
-  const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world);
+  const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world)
+    + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort());
   const dirty = s => norm(draftList(draftOf(s.file))) !== norm(s.applied);
 
   // a numeric input cell. kind: money|ammo|stat; init = value shown in the field
@@ -592,6 +601,74 @@
     renderPending(); renderCounts();
   }
 
+  // ---- save data: every section, one number or true/false at a time
+  function panelData(s) {
+    const sd = S.sd[s.file], d = draftOf(s.file).raw;
+    const head = `<div class="section-head"><h2>Save data</h2>${riskTag('danger')}
+        <p>Every section of the save, with names where they’re known. Numbers and true/false values can be changed one at a time; text, the story flow, heists, vehicle records and anything another tab handles stay read-only. Most of these values have unknown meanings, so change one thing, send the save and check it loads.</p></div>`;
+    if (!sd.cur) {
+      return head + `<table class="raw"><thead><tr><th>Section</th><th>Size</th><th></th></tr></thead><tbody>${sd.sections.map(x => `
+        <tr><td class="key">${esc(x.name || '0x' + x.hash)}<small>0x${x.hash}${x.readOnly ? ', read-only: ' + esc(x.readOnly) : x.risky ? ', not recommended' : ''}</small></td>
+          <td>${nf.format(x.bytes)} bytes</td><td><button class="btn small" data-act="sd-open" data-section="${x.hash}" data-path="[]">Open</button></td></tr>`).join('')}</tbody></table>`;
+    }
+    const n = sd.node, sec = sd.sections.find(x => x.hash === sd.cur.section);
+    const crumbs = [`<button class="btn small" data-act="sd-home">Sections</button>`, `<button class="btn small" data-act="sd-open" data-section="${sd.cur.section}" data-path="[]">${esc(sec?.name || '0x' + sd.cur.section)}</button>`]
+      .concat(sd.cur.path.map((p, i) => `<button class="btn small" data-act="sd-open" data-section="${sd.cur.section}" data-path='${esc(JSON.stringify(sd.cur.path.slice(0, i + 1)))}'>${esc(String(sd.cur.labels[i] ?? p))}</button>`));
+    if (!n) return head + `<div class="crumbs">${crumbs.join(' ')}</div><div class="empty">Reading…</div>`;
+    const ro = n.readOnly;
+    const rows = n.items.map(x => {
+      const path = [...n.path, x.key], k = rawKey(n.section, path), dr = d[k];
+      let cell;
+      if (x.kind === 'object' || x.kind === 'array') cell = `<button class="btn small" data-act="sd-open" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-label="${esc(String(x.label))}">Open, ${nf.format(x.count)} ${x.kind === 'array' ? 'items' : 'fields'}</button>`;
+      else if (ro || !['int', 'float', 'bool'].includes(x.kind)) cell = `<span class="lock">${esc(x.raw)}</span>`;
+      else if (x.kind === 'bool') { const on = dr ? dr.newValue : x.raw === 'true';
+        cell = `<label class="toggle"><input type="checkbox" data-raw="1" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" ${on ? 'checked' : ''}> ${on ? 'true' : 'false'}</label>`; }
+      else cell = `<input type="number" step="any" data-raw="1" data-kind="${x.kind}" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" value="${esc(dr ? String(dr.newValue) : x.raw)}">`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(String(x.label))}${typeof x.key === 'string' && x.label !== x.key ? `<small>${esc(x.key)}</small>` : ''}</td><td>${esc(x.kind)}</td><td>${cell}</td></tr>`;
+    }).join('');
+    const more = n.total > n.offset + n.items.length ? `<div class="more"><button class="btn small" data-act="sd-more">Show more (${nf.format(n.total - n.offset - n.items.length)} left)</button></div>` : '';
+    return head + `<div class="crumbs">${crumbs.join(' ')}</div>${ro ? `<div class="callout">Read-only: ${esc(ro)}.</div>` : n.risky ? '<div class="callout">Not recommended: this section is tied to the story or its meaning isn’t known.</div>' : ''}
+      <table class="raw"><thead><tr><th>Field</th><th>Type</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>${more}`;
+  }
+
+  async function sdOpen(file, section, path, labelText, append) {
+    const sd = S.sd[file];
+    if (!append) {
+      const same = sd.cur && sd.cur.section === section;
+      const labels = same ? sd.cur.labels.slice(0, path.length) : [];
+      if (labelText && path.length) labels[path.length - 1] = labelText;
+      sd.cur = {section, path, labels};
+      sd.node = null; S.mainKey = ''; renderMain();
+    }
+    const offset = append ? sd.node.offset + sd.node.items.length : 0;
+    try {
+      const n = await api('/api/savedata?file=' + encodeURIComponent(file) + '&section=' + section + '&path=' + encodeURIComponent(JSON.stringify(path)) + '&offset=' + offset);
+      if (append) { n.items = sd.node.items.concat(n.items); n.offset = sd.node.offset; }
+      sd.node = n;
+    } catch (e) { toast(ERR[e.code] || ERR.internal); }
+    S.mainKey = ''; renderMain();
+  }
+
+  function onRaw(el) {
+    const s = slotOf(S.slot);
+    if (!s) return;
+    const d = draftOf(s.file).raw, path = JSON.parse(el.dataset.path), k = rawKey(el.dataset.section, path);
+    let nv;
+    if (el.type === 'checkbox') { nv = el.checked; const lab = el.closest('label'); if (lab && lab.lastChild?.nodeType === 3) lab.lastChild.textContent = ' ' + String(nv); }
+    else {
+      nv = Number(el.value);
+      const ok = el.value.trim() !== '' && Number.isFinite(nv) && (el.dataset.kind !== 'int' || Number.isInteger(nv));
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      if (!ok) { delete d[k]; renderPending(); renderCounts(); return; }
+    }
+    const orig = el.dataset.orig;
+    const same = el.type === 'checkbox' ? String(nv) === orig : Number(orig) === nv;
+    if (same) delete d[k];
+    else d[k] = {section: el.dataset.section, path, value: orig, newValue: nv, label: el.dataset.label};
+    el.closest('tr')?.classList.toggle('changed', !same);
+    renderPending(); renderCounts();
+  }
+
   async function setStunts(file, ids) {
     const d = draftOf(file);
     for (const k of S.stuntKeys[file] || []) delete d.stats[k];
@@ -630,6 +707,11 @@
       try { S.stats[file] = await api('/api/stats?file=' + encodeURIComponent(file)); } catch (e) { S.stats[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
+    if (S.tab === 'data' && !S.sd[file]) {
+      try { S.sd[file] = {sections: (await api('/api/savedata?file=' + encodeURIComponent(file))).sections, cur: null, node: null}; }
+      catch (e) { S.sd[file] = {failed: e.code || 'request_failed'}; }
+      S.mainKey = ''; renderMain(); return;
+    }
     if (S.tab === 'world' && !S.world[file]) {
       try { S.world[file] = await api('/api/world?file=' + encodeURIComponent(file)); } catch (e) { S.world[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
@@ -646,7 +728,7 @@
     const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length, stats: 0, all: 0};
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
     const stunt = S.stuntKeys[S.slot] || new Set();
-    n.completion = 0; n.world = Object.keys(d.world || {}).length;
+    n.completion = 0; n.world = Object.keys(d.world || {}).length; n.data = Object.keys(d.raw || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     for (const el of $$('[data-count]')) el.textContent = n[el.dataset.count] || '';
   }
@@ -756,7 +838,7 @@
     const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
       w.health != null && {label: 'Health', value: now ? now.health : '', newValue: w.health},
       w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'}].filter(Boolean);
-    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList];
+    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {})];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
@@ -861,6 +943,9 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'sd-home') { S.sd[S.slot].cur = null; S.sd[S.slot].node = null; S.mainKey = ''; renderMain(); return; }
+    if (a === 'sd-open') { sdOpen(S.slot, b.dataset.section, JSON.parse(b.dataset.path), b.dataset.label, false); return; }
+    if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
     if (a === 'world-fill' || a === 'world-undo') {
       const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world;
       if (b.dataset.what === 'health') d.health = w.healthMax;
@@ -886,7 +971,7 @@
       }
       return;
     }
-    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; S.mainKey = ''; renderMain(); return; }
+    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; delete S.sd[f]; S.mainKey = ''; renderMain(); return; }
     if (a === 'more') { S.find.limit += 300; $('#allrows').innerHTML = allRows(slotOf(S.slot)); return; }
     if (a === 'review') { S.reviewOpen = !S.reviewOpen; renderPending(); return; }
     if (a === 'discard') {
@@ -896,7 +981,7 @@
     if (a === 'save') {
       const s = slotOf(S.slot);
       const d = draftList(draftOf(s.file));
-      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length;
+      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length;
       if (none && !s.modified) return;
       if (none) {
         if (confirm('You removed every edit for this save. Put its original back instead?')) act('/api/restore', {}, () => { S.drafts = {}; });
@@ -920,6 +1005,7 @@
     const el = e.target;
     if (el.dataset.edit && el.type !== 'checkbox') onEdit(el);
     if (el.dataset.world) onWorld(el);
+    if (el.dataset.raw && el.type !== 'checkbox') onRaw(el);
     if (el.dataset.find === 'q') {
       S.find.q = el.value; S.find.limit = 150;
       clearTimeout(S.findT);
@@ -930,6 +1016,7 @@
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.dataset.edit && el.type === 'checkbox') onEdit(el);
+    if (el.dataset.raw && el.type === 'checkbox') onRaw(el);
     if (el.dataset.find === 'varies' || el.dataset.find === 'named' || el.dataset.find === 'game') {
       S.find[el.dataset.find] = el.checked; S.find.limit = 150;
       const box = $('#allrows'); if (box) box.innerHTML = allRows(slotOf(S.slot));

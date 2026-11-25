@@ -271,6 +271,17 @@ def _apply_ammo(txt, changes):
 def apply(b, edits):
     """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'world': {...}} applied to the original file -> (bytes, log)."""
     b, log = _apply_core(b, edits)
+    if edits.get('raw'):
+        import savebrowse
+        try:
+            b, rlog = savebrowse.apply(b, edits['raw'])
+        except (KeyError, ValueError, TypeError) as e:
+            raise SaveError('bad_request') from e
+        except savebrowse.BrowseError as e:
+            raise SaveError(str(e)) from e
+        except Exception as e:                       # a path that no longer exists, for example
+            raise SaveError('stale_item') from e
+        log += rlog
     if edits.get('world'):
         import world
         try:

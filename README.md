@@ -22,6 +22,7 @@ your browser, and the PS5 takes it back the same way.
 | **Completion** | Marks every stunt jump, base jump, under-the-bridge flight and knife flight done, with the counters the 100% checklist reads. | Not tested yet |
 | **World** | The time of day (the date stays the same), health up to overpowered, and full armour for both characters. | Not tested yet |
 | **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for many more. | Can break your save |
+| **Save data** | Every section of the save, with names for 63 of the 82 sections and 464 of the 843 keys. Any number or true/false value can be changed; text, the story flow, heists and vehicle records stay read-only. | Can break your save |
 | **Trophies** | Not editable. The Trophies page in the app explains what a save edit can and can't do for them. | |
 
 Every edit in the app carries one of those labels, so you always know how safe it is. Edits are always applied to
