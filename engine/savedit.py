@@ -16,6 +16,7 @@ import json, math, re
 from collections import namedtuple
 
 import gamelabels
+import hashnames
 import itemnames
 import meanings
 import money
@@ -579,9 +580,12 @@ def stats_table(sec_txt):
     names['qual_labels'].update(qm)
     names['owner_labels'].update(om)
     names['meaning'] = {'base': sorted(names['base_meanings']), 'qual': sorted(qm), 'owner': sorted(om)}
+    # values that are IDs of something with a known name (favourite vehicle or station, gang item, biggest fish, …)
+    means = {'%s:%d' % (g, r): m for g, G in groups.items() if G['type'] in ('u32', 'int32', 'int64')
+             for r, v in enumerate(G['value']) for m in [hashnames.lookup(v)] if m}
     return {'groups': [{'key': g, 'type': G['type'], 'base': G['base'], 'qual': G['qual'], 'owner': G['owner'], 'value': G['value']}
                        for g, G in groups.items() if G['value']],
-            'names': names, 'labels': labels,
+            'names': names, 'labels': labels, 'means': means,
             'protected': {MONEY_GROUP: list(MONEY_BASES)}}
 
 

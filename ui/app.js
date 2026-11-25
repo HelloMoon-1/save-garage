@@ -476,7 +476,7 @@
     const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? (ql[i] === ql[i].toUpperCase() ? ql[i].toLowerCase() : ql[i]) : `#${i}`))), on = i => ol[i] || n.owner[i] || `#${i}`;
     // keys whose real name is unknown but whose meaning was worked out from the saves: shown as a description, marked
     const bm = n.base_meanings || {}, mq = new Set((n.meaning || {}).qual || []), mo = new Set((n.meaning || {}).owner || []);
-    const labels = t.labels || {};
+    const labels = t.labels || {}, means = t.means || {};
     const pretty = l => l ? (l.charAt(0) + l.slice(1).toLowerCase()).replace(/\b(lucia|jason)\b/g, w => w[0].toUpperCase() + w.slice(1)) : '';
     const prot = new Set((t.protected[MONEY_GROUP] || []).map(String));
     const rows = [];
@@ -488,8 +488,8 @@
         const meaning = !!desc || (!n.qual[q] && mq.has(q)) || mo.has(g.owner[r]);
         const game = pretty(labels[`${g.key}:${r}`]);
         rows.push({g: g.key, type: g.type, r, b: g.base[r], q: g.qual[r], o: g.owner[r], v: g.value[r], vary: vary.has(r),
-          named: !!(n.base[b] || n.qual[q] || game || desc), meaning, game, name, owner: on(g.owner[r]), qlab: n.qual[g.qual[r]] ? ql[g.qual[r]] || '' : '',
-          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + (ql[g.qual[r]] || '') + ' ' + on(g.owner[r]) + ' ' + (n.owner[g.owner[r]] || '') + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
+          named: !!(n.base[b] || n.qual[q] || game || desc), meaning, game, name, means: means[`${g.key}:${r}`], owner: on(g.owner[r]), qlab: n.qual[g.qual[r]] ? ql[g.qual[r]] || '' : '',
+          locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + (ql[g.qual[r]] || '') + ' ' + on(g.owner[r]) + ' ' + (n.owner[g.owner[r]] || '') + ' ' + (means[`${g.key}:${r}`]?.text || '') + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
       }
     }
     rows.sort((a, b) => (!!b.game - !!a.game) || (b.named - a.named) || (a.game || a.name).localeCompare(b.game || b.name) || a.b - b.b || a.q - b.q || a.o - b.o);
@@ -526,7 +526,7 @@
       else if (x.type === 'bool') input = `<label class="toggle"><input type="checkbox" ${attrs} data-type="bool" data-unit="flag" data-orig="${x.v ? 1 : 0}" ${(dr ? dr.newValue : x.v) ? 'checked' : ''}> ${(dr ? dr.newValue : x.v) ? 'true' : 'false'}</label>`;
       else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${capOf(x)}" step="${x.type === 'float' ? 'any' : 1}"
         data-init="${esc(String(x.v))}" data-orig="${esc(JSON.stringify(x.v))}" value="${esc(String(dr ? dr.newValue : x.v))}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key${x.meaning && !x.game ? ' described' : ''}">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}${x.meaning && !x.game ? 'real name unknown, described from how it behaves in saves, ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>up to ${esc(compact.format(capOf(x)))}</small>`}</td><td>${input}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key${x.meaning && !x.game ? ' described' : ''}">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}${x.meaning && !x.game ? 'real name unknown, described from how it behaves in saves, ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>up to ${esc(compact.format(capOf(x)))}</small>`}</td><td>${input}${x.means ? `<small class="means">${esc(x.means.kind)}: ${esc(x.means.text)}</small>` : ''}</td></tr>`;
     }).join('')}</tbody></table>${list.length > shown.length ? `<div class="more"><button class="btn small" data-act="more">Show more (${nf.format(list.length - shown.length)} left)</button></div>` : ''}`;
   }
 
