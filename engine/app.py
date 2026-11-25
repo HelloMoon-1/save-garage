@@ -361,6 +361,19 @@ def slot_stats(slot):
     return cached(('stats', slot['file']), build)
 
 
+def _completion_label(x):
+    """A readable line for a Completion feature's log entry that has no label of its own."""
+    if x.get('gym'):
+        return 'Gym membership added'
+    if x.get('title') or x.get('category') and x.get('n'):
+        return 'Challenge completed: ' + str(x.get('category', '')).capitalize()
+    if 'added' in x and x.get('group'):
+        return 'Compendium: %s added' % x['group']
+    if 'score' in str(x.get('step', '')):
+        return 'Challenge progress kept in step'
+    return str(x.get('category') or x.get('feature') or 'Change')
+
+
 def summarize(plog):
     out = []
     for x in plog:
@@ -370,8 +383,14 @@ def summarize(plog):
         elif w == 'ammo':
             out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
-        elif w in ('world', 'raw'):
-            out.append({'kind': 'stat', 'label': x['label'], 'from': x['from'], 'to': x['to']})
+        elif w in ('world', 'raw', 'completion'):
+            label = str(x.get('label') or _completion_label(x))
+            same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
+            if same and w == 'completion':
+                same['count'] = same.get('count', 1) + 1
+            else:
+                to = x.get('to', ('%s added' % x['added']) if 'added' in x else 'done')
+                out.append({'kind': 'stat', 'label': label, 'from': x.get('from', ''), 'to': to})
         elif w == 'stat':
             label = x.get('label') or 'Stat'
             same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
@@ -515,7 +534,7 @@ def job_patch(slot_file, edits):
         data, plog = savedit.apply(src.read_bytes(), edits)
     except money.SaveError as e:
         raise Fail('save_' + str(e))
-    if not any(x.get('what') in ('money', 'ammo', 'stat', 'world', 'raw') for x in plog):
+    if not plog:
         raise Fail('no_change')
     mod = sess / 'mod' / Path(slot['dir']).name
     if mod.exists():
@@ -698,7 +717,10 @@ class H(BaseHTTPRequestHandler):
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                return self._send(200, {'stunts': savedit.stunts(savedit.section(slot_bytes(slot), money.SEC_STAT))})
+                import compendium, discovery, challenges, gyms
+                b = slot_bytes(slot)
+                return self._send(200, {'stunts': savedit.stunts(savedit.section(b, money.SEC_STAT)), 'compendium': compendium.read(b),
+                                        'discovery': discovery.read(b), 'challenges': challenges.read(b), 'gyms': gyms.read(b)})
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
         if path in ('/api/slot', '/api/stats'):       # detail data for the editor
@@ -774,6 +796,11 @@ class H(BaseHTTPRequestHandler):
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
                 if not all(isinstance(v, list) for v in edits.values()):
                     raise ValueError('edits must be lists')
+                if body.get('completion'):
+                    c = body['completion']
+                    if not isinstance(c, dict):
+                        raise ValueError('completion must be an object')
+                    edits['completion'] = {k: c[k] for k in ('compendium', 'discovery', 'challenges', 'gyms', 'stuntDiscovery') if c.get(k)}
                 if body.get('raw'):
                     if not isinstance(body['raw'], list):
                         raise ValueError('raw must be a list')

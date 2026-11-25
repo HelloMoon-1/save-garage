@@ -335,9 +335,10 @@
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
-    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}};
+    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}};
     const a = s.applied || {};
     if (a.world) d.world = {...a.world};
+    if (a.completion) d.completion = JSON.parse(JSON.stringify(a.completion));
     for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
     for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
     for (const c of a.ammo || []) d.ammo[`${c.inv}:${c.idx}`] = c;
@@ -346,14 +347,15 @@
   }
 
   const rawKey = (sec, path) => sec + ':' + JSON.stringify(path);
-  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}});
+  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
-                           raw: Object.values(d.raw || {})});
+                           raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms'].filter(k => c && c[k]).length;
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
-                         + Object.keys(d.raw || {}).length;
+                         + Object.keys(d.raw || {}).length + compCount(d.completion);
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
   const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world)
-    + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort());
+    + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort()) + worldKey(e?.completion);
   const dirty = s => norm(draftList(draftOf(s.file))) !== norm(s.applied);
 
   // a numeric input cell. kind: money|ammo|stat; init = value shown in the field
@@ -555,7 +557,39 @@
         <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, and the counters the game keeps are set to match. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
       <div class="group"><div class="section-head"><h3>Stunts</h3>${left > 1 ? '<button class="btn small" data-act="stunts" data-group="all">Mark every stunt done</button>' : ''}
         <p>The 100% checklist needs any ${nf.format(c.for100)} of the game’s 397 stunts. Unique stunts done in this save: ${c.uniqueTotal == null ? 'unknown' : nf.format(c.uniqueTotal)}. Under-the-bridge flights and knife flights can’t be told apart in the save, so they’re marked together.</p></div>
-        <div class="fields">${c.groups.map(row).join('')}</div></div>`;
+        <div class="fields">${c.groups.map(row).join('')}</div></div>
+      ${compParts(s)}`;
+  }
+
+  function compParts(s) {
+    const C = S.comp[s.file], d = draftOf(s.file).completion;
+    const pending = (k, text) => `<span class="note">${esc(text)} Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="${k}">Undo</button>`;
+    // compendium: animals and weapons (vehicles aren't offered: the game's vehicle pages don't match the save's list)
+    const types = (C.compendium.types || []).filter(t => t.group === 'animals' || t.group === 'weapons');
+    const cg = new Set(d.compendium?.groups || []);
+    const comp = `<div class="group"><div class="section-head"><h3>Compendium</h3><p>Marks animals and weapons as discovered in the game’s compendium, with the counters and the 100% checklist rows that go with them. Vehicles aren’t offered: the game’s vehicle pages don’t match the list in the save.</p></div>
+      <div class="fields">${types.map(t => `<div class="field"><div class="name">${t.group === 'animals' ? 'Animals' : 'Weapons'}<span class="help">${nf.format(t.discovered)} of ${nf.format(t.candidates)} discovered in this save.</span></div>
+        <div class="inputs">${cg.has(t.group) ? pending('compendium:' + t.group, 'Will be marked discovered.') : `<button class="btn small" data-act="comp-add" data-feature="compendium" data-value="${t.group}" ${t.discovered >= t.candidates ? 'disabled' : ''}>${t.discovered >= t.candidates ? 'All discovered' : 'Mark all discovered'}</button>`}</div></div>`).join('')}</div></div>`;
+    // map discoveries: shop and place categories
+    const places = (C.discovery.categories || []).filter(x => x.kind === 'place');
+    const placeDone = places.filter(x => x.state === 'complete').length;
+    const disc = `<div class="group"><div class="section-head"><h3>Map discoveries</h3><p>Shops and places on the map, by kind: ${nf.format(placeDone)} of ${nf.format(places.length)} kinds fully discovered. Completing a kind marks all its locations discovered, the way the game records a finished kind. Stunt and gang locations aren’t touched here.</p></div>
+      <div class="fields"><div class="field"><div class="name">Every shop and place<span class="help">${places.filter(x => x.state !== 'complete').map(x => `${esc(x.label)} ${x.found}/${x.locations}`).join(', ') || 'All done.'}</span></div>
+        <div class="inputs">${d.discovery ? pending('discovery', 'Will be discovered.') : `<button class="btn small" data-act="comp-add" data-feature="discovery" data-value="all" ${placeDone >= places.length ? 'disabled' : ''}>${placeDone >= places.length ? 'All discovered' : 'Discover all'}</button>`}</div></div></div></div>`;
+    // challenges by category
+    const cats = C.challenges.categories || [];
+    const chosen = d.challenges ? (d.challenges.categories === 'all' ? new Set(cats.map(x => x.key)) : new Set(d.challenges.categories)) : new Set();
+    const chal = `<div class="group"><div class="section-head"><h3>Challenges</h3>${cats.some(x => x.done < x.of && !chosen.has(x.key)) ? '<button class="btn small" data-act="comp-add" data-feature="challenges" data-value="all">Complete every challenge</button>' : ''}
+        <p>The 100% checklist needs 70 of the game’s 80 challenges. Completed in this save: ${nf.format(C.challenges.done)}. Completing one sets it done and moves its counters; rewards the game hands out itself, such as vehicles, may not unlock.</p></div>
+      <div class="fields">${cats.map(x => `<div class="field"><div class="name">${esc(x.label)}<span class="help">${x.done} of ${x.of} completed.</span></div>
+        <div class="inputs">${chosen.has(x.key) ? pending('challenges:' + x.key, 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="challenges" data-value="${x.key}" ${x.done >= x.of ? 'disabled' : ''}>${x.done >= x.of ? 'All done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
+    // gym memberships
+    const gyms = C.gyms.gyms || [];
+    const owned = gyms.filter(g => g.owned).length;
+    const gymBox = `<div class="group"><div class="section-head"><h3>Gym memberships</h3><p>The 100% checklist needs all 8. Owned in this save: ${owned}. A membership is added the way the game adds one; the gyms marked “not seen yet” have never been bought in a real save, so their item IDs come from the game’s text.</p></div>
+      <div class="fields"><div class="field"><div class="name">All gym memberships<span class="help">${gyms.map(g => `${esc(g.label)}${g.owned ? ' (owned)' : g.grade !== 'confirmed' ? ' (not seen yet)' : ''}`).join(', ')}.</span></div>
+        <div class="inputs">${d.gyms ? pending('gyms', 'Will be added.') : `<button class="btn small" data-act="comp-add" data-feature="gyms" data-value="all" ${owned >= gyms.length ? 'disabled' : ''}>${owned >= gyms.length ? 'All owned' : 'Add all'}</button>`}</div></div></div></div>`;
+    return comp + disc + chal + gymBox;
   }
 
   // ---- world: time of day, health, armour
@@ -674,6 +708,7 @@
     for (const k of S.stuntKeys[file] || []) delete d.stats[k];
     S.stuntKeys[file] = new Set();
     S.stuntSel[file] = new Set(ids);
+    if (ids.length) d.completion.stuntDiscovery = [...ids]; else delete d.completion.stuntDiscovery;
     if (ids.length) {
       try {
         const r = await api('/api/stunt-edits', {file, groups: ids});
@@ -728,7 +763,7 @@
     const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length, stats: 0, all: 0};
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
     const stunt = S.stuntKeys[S.slot] || new Set();
-    n.completion = 0; n.world = Object.keys(d.world || {}).length; n.data = Object.keys(d.raw || {}).length;
+    n.completion = compCount(d.completion); n.world = Object.keys(d.world || {}).length; n.data = Object.keys(d.raw || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     for (const el of $$('[data-count]')) el.textContent = n[el.dataset.count] || '';
   }
@@ -740,7 +775,7 @@
     const done = job.kind === 'upload' && job.stage === 'uploaded';
     const edited = (st.slots || []).filter(x => x.modified);
     const summary = edited.length ? `<div class="panel"><h3>What’s being sent</h3><ul class="review" style="max-height:none;margin-top:8px">${edited.map(x =>
-      (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('') ||
+      (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('') ||
       `<li><span>${esc(missionName(x))}</span><span>edited</span></li>`).join('')}</ul></div>` : '';
     if (done) {
       return `<section class="title-card"><span class="chip">Done</span><h1>Your save is back on the PS5</h1>
@@ -838,7 +873,12 @@
     const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
       w.health != null && {label: 'Health', value: now ? now.health : '', newValue: w.health},
       w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'}].filter(Boolean);
-    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {})];
+    const cp = d.completion || {};
+    const compList = [cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
+      cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
+      cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
+      cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'}].filter(Boolean);
+    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
@@ -943,6 +983,30 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'comp-add' || a === 'comp-undo') {
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
+      const [feat, sub] = (a === 'comp-add' ? b.dataset.feature : b.dataset.feature).split(':');
+      const v = b.dataset.value;
+      if (a === 'comp-add') {
+        if (feat === 'compendium') { const g = new Set(d.compendium?.groups || []); g.add(v); d.compendium = {groups: [...g]}; }
+        if (feat === 'discovery') d.discovery = {categories: 'all'};
+        if (feat === 'gyms') d.gyms = {gyms: 'all'};
+        if (feat === 'challenges') {
+          if (v === 'all') d.challenges = {categories: 'all'};
+          else { const cur = d.challenges ? (d.challenges.categories === 'all' ? C.challenges.categories.map(x => x.key) : d.challenges.categories) : [];
+                 d.challenges = {categories: [...new Set([...cur, v])]}; }
+        }
+      } else {
+        if (feat === 'compendium') { const g = (d.compendium?.groups || []).filter(x => x !== sub); if (g.length) d.compendium = {groups: g}; else delete d.compendium; }
+        else if (feat === 'challenges') {
+          const cur = d.challenges ? (d.challenges.categories === 'all' ? C.challenges.categories.map(x => x.key) : d.challenges.categories) : [];
+          const left = cur.filter(x => x !== sub);
+          if (left.length) d.challenges = {categories: left}; else delete d.challenges;
+        } else delete d[feat];
+      }
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
     if (a === 'sd-home') { S.sd[S.slot].cur = null; S.sd[S.slot].node = null; S.mainKey = ''; renderMain(); return; }
     if (a === 'sd-open') { sdOpen(S.slot, b.dataset.section, JSON.parse(b.dataset.path), b.dataset.label, false); return; }
     if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
@@ -981,7 +1045,7 @@
     if (a === 'save') {
       const s = slotOf(S.slot);
       const d = draftList(draftOf(s.file));
-      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length;
+      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length && !compCount(d.completion);
       if (none && !s.modified) return;
       if (none) {
         if (confirm('You removed every edit for this save. Put its original back instead?')) act('/api/restore', {}, () => { S.drafts = {}; });
