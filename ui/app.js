@@ -600,24 +600,25 @@
     return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + collectibleParts(s) + leftToPlay(s);
   }
 
-  // collectibles: cards and magazines are proven; flamingos are experimental; the rest can't be written yet
+  // collectibles: the proven kinds, the experimental ones (no save has one to copy), and the ones that can't be written yet
+  const COLL = {
+    cards: ['Collectible cards', c => `All ${c.entries} cards in their 18 sets (the checklist needs 15); ${c.found} found in this save. The cards don’t appear in Lucia’s pocket.`],
+    magazines: ['Magazines, books and comics', c => `The ${c.entries} identified so far; ${c.found} found. They count toward MAGAZINES, BOOKS & COMICS (${c.line?.value ?? '?'} of ${c.line?.of ?? 30}).`],
+    watches: ['Luxury watches', c => `All ${c.entries} watches, which count as discovered styles (${c.line?.value ?? '?'} of ${c.line?.of ?? 70}); ${c.found} found. The watches themselves aren’t added to the wardrobe.`],
+    bookswaps: ['Book swaps (experimental)', c => `${c.entries} library book swaps that count toward magazines, books and comics. No save has one yet, so how the game records it is a best guess.`],
+    magazinestyles: ['Magazine styles (experimental)', c => `${c.entries} tattoos, make-up looks and hairstyles from magazines that count as discovered styles. No save has one yet, and the store unlock they give may be stored elsewhere.`],
+    flamingos: ['Cocaine flamingos (experimental)', c => `All ${c.entries} are identified, but no save has had one destroyed, so how the game records it is a best guess.`]};
   function collectibleParts(s) {
     const C = S.comp[s.file], d = draftOf(s.file).completion;
     if (!C.collectibles) return '';
-    const cats = C.collectibles.categories || [];
-    const by = Object.fromEntries(cats.map(c => [c.key, c]));
+    const cats = (C.collectibles.categories || []).filter(c => COLL[c.key] && (c.state === 'proven' || c.state === 'experimental'));
     const chosen = new Set(d.collectibles?.categories || []);
-    const row = (key, title, help, enabled) => `<div class="field"><div class="name">${esc(title)}<span class="help">${help}</span></div>
-      <div class="inputs">${chosen.has(key) ? `<span class="note">Will be marked found. Save edits to apply it.</span> <button class="btn small" data-act="coll-undo" data-value="${key}">Undo</button>`
-        : `<button class="btn small" data-act="coll-add" data-value="${key}" ${enabled ? '' : 'disabled'}>${enabled ? 'Mark found' : 'Done'}</button>`}</div></div>`;
-    const cards = by.cards, mags = by.magazines, fl = by.flamingos;
-    const parts = [];
-    if (cards) parts.push(row('cards', 'Collectible cards', `All 480 cards in their 18 sets (the checklist needs 15 sets); ${cards.found} found in this save. Only the collection is marked: the cards don’t appear in Lucia’s pocket.`, cards.found < 480));
-    if (mags) parts.push(row('magazines', 'Magazines, books and comics', `${mags.found} of ${mags.line?.of || 30} in this save. Only ${mags.entries - (mags.probable || []).length} of the game’s ${mags.gameTotal || 34} are identified so far, so this marks those.`, (mags.writableNow || 0) > 0));
-    if (fl) parts.push(row('flamingos', 'Cocaine flamingos (experimental)', `All ${fl.entries} are identified, but no save has ever had one destroyed, so the way the game records it is a best guess. Try it on a copy first.`, fl.found < fl.entries));
-    const refused = cats.filter(c => c.state === 'refused').map(c => esc(c.label.charAt(0) + c.label.slice(1).toLowerCase().replace('waink', 'WAiNK')));
+    const rows = cats.map(c => `<div class="field"><div class="name">${esc(COLL[c.key][0])}<span class="help">${COLL[c.key][1](c)}</span></div>
+      <div class="inputs">${chosen.has(c.key) ? `<span class="note">Will be marked found. Save edits to apply it.</span> <button class="btn small" data-act="coll-undo" data-value="${c.key}">Undo</button>`
+        : `<button class="btn small" data-act="coll-add" data-value="${c.key}" ${c.found >= c.entries ? 'disabled' : ''}>${c.found >= c.entries ? 'All found' : 'Mark found'}</button>`}</div></div>`).join('');
+    const refused = (C.collectibles.categories || []).filter(c => c.state === 'refused').map(c => esc((c.label || c.key).charAt(0) + (c.label || c.key).slice(1).toLowerCase().replace('waink', 'WAiNK')));
     return `<div class="group"><div class="section-head"><h3>Collectibles</h3><p>Marked found the way the game records a pickup. Marking one found may stop it appearing in the world, so keep your backup until the PS5 shows it counted.</p></div>
-      <div class="fields">${parts.join('')}</div>${refused.length ? `<p class="note">Not possible yet, because the save doesn’t show which entries they are or how the game records them: ${refused.join(', ')}.</p>` : ''}</div>`;
+      <div class="fields">${rows}</div>${refused.length ? `<p class="note">Not possible yet, because the save doesn’t show which entries they are or how the game records them: ${refused.join(', ')}.</p>` : ''}</div>`;
   }
 
   // activities, hoops and the vehicle compendium
@@ -1100,7 +1101,8 @@
       const s = slotOf(S.slot), d = draftOf(s.file).completion, v = b.dataset.value;
       const cur = new Set(d.collectibles?.categories || []);
       if (a === 'coll-add') cur.add(v); else cur.delete(v);
-      if (cur.size) d.collectibles = {categories: [...cur], card_items: 'skip', ...(cur.has('flamingos') ? {experimental: ['flamingos']} : {})};
+      const exp = [...cur].filter(k => ['bookswaps', 'magazinestyles', 'flamingos'].includes(k));
+      if (cur.size) d.collectibles = {categories: [...cur], card_items: 'skip', watch_items: 'skip', ...(exp.length ? {experimental: exp} : {})};
       else delete d.collectibles;
       S.mainKey = ''; renderMain(); renderPending(); renderCounts();
       return;

@@ -741,7 +741,8 @@ class H(BaseHTTPRequestHandler):
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium, collectibles
+                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium
+                import collectibles2 as collectibles
                 b = slot_bytes(slot)
                 return self._send(200, {'stunts': savedit.stunts(savedit.section(b, money.SEC_STAT)), 'compendium': compendium.read(b),
                                         'discovery': discovery.read(b), 'challenges': challenges.read(b), 'gyms': gyms.read(b),

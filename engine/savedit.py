@@ -284,7 +284,8 @@ def apply(b, edits):
         log += rlog
     comp = edits.get('completion') or {}
     if comp:
-        import compendium, discovery, challenges, gyms, activities, checklist, robberies, fencing, activities2, hoops, vehicles_compendium, collectibles
+        import compendium, discovery, challenges, gyms, activities, checklist, robberies, fencing, activities2, hoops, vehicles_compendium
+        import collectibles2 as collectibles
         steps = [(compendium, comp.get('compendium')), (discovery, comp.get('discovery')), (challenges, comp.get('challenges')), (gyms, comp.get('gyms')),
                  (activities, comp.get('activities')), (robberies, comp.get('robberies')), (fencing, comp.get('fencing')),
                  (activities2, comp.get('activities2')), (hoops, comp.get('hoops')), (vehicles_compendium, comp.get('vehicles')),
