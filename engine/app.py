@@ -717,11 +717,11 @@ class H(BaseHTTPRequestHandler):
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import compendium, discovery, challenges, gyms, activities, checklist
+                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs
                 b = slot_bytes(slot)
                 return self._send(200, {'stunts': savedit.stunts(savedit.section(b, money.SEC_STAT)), 'compendium': compendium.read(b),
                                         'discovery': discovery.read(b), 'challenges': challenges.read(b), 'gyms': gyms.read(b),
-                                        'activities': activities.read(b), 'checklist': checklist.read(b)})
+                                        'activities': activities.read(b), 'checklist': checklist.read(b), 'tasks': tasks.read(b), 'gangs': gangs.read(b)})
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
         if path in ('/api/slot', '/api/stats'):       # detail data for the editor

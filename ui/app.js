@@ -595,7 +595,22 @@
     const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
       <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
         <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox + med;
+    return comp + disc + chal + gymBox + med + leftToPlay(s);
+  }
+
+  // optional tasks and gang operations can't be completed by editing the save: show what's left to play
+  function leftToPlay(s) {
+    const C = S.comp[s.file], t = C.tasks, g = C.gangs;
+    if (!t || !g) return '';
+    const taskList = (t.notPassed || []).map(x => esc(x.title || x.mission)).join(', ');
+    const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.missing} are left to play.${(t.knownMissing || []).length ? ` One of them was finished in your other playthrough.` : ''}</p></div>
+      ${taskList ? `<p class="note">Side missions not passed in this save, a good place to look: ${taskList}.</p>` : ''}</div>`;
+    const left = (g.locations || []).filter(x => !x.cleared);
+    const byGang = Object.fromEntries((g.gangs || []).map(x => [x.key, x.name]));
+    const gangs = `<div class="group"><div class="section-head"><h3>Gang operations</h3><p>${g.checklist.value} of ${g.checklist.of} cleared. These can’t be completed by editing the save either: a clear is written in three places, many operations have no record yet, and each one hands out its own weapons, vehicles and safes. Left to clear:</p></div>
+      <table class="raw"><thead><tr><th>Operation</th><th>Gang</th><th>State</th></tr></thead><tbody>${left.map(x => `
+        <tr><td class="key">${esc(x.label || x.owner || x.id)}${x.hint ? `<small>${esc(x.hint)}</small>` : ''}</td><td>${esc(byGang[x.gang] || x.gang || '')}</td><td>${esc(x.state || '')}</td></tr>`).join('')}</tbody></table></div>`;
+    return tasks + gangs;
   }
 
   // the game's 100% checklist, line by line, with what this tab can do about each
