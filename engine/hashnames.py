@@ -14,7 +14,8 @@ import textlabels
 M32 = 0xffffffff
 _D = None
 KIND_WORDS = {'item': 'Item', 'slot': 'Inventory slot', 'stat': 'Stat', 'name': 'Name', 'mission': 'Mission or task', 'place': 'Place',
-              'text': 'Game text', 'key': 'Save data key', 'section': 'Section'}
+              'text': 'Game text', 'post': 'Social media post', 'article': 'News article', 'account': 'Social media account',
+              'key': 'Save data key', 'section': 'Section'}
 
 
 def _table():
@@ -55,6 +56,8 @@ def _table():
         put(h, 'item', label=l)
     for h, t in textlabels.TEXT.items():         # IDs that are the key of their own on-screen text
         put(h, 'text', label=t)
+    for h, (kind, t) in textlabels.SUFFIX_TEXT.items():    # posts, articles and accounts: text keyed by name + suffix
+        put(h, kind, label=t)
     for h, n in savekeys.KEY_NAMES.items():
         put(h, 'key', name=n)
     for h, n in savekeys.SECTION_NAMES.items():
