@@ -474,6 +474,8 @@
     const n = t.names;
     const ql = n.qual_labels || {}, ol = n.owner_labels || {};
     const bn = i => n.base[i] || `#${i}`, qn = i => (i === 0 ? '' : (n.qual[i] || (ql[i] ? (ql[i] === ql[i].toUpperCase() ? ql[i].toLowerCase() : ql[i]) : `#${i}`))), on = i => ol[i] || n.owner[i] || `#${i}`;
+    // keys whose real name is unknown but whose meaning was worked out from the saves: shown as a description, marked
+    const bm = n.base_meanings || {}, mq = new Set((n.meaning || {}).qual || []), mo = new Set((n.meaning || {}).owner || []);
     const labels = t.labels || {};
     const pretty = l => l ? (l.charAt(0) + l.slice(1).toLowerCase()).replace(/\b(lucia|jason)\b/g, w => w[0].toUpperCase() + w.slice(1)) : '';
     const prot = new Set((t.protected[MONEY_GROUP] || []).map(String));
@@ -481,10 +483,12 @@
     for (const g of t.groups) {
       const vary = new Set(g.varies);
       for (let r = 0; r < g.value.length; r++) {
-        const name = bn(g.base[r]) + (qn(g.qual[r]) ? '.' + qn(g.qual[r]) : '');
+        const b = g.base[r], q = g.qual[r], desc = !n.base[b] && bm[b];
+        const name = desc ? bm[b] + (qn(q) ? ` (${qn(q)})` : '') : bn(b) + (qn(q) ? '.' + qn(q) : '');
+        const meaning = !!desc || (!n.qual[q] && mq.has(q)) || mo.has(g.owner[r]);
         const game = pretty(labels[`${g.key}:${r}`]);
         rows.push({g: g.key, type: g.type, r, b: g.base[r], q: g.qual[r], o: g.owner[r], v: g.value[r], vary: vary.has(r),
-          named: !!(n.base[g.base[r]] || n.qual[g.qual[r]] || game), game, name, owner: on(g.owner[r]), qlab: n.qual[g.qual[r]] ? ql[g.qual[r]] || '' : '',
+          named: !!(n.base[b] || n.qual[q] || game || desc), meaning, game, name, owner: on(g.owner[r]), qlab: n.qual[g.qual[r]] ? ql[g.qual[r]] || '' : '',
           locked: g.key === MONEY_GROUP && prot.has(String(g.base[r])), text: (game + ' ' + name + ' ' + (ql[g.qual[r]] || '') + ' ' + on(g.owner[r]) + ' ' + (n.owner[g.owner[r]] || '') + ` #${g.base[r]} #${g.qual[r]}`).toLowerCase()});
       }
     }
@@ -501,7 +505,7 @@
   function panelAll(s) {
     const f = S.find;
     return `<div class="section-head"><h2>All stats</h2>${riskTag('danger')}
-        <p>Every stat in this save, ${nf.format(statIndex(s.file).length)} in all. Stats the game shows on its stats screens use the game’s own wording; other names were matched by their hash and are very likely right, and the rest are shown as numbers.
+        <p>Every stat in this save, ${nf.format(statIndex(s.file).length)} in all. Stats the game shows on its stats screens use the game’s own wording; other names were matched by their hash and are very likely right. Where the real name is still unknown but the saves show what a stat holds, it gets a plain description in italics. The rest are shown as numbers.
         Stats the game uses usually change between your saves, so that filter is on by default. Change one thing at a time.</p></div>
       <div class="finder"><input type="search" placeholder="Search, for example kills, time running, or #103" value="${esc(f.q)}" data-find="q" aria-label="Search stats">
         <label><input type="checkbox" data-find="varies" ${f.varies ? 'checked' : ''}> Only stats that change between my saves</label>
@@ -522,7 +526,7 @@
       else if (x.type === 'bool') input = `<label class="toggle"><input type="checkbox" ${attrs} data-type="bool" data-unit="flag" data-orig="${x.v ? 1 : 0}" ${(dr ? dr.newValue : x.v) ? 'checked' : ''}> ${(dr ? dr.newValue : x.v) ? 'true' : 'false'}</label>`;
       else input = `<input type="number" ${attrs} data-type="${x.type === 'float' ? 'float' : 'int'}" data-unit="${x.type === 'float' ? 'raw-float' : 'count'}" min="0" max="${capOf(x)}" step="${x.type === 'float' ? 'any' : 1}"
         data-init="${esc(String(x.v))}" data-orig="${esc(JSON.stringify(x.v))}" value="${esc(String(dr ? dr.newValue : x.v))}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>up to ${esc(compact.format(capOf(x)))}</small>`}</td><td>${input}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key${x.meaning && !x.game ? ' described' : ''}">${esc(x.game || x.name)}<small>${x.game ? esc(x.name) + ', ' : x.qlab ? esc(x.qlab) + ', ' : ''}${x.meaning && !x.game ? 'real name unknown, described from how it behaves in saves, ' : ''}#${x.b}${x.q ? ' / #' + x.q : ''}</small></td><td>${esc(x.owner)}</td><td>${esc(x.type)}${x.type === 'bool' ? '' : `<small>up to ${esc(compact.format(capOf(x)))}</small>`}</td><td>${input}</td></tr>`;
     }).join('')}</tbody></table>${list.length > shown.length ? `<div class="more"><button class="btn small" data-act="more">Show more (${nf.format(list.length - shown.length)} left)</button></div>` : ''}`;
   }
 
@@ -666,7 +670,8 @@
   function leftToPlay(s) {
     const C = S.comp[s.file], t = C.tasks, g = C.gangs;
     if (!t || !g) return '';
-    const taskList = (t.notPassed || []).map(x => esc(x.title || x.mission)).join(', ');
+    const np = t.notPassed || [], titled = np.filter(x => x.title), untitled = np.length - titled.length;
+    const taskList = titled.length ? titled.map(x => esc(x.title)).join(', ') + (untitled ? `, and ${untitled} more without a title in the game’s text` : '') : '';
     const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.missing} are left to play.${(t.knownMissing || []).length ? ` One of them was finished in your other playthrough.` : ''}</p></div>
       ${taskList ? `<p class="note">Side missions not passed in this save, a good place to look: ${taskList}.</p>` : ''}</div>`;
     const left = (g.locations || []).filter(x => !x.cleared);

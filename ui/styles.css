@@ -217,6 +217,8 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .raw td { padding: 7px 8px; border-bottom: 1px solid var(--hairline); vertical-align: middle; }
 .raw td.key { font-weight: 600; }
 .raw td.key small { display: block; color: var(--text-3); font-weight: 400; }
+.raw td.key.described { font-style: italic; font-weight: 500; }
+.raw td.key.described small { font-style: normal; }
 .raw td small { display: block; color: var(--text-3); font-size: 12px; }
 .raw input[type="number"] { width: 150px; height: 34px; padding: 2px 8px; border-radius: var(--r-input); border: 1px solid var(--hairline-2); background: var(--field); color: var(--text); font: 600 15px var(--body); font-variant-numeric: tabular-nums; }
 .raw tr.changed input { border-color: var(--edit); box-shadow: 0 0 0 1px var(--edit); }

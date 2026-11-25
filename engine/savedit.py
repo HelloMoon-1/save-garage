@@ -17,6 +17,7 @@ from collections import namedtuple
 
 import gamelabels
 import itemnames
+import meanings
 import money
 import statnames
 
@@ -571,6 +572,13 @@ def stats_table(sec_txt):
     names = table_names(tables)
     names['qual_labels'] = {i: gamelabels.QUALIFIER_LABELS[h] for i, h in enumerate(Q) if h in gamelabels.QUALIFIER_LABELS}
     names['owner_labels'] = {i: gamelabels.OWNER_LABELS[h] for i, h in enumerate(O) if i > 2 and h in gamelabels.OWNER_LABELS}
+    # keys whose real name is unknown: what they hold, worked out from the saves (the UI marks these as descriptions)
+    names['base_meanings'] = {i: meanings.BASE[h] for i, h in enumerate(A) if names['base'][i] is None and h in meanings.BASE}
+    qm = {i: meanings.QUALIFIER[h] for i, h in enumerate(Q) if names['qual'][i] is None and i not in names['qual_labels'] and h in meanings.QUALIFIER}
+    om = {i: meanings.OWNER[h] for i, h in enumerate(O) if names['owner'][i] is None and i not in names['owner_labels'] and h in meanings.OWNER}
+    names['qual_labels'].update(qm)
+    names['owner_labels'].update(om)
+    names['meaning'] = {'base': sorted(names['base_meanings']), 'qual': sorted(qm), 'owner': sorted(om)}
     return {'groups': [{'key': g, 'type': G['type'], 'base': G['base'], 'qual': G['qual'], 'owner': G['owner'], 'value': G['value']}
                        for g, G in groups.items() if G['value']],
             'names': names, 'labels': labels,
