@@ -350,7 +350,7 @@
   const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing'].filter(k => c && c[k]).length;
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles'].filter(k => c && c[k]).length;
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
                          + Object.keys(d.raw || {}).length + compCount(d.completion);
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
@@ -595,7 +595,31 @@
     const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
       <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
         <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox + med + robberyParts(s) + leftToPlay(s);
+    return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + leftToPlay(s);
+  }
+
+  // activities, hoops and the vehicle compendium
+  function activityParts(s) {
+    const C = S.comp[s.file], d = draftOf(s.file).completion;
+    if (!C.activities2 || !C.hoops || !C.vehicles) return '';
+    const label = t => t.charAt(0) + t.slice(1).toLowerCase().replace(/bret's/, 'Bret’s');
+    const chosen = new Set(d.activities2?.lines || []);
+    const lines = C.activities2.lines;
+    const open = lines.filter(l => !l.done_line && l.counter < l.of && !chosen.has(l.key) && l.key !== 'bret');
+    const help = l => l.confidence === 'verified' ? 'Marks each one played.' : l.key === 'bret' ? 'Sets the count only: deck progress isn’t in the save.' : 'Sets the checklist count; the individual results aren’t written, since no save has one played to copy.';
+    const acts = `<div class="group"><div class="section-head"><h3>Activities</h3>${open.length > 1 ? '<button class="btn small" data-act="act-line" data-value="all">Complete all</button>' : ''}<p>Races, ranges, video games, pool, mini golf, drone trials and Bret’s target decks. Prize money, rewards and trophies for them aren’t given.</p></div>
+      <div class="fields">${lines.map(l => `<div class="field"><div class="name">${esc(label(l.label))}<span class="help">${nf.format(l.counter)} of ${nf.format(l.of)}. ${help(l)}</span></div>
+        <div class="inputs">${chosen.has(l.key) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="act-line-undo" data-value="${l.key}">Undo</button>`
+          : `<button class="btn small" data-act="act-line" data-value="${l.key}" ${l.counter >= l.of ? 'disabled' : ''}>${l.counter >= l.of ? 'Done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
+    const h = C.hoops, ht = h.countyTotals || {};
+    const hoopBox = `<div class="group"><div class="section-head"><h3>Basketball hoops</h3><p>The 100% checklist needs 90 of the game’s 100 hoops. Found ${h.found}, scored ${h.scored}. Every hoop is marked found and scored, with each county’s count (${Object.entries(ht).map(([k, v]) => `${esc(k)} ${v}`).join(', ')}, from the game’s own hoop numbers on public maps).</p></div>
+      <div class="fields"><div class="field"><div class="name">Every hoop<span class="help">${h.scored} of ${h.total} scored.</span></div>
+        <div class="inputs">${d.hoops ? `<span class="note">Will be scored. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="hoops">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="hoops" data-value="all" ${h.scored >= h.total ? 'disabled' : ''}>${h.scored >= h.total ? 'All scored' : 'Score all'}</button>`}</div></div></div></div>`;
+    const v = C.vehicles;
+    const veh = `<div class="group"><div class="section-head"><h3>Vehicle compendium</h3><p>BASE MODEL VEHICLES on the 100% checklist: ${v.checklist.value} of ${v.checklist.of}. Adds the ${v.needed} cars and utility vehicles still needed to the compendium, each counted on its own page. Boats, aircraft and a few special cars aren’t added: their compendium IDs aren’t known.</p></div>
+      <div class="fields"><div class="field"><div class="name">Discover ${v.needed} more vehicles<span class="help">${v.candidates} candidates on the car and utility pages.</span></div>
+        <div class="inputs">${d.vehicles ? `<span class="note">Will be discovered. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="vehicles">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="vehicles" data-value="min" ${!v.needed || v.candidates < v.needed ? 'disabled' : ''}>${!v.needed ? 'Done' : v.candidates < v.needed ? 'Not enough candidates' : 'Discover'}</button>`}</div></div></div></div>`;
+    return acts + hoopBox + veh;
   }
 
   // robberies and fencing: lines of the checklist, each marked as the game records it
@@ -824,7 +848,8 @@
     const done = job.kind === 'upload' && job.stage === 'uploaded';
     const edited = (st.slots || []).filter(x => x.modified);
     const summary = edited.length ? `<div class="panel"><h3>What’s being sent</h3><ul class="review" style="max-height:none;margin-top:8px">${edited.map(x =>
-      (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('') ||
+      (x.changes || []).slice(0, 60).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('')
+      + ((x.changes || []).length > 60 ? `<li><span>${esc(missionName(x))}: and ${nf.format(x.changes.length - 60)} more changes</span><span></span></li>` : '') ||
       `<li><span>${esc(missionName(x))}</span><span>edited</span></li>`).join('')}</ul></div>` : '';
     if (done) {
       return `<section class="title-card"><span class="chip">Done</span><h1>Your save is back on the PS5</h1>
@@ -929,7 +954,10 @@
       cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
       cp.activities && {label: 'Meditation spots: all, as ' + (cp.activities.character === 'jason' ? 'Jason' : 'Lucia'), value: '', newValue: 'completed'},
       cp.robberies && {label: 'Robberies: ' + cp.robberies.lines.join(', '), value: '', newValue: 'fully hit'},
-      cp.fencing && {label: 'Fencing: ' + cp.fencing.lines.join(', '), value: '', newValue: 'completed'}].filter(Boolean);
+      cp.fencing && {label: 'Fencing: ' + cp.fencing.lines.join(', '), value: '', newValue: 'completed'},
+      cp.activities2 && {label: 'Activities: ' + cp.activities2.lines.join(', '), value: '', newValue: 'completed'},
+      cp.hoops && {label: 'Basketball hoops: all', value: '', newValue: 'scored'},
+      cp.vehicles && {label: 'Vehicle compendium: up to 200 base models', value: '', newValue: 'discovered'}].filter(Boolean);
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
@@ -1035,6 +1063,19 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'act-line' || a === 'act-line-undo') {
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
+      const lines = C.activities2.lines, v = b.dataset.value;
+      const cur = new Set(d.activities2?.lines || []);
+      if (a === 'act-line') { if (v === 'all') lines.filter(l => l.counter < l.of && l.key !== 'bret').forEach(l => cur.add(l.key)); else cur.add(v); } else cur.delete(v);
+      if (cur.size) {
+        const level = {};
+        for (const k of cur) level[k] = (lines.find(l => l.key === k) || {}).confidence === 'verified' ? 'full' : 'counter';
+        d.activities2 = {lines: [...cur], level, unverified_ok: cur.has('bret')};
+      } else delete d.activities2;
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
     if (a === 'comp-line' || a === 'comp-line-undo') {
       const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
       const feat = b.dataset.feature, v = b.dataset.value, all = C[feat].lines.filter(l => !l.done).map(l => l.key);
@@ -1053,6 +1094,8 @@
         if (feat === 'discovery') d.discovery = {categories: 'all'};
         if (feat === 'gyms') d.gyms = {gyms: 'all'};
         if (feat === 'activities') d.activities = {spots: 'all', character: 'lucia'};
+        if (feat === 'hoops') d.hoops = {hoops: 'all', scored: true, county_counters: 'update'};
+        if (feat === 'vehicles') d.vehicles = {count: 'min'};
         if (feat === 'challenges') {
           if (v === 'all') d.challenges = {categories: 'all'};
           else { const cur = d.challenges ? (d.challenges.categories === 'all' ? C.challenges.categories.map(x => x.key) : d.challenges.categories) : [];

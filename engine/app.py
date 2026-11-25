@@ -717,12 +717,13 @@ class H(BaseHTTPRequestHandler):
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing
+                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium
                 b = slot_bytes(slot)
                 return self._send(200, {'stunts': savedit.stunts(savedit.section(b, money.SEC_STAT)), 'compendium': compendium.read(b),
                                         'discovery': discovery.read(b), 'challenges': challenges.read(b), 'gyms': gyms.read(b),
                                         'activities': activities.read(b), 'checklist': checklist.read(b), 'tasks': tasks.read(b), 'gangs': gangs.read(b),
-                                        'robberies': robberies.read(b), 'fencing': fencing.read(b)})
+                                        'robberies': robberies.read(b), 'fencing': fencing.read(b), 'activities2': activities2.read(b),
+                                        'hoops': hoops.read(b), 'vehicles': vehicles_compendium.read(b)})
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
         if path in ('/api/slot', '/api/stats'):       # detail data for the editor
@@ -802,7 +803,7 @@ class H(BaseHTTPRequestHandler):
                     c = body['completion']
                     if not isinstance(c, dict):
                         raise ValueError('completion must be an object')
-                    edits['completion'] = {k: c[k] for k in ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'stuntDiscovery') if c.get(k)}
+                    edits['completion'] = {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}
                 if body.get('raw'):
                     if not isinstance(body['raw'], list):
                         raise ValueError('raw must be a list')
