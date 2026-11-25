@@ -15,7 +15,7 @@ CACHE="$ROOT/build_out/cache"
 STAGE="$ROOT/build_out/stage"
 rm -rf "$OUT" "$STAGE"
 mkdir -p "$OUT" "$CACHE" "$STAGE"
-APP_FILES=(engine vendor ui LICENSE CREDITS.md README.md requirements.txt)
+APP_FILES=(engine vendor ui LICENSE CREDITS.md README.md README.zh-CN.md requirements.txt)
 
 copy_app() {   # copy the app source into $1, without caches
   mkdir -p "$1"

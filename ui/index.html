@@ -9,28 +9,36 @@
   <title>Save Garage</title>
   <link rel="icon" href="art/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <script defer src="zh-CN.js"></script>
+  <script defer src="i18n.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
+  <a class="skip" href="#main" data-ui-text="Skip to content">Skip to content</a>
   <header class="masthead">
     <img class="scene" src="art/leonida.svg" alt="" aria-hidden="true">
     <div class="masthead-row">
-      <a class="brand" href="./" aria-label="Save Garage home">
+      <a class="brand" href="./" aria-label="Save Garage home" data-ui-label="Save Garage home">
         <img src="art/icon.svg" alt="" width="40" height="40">
-        <span><span class="brand-name">Save Garage</span><span class="brand-sub">Story saves for GTA VI on PS5</span></span>
+        <span><span class="brand-name">Save Garage</span><span class="brand-sub" data-ui-text="Story saves for GTA VI on PS5">Story saves for GTA VI on PS5</span></span>
       </a>
-      <div class="status" id="status" aria-live="polite"></div>
+      <div class="header-actions">
+        <select class="language" id="language" aria-label="Language" data-ui-label="Language">
+          <option value="en-US" lang="en">English</option>
+          <option value="zh-CN" lang="zh-CN">简体中文</option>
+        </select>
+        <div class="status" id="status" aria-live="polite"></div>
+      </div>
     </div>
-    <nav class="steps-nav" id="route" aria-label="Steps"></nav>
+    <nav class="steps-nav" id="route" aria-label="Steps" data-ui-label="Steps"></nav>
   </header>
   <main id="main" tabindex="-1"></main>
   <div class="pending" id="pending" hidden></div>
   <div class="passed" id="passed" hidden role="status" aria-live="assertive"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <footer class="foot">
-    <span>Runs on your own computer. Your PS5 talks to it over your home network.</span>
-    <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden>Quit Save Garage</button></span>
+    <span data-ui-text="Runs on your own computer. Your PS5 talks to it over your home network.">Runs on your own computer. Your PS5 talks to it over your home network.</span>
+    <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden data-ui-text="Quit Save Garage">Quit Save Garage</button></span>
   </footer>
   <noscript>Save Garage needs JavaScript.</noscript>
 </body>

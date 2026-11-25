@@ -5,6 +5,8 @@
   &nbsp;&nbsp;|&nbsp;&nbsp; Windows, macOS and Linux &nbsp;&nbsp;|&nbsp;&nbsp; Free and open source (GPL-3.0)
 </p>
 
+[简体中文](README.zh-CN.md) · Select **简体中文** in the editor to switch the interface language.
+
 Save Garage edits your **GTA VI story-mode save on PS5**: money, ammo and stats. It needs no jailbreak and installs
 nothing on the console. Your PS5 sends the save to your computer through its own Data Transfer feature, you edit it in
 your browser, and the PS5 takes it back the same way.

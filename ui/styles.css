@@ -58,6 +58,16 @@ button, input { font: inherit; color: inherit; }
 .brand img { border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, .35); }
 .brand-name { display: block; font: 400 30px/1 var(--display); letter-spacing: .01em; text-shadow: 0 2px 12px rgba(20, 8, 30, .6); }
 .brand-sub { display: block; margin-top: 3px; font-size: 13px; color: #eadff2; text-shadow: 0 1px 6px rgba(20, 8, 30, .8); }
+.header-actions { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: 8px; }
+.language {
+  color: inherit;
+  background: #241d32;
+  border: 1px solid #5a4c67;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: .85rem;
+}
 .status { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px; background: rgba(21, 17, 29, .78); border: 1px solid var(--hairline); font-size: 13px; color: var(--text-2); white-space: nowrap; }
 .pill b { color: var(--text); font-weight: 600; }
@@ -267,6 +277,7 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 @media (max-width: 860px) {
   .masthead { min-height: 230px; }
   .masthead-row { flex-direction: column; }
+  .header-actions { justify-content: flex-start; }
   .status { justify-content: flex-start; }
   .editor { grid-template-columns: 1fr; }
   .tabs { flex-direction: row; overflow-x: auto; position: static; }
