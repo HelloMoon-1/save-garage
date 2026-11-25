@@ -27,7 +27,7 @@ The whole app state, polled about once a second by the UI.
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "log": []},
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
-  "version": "1.17.0",
+  "version": "1.18.0",
   "canQuit": false                                    // true in the desktop builds
 }
 ```
