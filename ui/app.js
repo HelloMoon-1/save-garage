@@ -740,7 +740,7 @@
   function panelData(s) {
     const sd = S.sd[s.file], d = draftOf(s.file).raw;
     const head = `<div class="section-head"><h2>Save data</h2>${riskTag('danger')}
-        <p>Every section of the save, with names where they’re known. Numbers and true/false values can be changed one at a time; text, the story flow, heists, vehicle records and anything another tab handles stay read-only. Most of these values have unknown meanings, so change one thing, send the save and check it loads.</p></div>`;
+        <p>Every section of the save, with names where they’re known. A number that is the ID of an item, stat, place or vehicle the app knows shows that name under it. Numbers and true/false values can be changed one at a time; text, the story flow, heists, vehicle records and anything another tab handles stay read-only. Most of these values have unknown meanings, so change one thing, send the save and check it loads.</p></div>`;
     if (!sd.cur) {
       return head + `<table class="raw"><thead><tr><th>Section</th><th>Size</th><th></th></tr></thead><tbody>${sd.sections.map(x => `
         <tr><td class="key">${esc(x.name || '0x' + x.hash)}<small>0x${x.hash}${x.readOnly ? ', read-only: ' + esc(x.readOnly) : x.risky ? ', not recommended' : ''}</small></td>
@@ -759,7 +759,7 @@
       else if (x.kind === 'bool') { const on = dr ? dr.newValue : x.raw === 'true';
         cell = `<label class="toggle"><input type="checkbox" data-raw="1" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" ${on ? 'checked' : ''}> ${on ? 'true' : 'false'}</label>`; }
       else cell = `<input type="number" step="any" data-raw="1" data-kind="${x.kind}" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" value="${esc(dr ? String(dr.newValue) : x.raw)}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(String(x.label))}${typeof x.key === 'string' && x.label !== x.key ? `<small>${esc(x.key)}</small>` : ''}</td><td>${esc(x.kind)}</td><td>${cell}</td></tr>`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(String(x.label))}${typeof x.key === 'string' && x.label !== x.key ? `<small>${esc(x.key)}</small>` : ''}</td><td>${esc(x.kind)}</td><td>${cell}${x.means ? `<small class="means">${esc(x.means.kind)}: ${esc(x.means.text)}</small>` : ''}</td></tr>`;
     }).join('');
     const more = n.total > n.offset + n.items.length ? `<div class="more"><button class="btn small" data-act="sd-more">Show more (${nf.format(n.total - n.offset - n.items.length)} left)</button></div>` : '';
     return head + `<div class="crumbs">${crumbs.join(' ')}</div>${ro ? `<div class="callout">Read-only: ${esc(ro)}.</div>` : n.risky ? '<div class="callout">Not recommended: this section is tied to the story or its meaning isn’t known.</div>' : ''}

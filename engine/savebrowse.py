@@ -8,6 +8,7 @@ read-only here.
 import math
 import re
 
+import hashnames
 import jsonedit as je
 import money
 import savekeys
@@ -62,6 +63,35 @@ def sections(b):
              'readOnly': READ_ONLY.get(e[0]), 'risky': e[0] in RISKY} for i, e in enumerate(ents)]
 
 
+_HEXTEXT = re.compile(rb'^"0x([0-9a-fA-F]{8})"$')
+
+
+def _means(kind, raw):
+    """What a value stands for when it is the ID of something with a known name (a number or "0x…" text)."""
+    if kind == 'int':
+        return hashnames.lookup(int(raw))
+    m = _HEXTEXT.match(raw) if kind == 'text' else None
+    return hashnames.lookup(int(m.group(1), 16)) if m else None
+
+
+def _record_means(members):
+    """For an object: a typed hash {"$data": "0x…"} names itself; a small record is named by the first ID in it."""
+    if len(members) == 1 and members[0][0] == '$data':
+        return _means('text', members[0][1])
+    for _, v in members[:8]:
+        if len(v) > 200:
+            continue
+        kv = _kind(v)
+        if kv == 'object':
+            sub = je.members(v)
+            m = _means('text', sub[0][1]) if len(sub) == 1 and sub[0][0] == '$data' else None
+        else:
+            m = _means(kv, v)
+        if m:
+            return m
+    return None
+
+
 def node(b, sec_hash, path, offset=0, limit=200):
     ents, secs, _, _, _ = money._load(b)
     txt = secs[money._sec(ents, sec_hash)]
@@ -71,9 +101,16 @@ def node(b, sec_hash, path, offset=0, limit=200):
         kind = _kind(raw)
         item = {'key': k, 'label': label(k) if isinstance(k, str) else k, 'kind': kind}
         if kind in ('object', 'array'):
-            item['count'] = len(je.members(raw))
+            members = je.members(raw)
+            item['count'] = len(members)
+            means = _record_means(members) if kind == 'object' else None
+            if means:
+                item['means'] = means
         else:
             item['raw'] = raw.decode('utf-8', 'replace')[:200]
+            means = _means(kind, raw)
+            if means:
+                item['means'] = means
         out.append(item)
     return {'section': '%08x' % sec_hash, 'path': path, 'total': len(rows), 'offset': offset, 'items': out,
             'readOnly': READ_ONLY.get(sec_hash), 'risky': sec_hash in RISKY}
