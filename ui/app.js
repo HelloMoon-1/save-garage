@@ -352,7 +352,7 @@
   const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles'].filter(k => c && c[k]).length;
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles'].filter(k => c && c[k]).length;
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
                          + Object.keys(d.raw || {}).length + compCount(d.completion);
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
@@ -597,7 +597,27 @@
     const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
       <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
         <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + leftToPlay(s);
+    return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + collectibleParts(s) + leftToPlay(s);
+  }
+
+  // collectibles: cards and magazines are proven; flamingos are experimental; the rest can't be written yet
+  function collectibleParts(s) {
+    const C = S.comp[s.file], d = draftOf(s.file).completion;
+    if (!C.collectibles) return '';
+    const cats = C.collectibles.categories || [];
+    const by = Object.fromEntries(cats.map(c => [c.key, c]));
+    const chosen = new Set(d.collectibles?.categories || []);
+    const row = (key, title, help, enabled) => `<div class="field"><div class="name">${esc(title)}<span class="help">${help}</span></div>
+      <div class="inputs">${chosen.has(key) ? `<span class="note">Will be marked found. Save edits to apply it.</span> <button class="btn small" data-act="coll-undo" data-value="${key}">Undo</button>`
+        : `<button class="btn small" data-act="coll-add" data-value="${key}" ${enabled ? '' : 'disabled'}>${enabled ? 'Mark found' : 'Done'}</button>`}</div></div>`;
+    const cards = by.cards, mags = by.magazines, fl = by.flamingos;
+    const parts = [];
+    if (cards) parts.push(row('cards', 'Collectible cards', `All 480 cards in their 18 sets (the checklist needs 15 sets); ${cards.found} found in this save. Only the collection is marked: the cards don’t appear in Lucia’s pocket.`, cards.found < 480));
+    if (mags) parts.push(row('magazines', 'Magazines, books and comics', `${mags.found} of ${mags.line?.of || 30} in this save. Only ${mags.entries - (mags.probable || []).length} of the game’s ${mags.gameTotal || 34} are identified so far, so this marks those.`, (mags.writableNow || 0) > 0));
+    if (fl) parts.push(row('flamingos', 'Cocaine flamingos (experimental)', `All ${fl.entries} are identified, but no save has ever had one destroyed, so the way the game records it is a best guess. Try it on a copy first.`, fl.found < fl.entries));
+    const refused = cats.filter(c => c.state === 'refused').map(c => esc(c.label.charAt(0) + c.label.slice(1).toLowerCase().replace('waink', 'WAiNK')));
+    return `<div class="group"><div class="section-head"><h3>Collectibles</h3><p>Marked found the way the game records a pickup. Marking one found may stop it appearing in the world, so keep your backup until the PS5 shows it counted.</p></div>
+      <div class="fields">${parts.join('')}</div>${refused.length ? `<p class="note">Not possible yet, because the save doesn’t show which entries they are or how the game records them: ${refused.join(', ')}.</p>` : ''}</div>`;
   }
 
   // activities, hoops and the vehicle compendium
@@ -660,7 +680,7 @@
   function checklistTable(s) {
     const c = S.comp[s.file].checklist;
     if (!c || !c.lines) return '';
-    const here = l => l.grade === 'a' || l.grade === 'done' ? 'On this tab' : l.grade === 'b' ? 'Not yet: tied to missions, or not certain enough' : 'Can’t be done from the save';
+    const here = l => l.grade === 'a' || l.grade === 'done' ? 'On this tab' : l.grade === 'partial' ? 'Partly, on this tab' : l.grade === 'b' ? 'Not yet: tied to missions, or not certain enough' : 'Can’t be done from the save';
     const fmtv = l => l.of == null ? (typeof l.value === 'number' ? nf2.format(l.value) + (l.label.includes('COMPLETION') ? '%' : '') : '') : `${nf.format(l.value)} / ${nf.format(l.of)}`;
     return `<details class="checklist"><summary>The game’s 100% checklist: ${nf2.format(c.overall?.stored ?? c.overall)}% in this save</summary>
       <table class="raw"><thead><tr><th>Line</th><th>In this save</th><th>Weight</th><th>Here</th></tr></thead><tbody>${c.lines.map(l => `
@@ -968,7 +988,8 @@
       cp.fencing && {label: 'Fencing: ' + cp.fencing.lines.join(', '), value: '', newValue: 'completed'},
       cp.activities2 && {label: 'Activities: ' + cp.activities2.lines.join(', '), value: '', newValue: 'completed'},
       cp.hoops && {label: 'Basketball hoops: all', value: '', newValue: 'scored'},
-      cp.vehicles && {label: 'Vehicle compendium: up to 200 base models', value: '', newValue: 'discovered'}].filter(Boolean);
+      cp.vehicles && {label: 'Vehicle compendium: up to 200 base models', value: '', newValue: 'discovered'},
+      cp.collectibles && {label: 'Collectibles: ' + cp.collectibles.categories.join(', '), value: '', newValue: 'found'}].filter(Boolean);
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
@@ -1073,6 +1094,15 @@
     if (a === 'fill') {
       const input = b.parentElement.querySelector('input[type="number"]');
       if (input) { input.value = b.dataset.to; onEdit(input); }
+      return;
+    }
+    if (a === 'coll-add' || a === 'coll-undo') {
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, v = b.dataset.value;
+      const cur = new Set(d.collectibles?.categories || []);
+      if (a === 'coll-add') cur.add(v); else cur.delete(v);
+      if (cur.size) d.collectibles = {categories: [...cur], card_items: 'skip', ...(cur.has('flamingos') ? {experimental: ['flamingos']} : {})};
+      else delete d.collectibles;
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
       return;
     }
     if (a === 'act-line' || a === 'act-line-undo') {
