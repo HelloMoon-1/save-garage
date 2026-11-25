@@ -283,3 +283,6 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .weapons .kind { color: var(--text-3); }
 
 .crumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+
+.checklist { margin: 0 0 18px; }
+.checklist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
