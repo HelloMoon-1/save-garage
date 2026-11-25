@@ -442,8 +442,8 @@ TESTED_ON_PS5 = {
 EXTRA_HELP = {
     'overall_pct': 'The game shows the value you set; it is not counted again on load.',
     'challenges': 'It also changes CHALLENGES COMPLETED on the 100% checklist.',
-    'stunts_total': 'The 100% checklist counts stunts from each stunt\u2019s own record, so this does not change it.',
-    'stunt_jumps': 'The 100% checklist counts stunts from each stunt\u2019s own record, so this does not change it.',
+    'stunts_total': 'The 100% checklist reads a separate count of unique stunts, so this does not change it.',
+    'stunt_jumps': 'The 100% checklist reads a separate count of unique stunts, so this does not change it.',
 }
 FEATURED = [s if s.id not in TESTED_ON_PS5 else s._replace(
                 risk='tested', help=' '.join(x for x in (s.help if 'Tested on PS5' in s.help else s.help + ' Tested on PS5: the game keeps an edited value.',
@@ -529,3 +529,102 @@ def stats_table(sec_txt):
                        for g, G in groups.items() if G['value']],
             'names': names, 'labels': labels,
             'protected': {MONEY_GROUP: list(MONEY_BASES)}}
+
+
+# ---------------------------------------------------------------- stunts (Completion tab)
+import completiondata
+
+# (id, label, stunt hashes, unique-counter qualifiers with the game's total for each, game total)
+STUNT_GROUPS = (
+    ('jumps', 'Stunt jumps', completiondata.STUNT_JUMPS, (('stuntjumps', 130),), 130),
+    ('base', 'Base jumps', completiondata.BASE_JUMPS, (('basejumps', 25),), 25),
+    ('bridges', 'Under the bridge and knife flights', completiondata.BRIDGES_AND_KNIFE_FLIGHTS, (('underthebridge', 202), ('knifeflights', 40)), 242),
+)
+STUNTS_FOR_100 = 300            # the 100% checklist asks for any 300 of the game's 397 stunts
+
+
+def _stunt_index(sec_txt):
+    groups, tables = stat_rows(sec_txt)
+    A, Q, O = tables['base'], tables['qual'], tables['owner']
+    where = {}
+    for g, G in groups.items():
+        for r in range(len(G['value'])):
+            where[(A[G['base'][r]], Q[G['qual'][r]], O[G['owner'][r]])] = {
+                'group': g, 'row': r, 'base': G['base'][r], 'qual': G['qual'][r], 'owner': G['owner'][r], 'type': G['type'], 'value': G['value'][r]}
+    o0 = O[0]
+    return lambda base, qual: where.get((_h(base), _h(qual), o0))
+
+
+def stunts(sec_txt):
+    """How many stunts of each type are done, out of the stunts in this save and the game's total."""
+    ref = _stunt_index(sec_txt)
+    out = []
+    for gid, label, hashes, _, game_total in STUNT_GROUPS:
+        states = [ref('completionstate', h) for h in hashes]
+        states = [s for s in states if s]
+        out.append({'id': gid, 'label': label, 'count': len(states), 'gameTotal': game_total,
+                    'done': sum(1 for s in states if s['value'])})
+    pct = ref('totalprogressmade', 'totalstunts')
+    unique = ref('uniquestuntscompleted', 'totalstunts')
+    return {'groups': out, 'uniqueTotal': unique['value'] if unique else None, 'pct': pct['value'] if pct else None,
+            'for100': STUNTS_FOR_100}
+
+
+def _split(n, totals):
+    """Share n done stunts between counters in proportion to the game's totals (the under-the-bridge flights and
+    knife flights can't be told apart in the save)."""
+    if len(totals) == 1:
+        return [n]
+    whole = sum(totals)
+    if n == whole:
+        return list(totals)
+    parts = [n * t // whole for t in totals]
+    parts[0] += n - sum(parts)
+    return parts
+
+
+def stunt_edits(sec_txt, ids):
+    """Stat edits that mark every stunt of the given types found and completed, with the game's counters to match:
+    the unique counts per type and in total (the 100% checklist reads these), the repeat counts, and the cached
+    completion percentage for stunts."""
+    ref = _stunt_index(sec_txt)
+    edits = {}
+
+    def put(r, nv, label):
+        if r and not _same(r['type'], r['value'], nv):
+            edits[(r['group'], r['row'])] = dict({k: r[k] for k in ('group', 'row', 'base', 'qual', 'owner')}, value=r['value'], newValue=nv, label=label)
+
+    unique_now = {}
+    for gid, label, hashes, counters, _ in STUNT_GROUPS:
+        rows = [(ref('found', h), ref('completionstate', h), ref('numtimescompleted', h)) for h in hashes]
+        rows = [x for x in rows if x[1]]
+        if gid in ids:
+            for found, state, times in rows:
+                put(found, True, label + ': found')
+                if not state['value']:
+                    put(state, 1, label + ': completed')
+                if times and not times['value']:
+                    put(times, 1, label + ': times completed')
+            share = _split(len(rows), [t for _, t in counters])   # every stunt of the type in this save is now done
+            for (q, _), n in zip(counters, share):
+                unique_now[q] = n
+        else:
+            for q, _ in counters:
+                r = ref('uniquestuntscompleted', q)
+                unique_now[q] = r['value'] if r else 0
+    for gid, label, hashes, counters, _ in STUNT_GROUPS:
+        if gid in ids:
+            for q, _ in counters:
+                put(ref('uniquestuntscompleted', q), unique_now[q], 'Unique stunts completed: ' + q)
+                r = ref('stuntscompleted', q)
+                if r:
+                    put(r, max(r['value'], unique_now[q]), 'Stunts completed, repeats included: ' + q)
+    total_unique = sum(unique_now.values())
+    put(ref('uniquestuntscompleted', 'totalstunts'), total_unique, 'Unique stunts completed')
+    r = ref('stuntscompleted', 'totalstunts')
+    if r:
+        put(r, max(r['value'], total_unique), 'Stunts completed, repeats included')
+    pct = ref('totalprogressmade', 'totalstunts')
+    if pct:
+        put(pct, round(min(100.0, total_unique * 100.0 / STUNTS_FOR_100), 6), 'Stunts, part of 100% completion')
+    return list(edits.values())

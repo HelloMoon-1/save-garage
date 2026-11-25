@@ -371,7 +371,12 @@ def summarize(plog):
             out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
         elif w == 'stat':
-            out.append({'kind': 'stat', 'label': x.get('label') or 'Stat', 'from': x['from'], 'to': x['to']})
+            label = x.get('label') or 'Stat'
+            same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
+            if same:                                   # bulk edits (such as every stunt) collapse into one line
+                same['count'] = same.get('count', 1) + 1
+            else:
+                out.append({'kind': 'stat', 'label': label, 'from': x['from'], 'to': x['to']})
     return out
 
 
@@ -661,6 +666,14 @@ class H(BaseHTTPRequestHandler):
         if path == '/api/state':
             LAST_SEEN['t'] = time.time()
             return self._send(200, public_state())
+        if path == '/api/completion':                   # the Completion tab: stunts and their counters
+            slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
+            if not slot:
+                return self._send(404, {'error': 'no_slot'})
+            try:
+                return self._send(200, {'stunts': savedit.stunts(savedit.section(slot_bytes(slot), money.SEC_STAT))})
+            except Exception as e:
+                return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
         if path in ('/api/slot', '/api/stats'):       # detail data for the editor
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
@@ -723,6 +736,12 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {'job': start_job('download', job_download)})
             if not STATE['session']:
                 raise Fail('no_session')
+            if path == '/api/stunt-edits':             # stat edits that mark whole stunt types done
+                slot = slot_by_file(body.get('file') or '') if STATE['session'] else None
+                if not slot:
+                    raise Fail('no_slot')
+                ids = [i for i in (body.get('groups') or []) if i in {g[0] for g in savedit.STUNT_GROUPS}]
+                return self._send(200, {'edits': savedit.stunt_edits(savedit.section(slot_bytes(slot), money.SEC_STAT), ids)})
             if path == '/api/patch':                   # money, ammo and stats in one request
                 slot = body['slot']
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}

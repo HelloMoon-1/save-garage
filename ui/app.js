@@ -60,7 +60,7 @@
 
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
-    slot: null, tab: 'money', detail: {}, stats: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
+    slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
     find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
 
   // ------------------------------------------------------------ api
@@ -127,7 +127,7 @@
     const jobKey = job.id + ':' + job.status;
     const sig = slotsSig(st);
     if (sig !== S.sig) {                         // new download: forget per-save data
-      S.sig = sig; S.detail = {}; S.stats = {}; S.drafts = {};
+      S.sig = sig; S.detail = {}; S.stats = {}; S.comp = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
       const slots = sortedSlots(st);
       S.slot = slots.length ? slots[0].file : null;
     }
@@ -293,7 +293,7 @@
     const st = S.state;
     const s = slotOf(S.slot);
     if (!s) return '<div class="empty">No story saves were found in this download.</div>';
-    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['all', 'All stats'], ['trophies', 'Trophies']];
+    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['all', 'All stats'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1>${esc(missionName(s))}</h1>
         <p>${moneySummary(s) || 'No money balances in this save'}.${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
@@ -316,6 +316,8 @@
     if (S.tab === 'all' && S.stats[s.file]?.failed) return `<div class="callout danger">${esc(ERR[S.stats[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`;
     if (S.tab === 'ammo') return panelAmmo(s, d);
     if (S.tab === 'stats') return panelStats(s, d);
+    if (S.tab === 'completion') return S.comp[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.comp[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
+      : S.comp[s.file] ? panelCompletion(s) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'all') return S.stats[s.file] ? panelAll(s) : '<div class="empty">Loading every stat in this save…</div>';
     return '';
   }
@@ -524,6 +526,38 @@
   }
 
   // ---- trophies
+  // ---- completion: whole groups of the 100% checklist at once
+  function panelCompletion(s) {
+    const c = S.comp[s.file].stunts;
+    const sel = S.stuntSel[s.file] || new Set();
+    const row = g => {
+      const marked = sel.has(g.id), all = g.done >= g.count;
+      return `<div class="field"><div class="name">${esc(g.label)}<span class="help">${nf.format(g.done)} of ${nf.format(g.count)} done in this save${g.gameTotal !== g.count ? ` (the game has ${nf.format(g.gameTotal)})` : ''}.</span></div>
+        <div class="inputs">${marked ? `<span class="note">Marked done. Save edits to apply it.</span> <button class="btn small" data-act="stunts-undo" data-group="${g.id}">Undo</button>`
+          : `<button class="btn small" data-act="stunts" data-group="${g.id}" ${all ? 'disabled' : ''}>${all ? 'All done' : 'Mark all done'}</button>`}</div></div>`;
+    };
+    const left = c.groups.filter(g => g.done < g.count && !sel.has(g.id)).length;
+    return `<div class="section-head"><h2>Completion</h2>${riskTag('caution')}
+        <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, and the counters the game keeps are set to match. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
+      <div class="group"><div class="section-head"><h3>Stunts</h3>${left > 1 ? '<button class="btn small" data-act="stunts" data-group="all">Mark every stunt done</button>' : ''}
+        <p>The 100% checklist needs any ${nf.format(c.for100)} of the game’s 397 stunts. Unique stunts done in this save: ${c.uniqueTotal == null ? 'unknown' : nf.format(c.uniqueTotal)}. Under-the-bridge flights and knife flights can’t be told apart in the save, so they’re marked together.</p></div>
+        <div class="fields">${c.groups.map(row).join('')}</div></div>`;
+  }
+
+  async function setStunts(file, ids) {
+    const d = draftOf(file);
+    for (const k of S.stuntKeys[file] || []) delete d.stats[k];
+    S.stuntKeys[file] = new Set();
+    S.stuntSel[file] = new Set(ids);
+    if (ids.length) {
+      try {
+        const r = await api('/api/stunt-edits', {file, groups: ids});
+        for (const e of r.edits) { const k = `${e.group}:${e.row}`; d.stats[k] = e; S.stuntKeys[file].add(k); }
+      } catch (e) { S.stuntSel[file] = new Set(); toast(ERR[e.code] || ERR.internal); }
+    }
+    S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+  }
+
   function panelTrophies() {
     return `<div class="section-head"><h2>Trophies</h2><p>What a save edit can and can’t do for trophies on a PS5 without a jailbreak.</p></div>
       <div class="facts">
@@ -548,6 +582,10 @@
       try { S.stats[file] = await api('/api/stats?file=' + encodeURIComponent(file)); } catch (e) { S.stats[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
+    if (S.tab === 'completion' && !S.comp[file]) {
+      try { S.comp[file] = await api('/api/completion?file=' + encodeURIComponent(file)); } catch (e) { S.comp[file] = {failed: e.code || 'request_failed'}; }
+      S.mainKey = ''; renderMain(); return;
+    }
     renderCounts();
   }
 
@@ -555,7 +593,9 @@
     const d = draftOf(S.slot);
     const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length, stats: 0, all: 0};
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
-    for (const k of Object.keys(d.stats)) n[feat.has(k) ? 'stats' : 'all']++;
+    const stunt = S.stuntKeys[S.slot] || new Set();
+    n.completion = 0;
+    for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     for (const el of $$('[data-count]')) el.textContent = n[el.dataset.count] || '';
   }
 
@@ -566,7 +606,7 @@
     const done = job.kind === 'upload' && job.stage === 'uploaded';
     const edited = (st.slots || []).filter(x => x.modified);
     const summary = edited.length ? `<div class="panel"><h3>What’s being sent</h3><ul class="review" style="max-height:none;margin-top:8px">${edited.map(x =>
-      (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}</span></li>`).join('') ||
+      (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('') ||
       `<li><span>${esc(missionName(x))}</span><span>edited</span></li>`).join('')}</ul></div>` : '';
     if (done) {
       return `<section class="title-card"><span class="chip">Done</span><h1>Your save is back on the PS5</h1>
@@ -765,6 +805,15 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'stunts' || a === 'stunts-undo') {
+      const file = S.slot, sel = new Set(S.stuntSel[file] || []);
+      const g = b.dataset.group;
+      if (a === 'stunts-undo') sel.delete(g);
+      else if (g === 'all') for (const x of S.comp[file].stunts.groups) { if (x.done < x.count) sel.add(x.id); }
+      else sel.add(g);
+      setStunts(file, [...sel]);
+      return;
+    }
     if (a === 'fillall' || a === 'maxall') {
       for (const w of $$(`.inputs[data-scope="${b.dataset.scope}"]`)) {
         const input = w.querySelector('input[type="number"]');
@@ -773,12 +822,12 @@
       }
       return;
     }
-    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; S.mainKey = ''; renderMain(); return; }
+    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; S.mainKey = ''; renderMain(); return; }
     if (a === 'more') { S.find.limit += 300; $('#allrows').innerHTML = allRows(slotOf(S.slot)); return; }
     if (a === 'review') { S.reviewOpen = !S.reviewOpen; renderPending(); return; }
     if (a === 'discard') {
       const s = slotOf(S.slot);
-      delete S.drafts[s.file]; seedDraft(s); S.mainKey = ''; renderMain(); renderPending(); return;
+      delete S.drafts[s.file]; delete S.stuntSel[s.file]; delete S.stuntKeys[s.file]; seedDraft(s); S.mainKey = ''; renderMain(); renderPending(); return;
     }
     if (a === 'save') {
       const s = slotOf(S.slot);
@@ -788,7 +837,8 @@
         if (confirm('You removed every edit for this save. Put its original back instead?')) act('/api/restore', {}, () => { S.drafts = {}; });
         return;
       }
-      const risky = d.stats.some(c => !(S.detail[s.file]?.featured || []).some(f => f.entries.some(e => e.group === c.group && e.row === c.row)));
+      const stuntKeys = S.stuntKeys[s.file] || new Set();
+      const risky = d.stats.some(c => !stuntKeys.has(`${c.group}:${c.row}`) && !(S.detail[s.file]?.featured || []).some(f => f.entries.some(e => e.group === c.group && e.row === c.row)));
       if (risky && !confirm('Some of these edits come from All stats, where most values have unknown meanings and can break the save. Keep the originals backed up and check the save loads. Continue?')) return;
       act('/api/patch', {slot: s.file, ...d});
     }
