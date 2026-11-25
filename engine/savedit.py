@@ -427,6 +427,30 @@ def _h(x):
     return joaat(x) if isinstance(x, str) else x
 
 
+# Stats a PS5 kept after loading an edited save, shown on its stats screens and written back on its next save (24-25 Nov
+# 2026). Tested values ran from 10 to 2,222,222, including counters set above the game's own totals, and the game kept
+# counting on from them.
+TESTED_ON_PS5 = {
+    'overall_pct', 'side_tasks', 'overpowers_health', 'overpowers_stamina', 'overpowers_focus', 'buffs_health', 'buffs_stamina',
+    'buffs_focus', 'workouts', 'meditations', 'time_played', 'earned_buckme', 'earned_pickups', 'earned_robberies', 'earned_safe',
+    'earned_till', 'times_wanted', 'stars_gained', 'stars_lost', 'evaded_l1', 'evaded_l2', 'evaded_l3', 'evaded_l4', 'evaded_l5',
+    'evaded_l6', 'weapon_kills', 'runover_kills', 'driveby_kills', 'vehicleweapon_kills', 'kills', 'headshots', 'shots', 'deaths',
+    'busted', 'stolen', 'stolen_slimjim', 'stolen_window', 'carjackings', 'holdups', 'fish', 'photo_animal', 'rentals', 'taxis',
+    'masks', 'armor', 'fenced_packages', 'fenced_doubloons', 'fenced_meteorites', 'stunts_total', 'stunt_jumps', 'base_jumps',
+    'knife_flights', 'under_bridges', 'challenges', 'discoverables', 'collectibles', 'collectible_cards', 'collectible_sets', 'vaults',
+    'gadget_metaldetector', 'gadget_masks', 'gadget_headphones'}
+EXTRA_HELP = {
+    'overall_pct': 'The game shows the value you set; it is not counted again on load.',
+    'challenges': 'It also changes CHALLENGES COMPLETED on the 100% checklist.',
+    'stunts_total': 'The 100% checklist counts stunts from each stunt\u2019s own record, so this does not change it.',
+    'stunt_jumps': 'The 100% checklist counts stunts from each stunt\u2019s own record, so this does not change it.',
+}
+FEATURED = [s if s.id not in TESTED_ON_PS5 else s._replace(
+                risk='tested', help=' '.join(x for x in (s.help if 'Tested on PS5' in s.help else s.help + ' Tested on PS5: the game keeps an edited value.',
+                                                         EXTRA_HELP.get(s.id, '')) if x))
+            for s in FEATURED]
+
+
 # The most each featured stat should be set to: the game's own total where it has one (from its stats screens and
 # 100% checklist), otherwise a limit far above what a long playthrough reaches and far below where a counter could
 # overflow as the game keeps adding to it. Raw units: milliseconds, metres, dollars or a count.

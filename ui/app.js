@@ -20,7 +20,7 @@
     ['earnings', 'Money earned', 'Records of money you earned. Changing these does not add money. Use the Money tab for that.'],
     ['wanted', 'Wanted levels', 'How often and how long the police were after you. Times are in hours.'],
     ['records', 'Records', 'Combat, vehicle and other counters.'],
-    ['trophies', 'Trophy counters', 'Counters behind some of the trophies. Raising one may make the game award the trophy the next time the counter goes up, and trophy sites such as PSNProfiles may flag that. The things a counter counts are not changed, so the numbers can stop matching.'],
+    ['trophies', 'Trophy counters', 'Counters behind some of the trophies. A PS5 keeps edited values, even above the game\u2019s own totals. Raising one may make the game award the trophy the next time the counter goes up, and trophy sites such as PSNProfiles may flag that. The things a counter counts are not changed, so the numbers can stop matching.'],
     ['gadgets', 'Gadgets', 'Flags for gadgets you picked up.']];
   const TYPE_MAX = {int32: 2147483647, u32: 4294967295, int64: 9007199254740991, int16: 32767, u8: 127, float: 1e12};
   const STAGE = {
@@ -444,7 +444,7 @@
       const worst = list.every(f => f.risk === 'danger') ? 'danger' : list.every(f => f.risk === 'tested') ? 'tested' : 'caution';
       return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
     }).join('');
-    return `<div class="callout" style="margin-bottom:24px">Health and stamina overpowers and buffs, workouts, meditations, money-earned records and the metal detector, masks and headphones flags have been tested on a PS5 and are kept by the game. Labels follow the game’s own stats screens. The others haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
+    return `<div class="callout" style="margin-bottom:24px">Almost every stat here has been tested on a PS5: the game showed the edited values on its stats screens, kept them when it saved, and went on counting from them. Labels follow the game’s own stats screens. The times, distances, story and styles percentages and two gadget flags haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
   }
 
   // ---- all stats browser
