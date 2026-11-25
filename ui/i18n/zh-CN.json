@@ -1074,5 +1074,11 @@
 "{0} changes not saved yet": "{0} 项修改尚未保存",
 "Decryption service offline": "解密服务离线",
 "Checking the decryption service": "正在检查解密服务",
-"Open, {0} items": "打开（{0} 项）"
+"Open, {0} items": "打开（{0} 项）",
+"Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page.": "把尚缺的载具（汽车、摩托车、船只和飞机）加入图鉴，每辆都计入各自的页面。",
+"Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.": "紧急、军用、卡车、运输、工业和越野载具暂不添加：存档无法确定它们计入哪一页。",
+"Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "再完成任意 {0} 个即可：可选任务有几百个，每个价值 {3}，所以 {1} 个即可达到 {2}。",
+"No candidates left": "没有剩余候选",
+"Reaches {0} of {1}, from {2} candidates.": "从 {2} 个候选中达到 {1} 中的 {0}。",
+"This line is complete.": "此项已完成。"
 }

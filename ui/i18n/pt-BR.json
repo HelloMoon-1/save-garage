@@ -1074,5 +1074,11 @@
 "{0} changes not saved yet": "{0} alterações ainda não salvas",
 "Decryption service offline": "Serviço de descriptografia offline",
 "Checking the decryption service": "Verificando o serviço de descriptografia",
-"Open, {0} items": "Abrir, {0} itens"
+"Open, {0} items": "Abrir, {0} itens",
+"Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page.": "Adiciona ao compêndio os veículos que ainda faltam, carros, motos, barcos e aviões, cada um contado na sua própria página.",
+"Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.": "Veículos de emergência, militares, caminhões, de transporte, industriais e off-road ainda não são adicionados: o save não mostra com certeza qual página os conta.",
+"Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "Quaisquer {0} a mais bastam: há algumas centenas de tarefas opcionais, e {1} dão os {2} completos, porque cada uma vale {3}.",
+"No candidates left": "Não há mais candidatos",
+"Reaches {0} of {1}, from {2} candidates.": "Chega a {0} de {1}, entre {2} candidatos.",
+"This line is complete.": "Esta linha está completa."
 }

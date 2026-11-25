@@ -884,9 +884,9 @@
       <div class="fields"><div class="field"><div class="name">Every hoop<span class="help">${h.scored} of ${h.total} scored.</span></div>
         <div class="inputs">${d.hoops ? `<span class="note">Will be scored. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="hoops">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="hoops" data-value="all" ${h.scored >= h.total ? 'disabled' : ''}>${h.scored >= h.total ? 'All scored' : 'Score all'}</button>`}</div></div></div></div>`;
     const v = C.vehicles;
-    const veh = `<div class="group"><div class="section-head"><h3>Vehicle compendium</h3><p>BASE MODEL VEHICLES on the 100% checklist: ${v.checklist.value} of ${v.checklist.of}. Adds the ${v.needed} cars and utility vehicles still needed to the compendium, each counted on its own page. Boats, aircraft and a few special cars aren’t added: their compendium IDs aren’t known.</p></div>
-      <div class="fields"><div class="field"><div class="name">Discover ${v.needed} more vehicles<span class="help">${v.candidates} candidates on the car and utility pages.</span></div>
-        <div class="inputs">${d.vehicles ? `<span class="note">Will be discovered. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="vehicles">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="vehicles" data-value="min" ${!v.needed || v.candidates < v.needed ? 'disabled' : ''}>${!v.needed ? 'Done' : v.candidates < v.needed ? 'Not enough candidates' : 'Discover'}</button>`}</div></div></div></div>`;
+    const veh = `<div class="group"><div class="section-head"><h3>Vehicle compendium</h3><p>BASE MODEL VEHICLES on the 100% checklist: ${v.checklist.value} of ${v.checklist.of}. Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page. Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.</p></div>
+      <div class="fields"><div class="field"><div class="name">Discover ${v.min ? v.min.adds : v.needed} more vehicles<span class="help">Reaches ${v.min ? v.min.reaches : v.checklist.value + v.needed} of ${v.checklist.of}, from ${v.candidates} candidates.</span></div>
+        <div class="inputs">${d.vehicles ? `<span class="note">Will be discovered. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="vehicles">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="vehicles" data-value="min" ${!v.needed || !(v.min ? v.min.adds : v.candidates) ? 'disabled' : ''}>${!v.needed ? 'Done' : !(v.min ? v.min.adds : v.candidates) ? 'No candidates left' : 'Discover'}</button>`}</div></div></div></div>`;
     return acts + hoopBox + veh;
   }
 
@@ -911,11 +911,11 @@
   function leftToPlay(s) {
     const C = S.comp[s.file], t = C.tasks, g = C.gangs;
     if (!t || !g) return '';
-    const np = t.notPassed || [], titled = np.filter(x => x.title), untitled = np.length - titled.length;
+    const np = (t.sideMissions || []).some(x => x.title) ? t.sideMissions.filter(x => x.state !== 'done') : (t.notPassed || []), titled = np.filter(x => x.title), untitled = np.length - titled.length;
     const taskList = titled.length ? `<span data-no-i18n>${titled.map(x => esc(x.title)).join(', ')}</span>` + (untitled ? `<span>, and ${untitled} more without a title in the game’s text</span>` : '') : '';
-    const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.missing} are left to play.${(t.knownMissing || []).length ? ` One of them was finished in your other playthrough.` : ''}</p></div>
+    const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.left > 0 ? `Any ${t.left} more will do: there are a few hundred optional tasks, and 102 give the full 100%, because each one is worth 0.99%.` : 'This line is complete.'}</p></div>
       ${taskList ? `<p class="note">Side missions not passed in this save, a good place to look: ${taskList}.</p>` : ''}</div>`;
-    const left = (g.locations || []).filter(x => !x.cleared);
+    const left = (g.locations || []).filter(x => !x.cleared && x.counted !== false);
     const byGang = Object.fromEntries((g.gangs || []).map(x => [x.key, x.name]));
     const gangs = `<div class="group"><div class="section-head"><h3>Gang operations</h3><p>${g.checklist.value} of ${g.checklist.of} cleared. These can’t be completed by editing the save either: a clear is written in three places, many operations have no record yet, and each one hands out its own weapons, vehicles and safes. Left to clear:</p></div>
       <table class="raw"><thead><tr><th>Operation</th><th>Gang</th><th>State</th></tr></thead><tbody>${left.map(x => `

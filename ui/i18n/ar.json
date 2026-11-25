@@ -1074,5 +1074,11 @@
 "{0} changes not saved yet": "تعديلات غير محفوظة: {0}",
 "Decryption service offline": "خدمة فك التشفير غير متصلة",
 "Checking the decryption service": "جارٍ التحقق من خدمة فك التشفير",
-"Open, {0} items": "فتح (العناصر: {0})"
+"Open, {0} items": "فتح (العناصر: {0})",
+"Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page.": "يضيف المركبات الناقصة إلى الموسوعة، من سيارات ودراجات نارية وقوارب وطائرات، وتُحتسب كل منها في صفحتها.",
+"Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.": "لا تُضاف بعدُ مركبات الطوارئ والمركبات العسكرية والشاحنات ومركبات النقل والمركبات الصناعية ومركبات الطرق الوعرة: لا يوضح الحفظ بشكل مؤكد أي صفحة تحتسبها.",
+"Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "يكفي أي {0} إضافية: هناك بضع مئات من المهام الاختيارية، و{1} تمنح {2} كاملة لأن كل مهمة تساوي {3}.",
+"No candidates left": "لم يتبقَّ مرشحون",
+"Reaches {0} of {1}, from {2} candidates.": "يصل إلى {0} من {1}، من بين {2} مرشحًا.",
+"This line is complete.": "اكتمل هذا البند."
 }

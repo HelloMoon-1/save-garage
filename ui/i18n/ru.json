@@ -1074,5 +1074,11 @@
 "{0} changes not saved yet": "Несохранённых изменений: {0}",
 "Decryption service offline": "Сервис расшифровки недоступен",
 "Checking the decryption service": "Проверка сервиса расшифровки",
-"Open, {0} items": "Открыть (элементов: {0})"
+"Open, {0} items": "Открыть (элементов: {0})",
+"Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page.": "Добавляет в справочник недостающий транспорт: машины, мотоциклы, лодки и самолёты, каждый учитывается на своей странице.",
+"Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.": "Экстренный, военный, грузовой, пассажирский, промышленный и внедорожный транспорт пока не добавляется: сохранение не показывает точно, какая страница его считает.",
+"Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "Хватит ещё {0} любых: необязательных заданий несколько сотен, а {1} дают полные {2}, потому что каждое стоит {3}.",
+"No candidates left": "Кандидатов не осталось",
+"Reaches {0} of {1}, from {2} candidates.": "Достигает {0} из {1} (кандидатов: {2}).",
+"This line is complete.": "Эта строка выполнена."
 }

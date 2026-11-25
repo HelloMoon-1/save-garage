@@ -1074,5 +1074,11 @@
 "{0} changes not saved yet": "未保存の変更{0}件",
 "Decryption service offline": "復号サービス：オフライン",
 "Checking the decryption service": "復号サービスを確認中",
-"Open, {0} items": "開く（{0}件）"
+"Open, {0} items": "開く（{0}件）",
+"Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page.": "図鑑にまだ足りない車両（車、バイク、ボート、航空機）を追加し、それぞれのページで数えます。",
+"Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.": "緊急車両、軍用車両、トラック、輸送車両、産業車両、オフロード車両はまだ追加しません。どのページで数えられるかがセーブデータから確実にはわからないためです。",
+"Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "あと任意の{0}件で十分です。オプションタスクは数百件あり、各タスクが{3}分なので{1}件で{2}になります。",
+"No candidates left": "候補がありません",
+"Reaches {0} of {1}, from {2} candidates.": "{2}件の候補から{1}中{0}に到達します。",
+"This line is complete.": "この項目は達成済みです。"
 }

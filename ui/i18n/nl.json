@@ -1074,5 +1074,11 @@
 "{0} changes not saved yet": "{0} wijzigingen nog niet opgeslagen",
 "Decryption service offline": "Ontsleutelingsdienst offline",
 "Checking the decryption service": "Ontsleutelingsdienst wordt gecontroleerd",
-"Open, {0} items": "Openen, {0} items"
+"Open, {0} items": "Openen, {0} items",
+"Adds the vehicles still needed to the compendium, cars, bikes, boats and aircraft, each counted on its own page.": "Voegt de voertuigen die nog ontbreken toe aan het compendium, auto’s, motoren, boten en vliegtuigen, elk geteld op hun eigen pagina.",
+"Emergency, military, truck, transport, industrial and off-road vehicles aren’t added yet: the save doesn’t show for certain which page counts them.": "Hulpdienst-, militaire, vracht-, transport-, industriële en terreinvoertuigen worden nog niet toegevoegd: de savegame laat niet zeker zien welke pagina ze telt.",
+"Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "Elke {0} extra zijn genoeg: er zijn een paar honderd optionele taken, en {1} geven de volle {2}, omdat elke taak {3} waard is.",
+"No candidates left": "Geen kandidaten meer",
+"Reaches {0} of {1}, from {2} candidates.": "Bereikt {0} van {1}, uit {2} kandidaten.",
+"This line is complete.": "Deze regel is compleet."
 }

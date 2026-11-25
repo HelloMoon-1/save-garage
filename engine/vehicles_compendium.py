@@ -2,11 +2,12 @@
 
 WHAT THE LINE READS
   studied.<2b12592f>/story000, the base-model counter (163 at 67.5%; compendium.py), with its cached percentage
-  totalprogressmade.vehiclesdiscovered = float32(min(base, 200) / 200) * 100 (81.5 = 163/200).
+  totalprogressmade.vehiclesdiscovered = float32(min(base, 200) / 200) * 100 (81.5 = 163/200). The game has 277 base
+  models (PowerPyx: 'any 200 of the 277 base model vehicles'); 280 standout vehicles are counted elsewhere.
 
 WHAT IT CHANGES (the minimum consistent edit)
-  Section dbf71c51 (DiscoverableMemoryData), DiscoverableType 3: joaat(model) appended to NameHashes and flag 1 to
-  Flags for each added model (the plain 'discovered' state; compendium.py).
+  Section dbf71c51 (DiscoverableMemoryData), DiscoverableType 3: the model's compendium key appended to NameHashes and
+  flag 1 to Flags for each added model (the plain 'discovered' state; compendium.py).
   Stats 0635cbd9, story000, by the number of models added:
     * studied.<2b12592f> (base models) and studied.vehicles (+n each; every added model is a base model);
     * studied.<page> for the compendium page of each model (+1 per model; see PAGES);
@@ -15,37 +16,52 @@ WHAT IT CHANGES (the minimum consistent edit)
   EXPLORATION 'discover vehicles' tracker reads studied.vehicles while it is incomplete; complete in A6b).
   'min' (the default) adds just enough models to reach 200; 'all' adds every candidate.
 
-THE 44 PAGE COUNTERS (settled here)
+THE COMPENDIUM KEY IS THE VEHICLE'S gameName (settled in round 16)
+  The key of a listed vehicle is joaat(gameName), the game-text key of its display name (table C0898). For most
+  vehicles the gameName is the model name, so the key is joaat(model): 153 of the 176 vehicles seen in the 20 saves.
+  For ten it is not, and all ten were cracked against the keys seen in game-written lists (GAME_NAMES): 60 guesses gave
+  12 hits, all on seen keys, and 0 hits on 100,000 random decoys (expected 0.0014); the last three came from a token
+  grammar, 3 of 3 targets and 0 of 30 decoys. Example: the driven 'airgator' is listed as e54c8bcf = joaat('airboat'),
+  whose text is 'Airboat 09'. Two of them are the model name cut to 11 characters (seaenchantr, dominatorbu).
+  The 23 listed keys that are not joaat(model) are now all accounted for: the 10 gameNames, 11 standout vehicles
+  (C0924 kit keys or unnamed, all on STANDOUT pages), the uncounted Police Lowline, and one base model 865b7f60 whose
+  name is unknown (in every save of both playthroughs, on page 127d7901).
+
+THE PAGE COUNTERS (settled; 4 more in round 16)
   The compendium has 44 page counters studied.<page> (CARS 9, SERVICE 6, STANDOUT 25 category pages, plus BIKES,
   WATERCRAFT, AIRCRAFT); with the equipment counter their sum is studied.vehicles + the type-6 tools in every save.
-  A vehicle site's category list (gtazone, via the SaveRift data file: model hash -> category) gives, for each save,
-  how many listed vehicles fall in each category. For 12 categories that count equals one page counter in all 14
-  game-written saves of both playthroughs (A0..A6b, B7as_a..B7b), value by value:
+  A vehicle site's category list (GTA.ZONE, via the SaveRift data file) with the game's display names and the gameNames
+  gives, for each save, how many listed vehicles fall in each category. For 18 categories that count equals a page
+  counter in all 14 game-written saves of both playthroughs (A0..A6b, B7as_a..B7b), value by value:
     Coupes ee17db65 (13 at 67.5%, the screen's 'COUPES 13 / 18'), Muscle Cars 797cf81e, SUVs 97f2e8d3, Pickups
     c82e2dbe, Sports 9ef3195e, Supercars 37a38f02, Vans 5f3ef66d, Utility 7fe14bbb, Emergency 32f90aa2, Military
-    0085e736, Trucks adeae663 or ea384fd4 (the screen's 'TRUCKS 2 / 11'), Transport 704b9a5f or 8b30431d.
-  Close but not exact, because vehicles listed under a key that is not their model hash have no category in the
-  list: Bikes 8e0937f5, Sedans b34a29b2, Watercraft 1022c6ab (always exactly 5 more in playthrough A: the five boats
-  listed under such keys, Airboat 09, S23 CCS, Sea Enchantress, Hydroblast, Shining Sea Squalo), Aircraft 436bbda1,
-  Off-Road 631ba30a. (Analysis script: work/act2/veh_pages.py.)
-  So the page of a model is known, and this module only adds models from the eight car/utility categories whose
-  series match exactly and that have one counter: their page counters stay in step and the sum rule holds.
+    0085e736, and since round 16 Bikes 8e0937f5, Sedans b34a29b2, Aircraft 436bbda1 and Watercraft 1022c6ab (they
+    were only close before, because Boomazoom, Transient, SuperVolito and five boats are listed under gameName keys).
+  Four categories match two counters each, because one of each pair is a STANDOUT page whose series happens to be
+  identical in these saves: Off-Road acc5c529/7ac90154, Industrial bd646822/8bd2aa53, Transport 8b30431d/704b9a5f,
+  Trucks adeae663/ea384fd4. A save with more vehicles will separate them; until then they are not used.
+  The page totals match the screen where it was seen: the site's 18 coupes, 11 trucks and 28 boats ('WATERCRAFT x / 28').
+  The site lists 271 'Discover in game' base models plus 4 Ultimate Edition and 1 pack vehicle; with 865b7f60 that is
+  277, the guides' number. (Analysis: research_scratch/names/round16/tasks_gangs_vehicles/scripts/v3_pages.py,
+  v9_keys2.py, v10_catalogue.py.)
 
-WHY ONLY THOSE MODELS (the key and membership risks)
-  * The compendium key is joaat(model) for 153 of the 176 vehicles seen, but not for 23 (for example the driven
-    'airgator' is listed as e54c8bcf 'Airboat 09', 'bombora' as 1b0b0c83 'S23 CCS'): boats, aircraft, industrial
-    vehicles and special cars. In the eight chosen categories every discovered vehicle in 14 saves used its model
-    hash (otherwise the series would not match), so joaat(model) is the right key there.
-  * Membership: the site lists 18 coupes, exactly the screen's 18, and its 11 trucks match the screen's 11. For the
-    other categories the page totals are not on screen; base-spec stats rows exist for every candidate.
-  * Emergency and Military are left out (police variants are listed but not counted), as are Trucks and Transport
-    (two possible counters each).
-  With the save at 163 the eight categories leave 45 candidates: 'min' takes 37 (Coupes 5, SUVs 5, Pickups 5,
-  Sports 3, Supercars 1, Vans 6, Utility 6, then 6 Muscle Cars in alphabetical order). A save with fewer base models
-  cannot reach 200 from this set; the log says how far it got.
+WHICH MODELS ARE OFFERED (the key and membership risks)
+  Only models on the 12 pages with a single confirmed counter, minus Emergency and Military (police variants are listed
+  but not counted), and only with a key graded:
+    * confirmed: the key was seen in a game-written compendium list (148 offered);
+    * likely: joaat(model) is the only C0898 key carrying the model's display name (70 offered). That rule holds for
+      135 of 135 seen vehicles it applies to, and none of the ten gameName vehicles falls under it.
+  Held back (NOT_OFFERED): 8 models whose key is weak (no name key for the model, or several keys carry the same name)
+  and the 5 Ultimate Edition / pack vehicles, which a standard copy of the game does not have. They stay page members,
+  so a page still reads as consistent when the game lists them.
+  Every offered model has a <model>_base_spec stats row. 'min' takes the pages in the order of PAGES (the eight car and
+  utility pages first, as before, then Sedans, Bikes, Watercraft, Aircraft) and models in alphabetical order. With the
+  save at 163 it adds the same 37 models from the car pages as before; an early save (playthrough B, 4 base models)
+  reaches 200 using the new pages.
 
-RISK: medium. The page mapping rests on exact series matches; the category list is third-party; nothing has been
-loaded on a PS5. The game shows the added models as discovered but never driven (no stats beyond the counters).
+RISK: medium. The page mapping rests on exact series matches; the category list is third-party; 70 of the offered keys
+are inferred from the game text (likely), not seen; nothing has been loaded on a PS5. The game shows the added models
+as discovered but never driven (no stats beyond the counters).
 """
 import challenges
 import checklist
@@ -61,7 +77,18 @@ FOR_100 = 200
 PCT = ('totalprogressmade', 'vehiclesdiscovered')
 FLAG = 1
 
-# category -> (page counter studied.<q>, models with a <model>_base_spec stats row in that category); order = 'min' order
+# model -> gameName where they differ (each joaat equals a key seen in a game-written compendium list; round 16)
+GAME_NAMES = {'airgator': 'airboat', 'bombora': 's23', 'willard': 'transient', 'digger': 'excavator',
+              'mobilityscooter': 'mobility', 'lurepredator': 'l35p', 'seashark': 'hydroblast', 'seaenchantress': 'seaenchantr',
+              'dominatorbuggy': 'dominatorbu', 'supervolito': 'svolito'}
+
+
+def key_of(model):
+    """Compendium key of a model: joaat(gameName)."""
+    return fl.joaat(GAME_NAMES.get(model, model))
+
+
+# category -> (page counter studied.<q>, every base model of the page); order = 'min' order
 PAGES = (
     ('Coupes', 0xee17db65, ('akane', 'arcturus', 'blista2', 'cypher', 'drafter', 'elegy', 'fr36', 'futo', 'hustler', 'lasso',
                             'paragon', 'penumbra', 'penumbraff', 'ruiner', 'schutzen', 'vectre', 'windsor2', 'zion2')),
@@ -74,20 +101,57 @@ PAGES = (
     ('Sports', 0x9ef3195e, ('banshee', 'carbonizzare', 'comet7', 'cometretro', 'coquette', 'coquette4', 'growler', 'mambagt',
                             'neon', 'schafter3', 'sentinelclassic2', 'sultan', 'wymankitcar')),
     ('Supercars', 0x37a38f02, ('cheetah2', 'emerus', 'furia', 'infernus2', 'italirsx', 'tempesta', 'thrax', 'vitello', 'zorrusso')),
-    ('Vans', 0x5f3ef66d, ('boxville', 'burrito', 'minivan', 'moocher', 'rumpo', 'shifter', 'shuttle', 'speedo', 'spritz',
-                          'trotter', 'vivanite', 'youga2', 'yougaxl')),
-    ('Utility', 0x7fe14bbb, ('airtug', 'caddy', 'caddy2', 'forklift', 'golfcarthotrod', 'ripley', 'taco', 'telehandler', 'towtruck')),
+    ('Vans', 0x5f3ef66d, ('boxville', 'burrito', 'journey', 'minivan', 'moocher', 'rumpo', 'shifter', 'shuttle', 'speedo',
+                          'spritz', 'trotter', 'vivanite', 'youga2', 'yougaxl')),
+    ('Utility', 0x7fe14bbb, ('airtug', 'caddy', 'caddy2', 'forklift', 'golfcarthotrod', 'ripley', 'taco', 'telehandler',
+                             'towtruck')),
     ('Muscle Cars', 0x797cf81e, ('buccaneer', 'chino', 'coquette2', 'declasse500', 'devanity', 'deviant', 'dominator', 'dominator7',
                                  'dominator9', 'dominatorclassic', 'ganado', 'gauntlet4', 'gauntlet5', 'hermes', 'manana', 'phoenix',
                                  'picador', 'slamvan', 'stallion', 'stanier55', 'transgressor', 'tulip', 'tulip2', 'vamos',
                                  'vigero3', 'yosemite')),
+    ('Sedans', 0xb34a29b2, ('animus', 'asterope2', 'bogan', 'buffalo', 'buffalo6', 'chavosxs', 'emperor', 'feroci', 'greta',
+                            'grouse', 'impaler5', 'impaler6', 'intruder', 'jugular', 'lowline', 'meritlx', 'parkland', 'pmp700',
+                            'primo', 'raiden', 'schafters', 'stanier', 'stanierg2', 'sugoi', 'sungrazer', 'tailgater2', 'vstr',
+                            'willard', 'woodland')),
+    ('Bikes', 0x8e0937f5, ('alvinov1', 'aphid', 'avarus', 'blazer4', 'bmx', 'carbonrs', 'cliffhanger', 'cruiser', 'crusher',
+                           'double', 'eboost', 'enduro', 'erode', 'esskey', 'fcr', 'lectro', 'lombike', 'manchez',
+                           'mobilityscooter', 'nightblade2', 'nimbe', 'ragno', 'sanchez', 'scorcher', 'sfb1000', 'sovereign107',
+                           'tribike', 'verus', 'zombieb')),
+    ('Watercraft', 0x1022c6ab, ('airgator', 'azure', 'blade500', 'bombora', 'calder', 'clarion', 'cretacean', 'dibnah', 'dinghy',
+                                'flatdeck', 'fortune', 'hemming', 'kayak', 'lurepredator', 'marquis', 'nepa', 'pontoon', 'rhode',
+                                'seaenchantress', 'seashark', 'sedna', 'shasa', 'skivvy', 'speeder700gt', 'squalo', 'tao', 'torlan',
+                                'yakuruna')),
+    ('Aircraft', 0x436bbda1, ('216cstreamer', 'crake', 'dodo', 'duster', 'duster2', 'jet', 'jet2', 'mallard', 'mammatus',
+                              'maverick', 'nimbus', 'seasparrow', 'shamal', 'supervolito', 'swift', 'volatus')),
 )
+# page members that are never added, with the reason
+NOT_OFFERED = dict(
+    [(m, 'key weak: no name key for the model, or several game-text keys carry its display name')
+     for m in ('216cstreamer', 'calder', 'crusher', 'double', 'forklift', 'swift', 'telehandler', 'vigero3')] +
+    [(m, 'Ultimate Edition vehicle') for m in ('deviant', 'riataclassic', 'transgressor', 'wymankitcar')] +
+    [('stanier55', 'pack vehicle (Vintage Vice City)')])
+# offered models whose key is inferred from the game text, not seen in a save (the rest are confirmed)
+LIKELY = frozenset((
+    'aleutian', 'aphid', 'arcturus', 'azure', 'blazer4', 'bobcatxl', 'buccaneer', 'caddy2', 'carbonrs', 'chino', 'cliffhanger',
+    'cometretro', 'coquette2', 'crake', 'cretacean', 'declasse500', 'devanity', 'dibnah', 'dominator7', 'drafter', 'duster',
+    'emerus', 'esskey', 'fcr', 'flatdeck', 'fortune', 'fr36', 'gauntlet5', 'golfcarthotrod', 'gresleyxt', 'growler', 'hermes',
+    'journey', 'kamacho', 'lectro', 'mallard', 'marquis', 'mesa', 'montagnepu', 'moocher', 'nimbus', 'penumbraff', 'pmp700',
+    'pontoon', 'primo', 'reclaimerclassic', 'ripley', 'sandkingxt', 'sedna', 'shamal', 'shuttle', 'skivvy', 'slamvan', 'spritz',
+    'sungrazer', 'taco', 'tao', 'torlan', 'tribike', 'trotter', 'tulip2', 'verus', 'volatus', 'walton', 'windsor2', 'woodland',
+    'yosemite', 'youga2', 'yougaxl', 'zombieb'))
 # the other page counters identified by series (not used for adding; documented and tested)
 OTHER_PAGES = {'Emergency': (0x32f90aa2,), 'Military': (0x0085e736,), 'Trucks': (0xadeae663, 0xea384fd4),
-               'Transport Vehicles': (0x704b9a5f, 0x8b30431d), 'Bikes': (0x8e0937f5,), 'Sedans': (0xb34a29b2,),
-               'Watercraft': (0x1022c6ab,), 'Aircraft': (0x436bbda1,), 'Off-Road Vehicles': (0x631ba30a,)}
+               'Transport Vehicles': (0x8b30431d, 0x704b9a5f), 'Industrial': (0xbd646822, 0x8bd2aa53),
+               'Off-Road Vehicles': (0xacc5c529, 0x7ac90154),
+               'base model 865b7f60 (name unknown) and one more entry': (0x127d7901,)}
 PAGE_OF = {m: (cat, q) for cat, q, models in PAGES for m in models}
-ORDER = [m for _, _, models in PAGES for m in models]
+ORDER = [m for _, _, models in PAGES for m in models if m not in NOT_OFFERED]
+
+
+def grade(model):
+    if model in NOT_OFFERED:
+        return 'held back'
+    return 'likely' if model in LIKELY else 'confirmed'
 
 
 def _listed(t):
@@ -97,7 +161,6 @@ def _listed(t):
 def _studied_pages(st):
     """{page qualifier: value} of every studied.<q>/story000 row that is not one of the six totals."""
     tot = {fl.joaat('vehicles'), fl.joaat('animals'), fl.joaat('weapons'), 0x2b12592f, 0x8dc8c123, 0x4fa68fa3}
-    A, Q, O = st.tables['base'], st.tables['qual'], st.tables['owner']
     out = {}
     for (b, q, o), (g, r) in st.where.items():
         if b == fl.joaat(STUDIED) and o == fl.joaat('story000') and q not in tot:
@@ -109,23 +172,33 @@ def read(b):
     s = fl.Save(b)
     st = fl.Stats(s.text(fl.STATS))
     listed = _listed(s.text(SEC))
+    base = st.value(STUDIED, C_BASE)
+    pool = [m for m in ORDER if key_of(m) not in listed]
+    need = max(0, FOR_100 - (base or 0))
+    take = pool[:need]
     pages = []
     for cat, q, models in PAGES:
-        have = [m for m in models if fl.joaat(m) in listed]
+        have = [m for m in models if key_of(m) in listed]
+        missing = [m for m in models if key_of(m) not in listed and m not in NOT_OFFERED]
         pages.append({'category': cat, 'counter': fl.hexid(q), 'value': st.value(STUDIED, q), 'models': len(models),
-                      'listed': len(have), 'consistent': st.value(STUDIED, q) == len(have),
-                      'missing': [m for m in models if fl.joaat(m) not in listed]})
-    base = st.value(STUDIED, C_BASE)
+                      'listed': len(have), 'consistent': st.value(STUDIED, q) == len(have), 'missing': missing,
+                      'candidates': [{'model': m, 'key': fl.hexid(key_of(m)), 'grade': grade(m)} for m in missing],
+                      'heldBack': [{'model': m, 'why': NOT_OFFERED[m]} for m in models if key_of(m) not in listed and m in NOT_OFFERED],
+                      'minAdds': sum(1 for m in take if PAGE_OF[m][0] == cat)})
     allpages = _studied_pages(st)
     tools = len(compendium._lists(s.text(SEC)).get(compendium.T_EQUIPMENT, []))
     return {'feature': FEATURE, 'checklist': {'label': 'BASE MODEL VEHICLES', 'value': base, 'of': FOR_100},
             'percent': st.value(*PCT), 'studiedVehicles': st.value(STUDIED, C_VEHICLES), 'listed': len(listed),
-            'pages': pages, 'candidates': sum(len(p['missing']) for p in pages),
-            'needed': max(0, FOR_100 - (base or 0)),
+            'pages': pages, 'candidates': len(pool), 'needed': need,
+            'min': {'adds': len(take), 'reaches': (base or 0) + len(take), 'short': need - len(take),
+                    'likelyKeys': sum(1 for m in take if m in LIKELY),
+                    'byPage': {p['category']: p['minAdds'] for p in pages if p['minAdds']}},
             'pageSumConsistent': sum(allpages.values()) == (st.value(STUDIED, C_VEHICLES) or 0) + tools,
-            'possible': [m for p in pages for m in p['missing']], 'risk': 'medium',
-            'notes': ['Adds base models from eight car/utility pages whose page counters match the saves exactly, with '
-                      "their page counters, so 'COUPES 13 / 18' and the other pages stay right.",
+            'possible': pool, 'risk': 'medium',
+            'notes': ['Adds base models from twelve pages whose page counters match the saves exactly, with their page counters, so '
+                      "'COUPES 13 / 18' and the other pages stay right. Boats, aircraft, bikes and sedans are included since round 16.",
+                      'Keys are joaat(gameName): seen in a save (confirmed) or inferred from the game text (likely). Weak keys, '
+                      'Emergency, Military, the four pages with two possible counters and Ultimate Edition / pack vehicles are left out.',
                       'The models show as discovered but never driven.']}
 
 
@@ -137,6 +210,8 @@ def apply(b, choice=None):
     if want is not None:
         if isinstance(want, (str, bytes)) or any(m not in PAGE_OF for m in want):
             raise fl.FeatureError('unknown_model')
+        if any(m in NOT_OFFERED for m in want):
+            raise fl.FeatureError('not_offered')
     if not (count in ('min', 'all') or (isinstance(count, int) and not isinstance(count, bool) and count >= 0)):
         raise fl.FeatureError('bad_request')
     s = fl.Save(b)
@@ -146,7 +221,7 @@ def apply(b, choice=None):
     base = st.value(STUDIED, C_BASE)
     if base is None:
         raise fl.FeatureError('layout_changed')
-    pool = [m for m in ORDER if fl.joaat(m) not in listed and (want is None or m in want)]
+    pool = [m for m in ORDER if key_of(m) not in listed and (want is None or m in want)]
     n = len(pool) if count == 'all' else (max(0, FOR_100 - base) if count == 'min' else count)
     add = pool[:n]
     log = []
@@ -154,7 +229,7 @@ def apply(b, choice=None):
         log.append({'what': 'short_of_target', 'base': base, 'added': len(add), 'needed': FOR_100 - base})
     if not add:
         return b, log
-    t = compendium._append(t, T_VEHICLES, [fl.joaat(m) for m in add], FLAG)
+    t = compendium._append(t, T_VEHICLES, [key_of(m) for m in add], FLAG)
     s.set_text(SEC, t)
     moved = {}
 
@@ -176,7 +251,7 @@ def apply(b, choice=None):
     st.set(PCT[0], PCT[1], fl.pct32(base + len(add), FOR_100), 'Vehicles, part of 100% completion')
     checklist.refresh_overall(st)
     log.append({'what': 'compendium_vehicles', 'added': len(add), 'flag': FLAG, 'models': add,
-                'pages': {cat: k for (cat, _), k in per.items()}})
+                'likelyKeys': [m for m in add if m in LIKELY], 'pages': {cat: k for (cat, _), k in per.items()}})
     import activities2
     ct = s.text(challenges.SEC)
     ct2, tlog = activities2.mirror_trackers(ct, moved)

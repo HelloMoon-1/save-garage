@@ -10,8 +10,29 @@ WHERE THE LINE LIVES
     CompletionType}, unique ids sorted as signed int32. Type 1 = story, 2 = optional task, 3 = counts for both.
     The id is the joaat of the mission/task id and also the key of its title in the game text ('mtl_pain' ->
     91e56ead -> 'Slam Dunk'), so titled ids are named exactly; 57 of the 95 optional ids have no title in our text dump.
-  * Percentage: totalprogressmade.optionaltasks = float32(counter * 0.99) (checklist.percent_for); the game rebuilds it
-    from the counter when it saves (B7a: one type-2 record, counter 0, percentage 0.0). Weight 6 in the 100% figure.
+  * Percentage: totalprogressmade.optionaltasks = min(100, f32(f32(f32(counter / 100) * 0.99) * 100)) (percent_for
+    here; round 16). It reproduces all 15 game-written values of this row, and of the story row with type 1 + type 3
+    records; checklist.percent_for's float32(counter * 0.99) misses 2 of 15 by one float32 step (A3 57.419998). The
+    game rebuilds it from the counter when it saves (B7a: one type-2 record, counter 0, percentage 0.0). Weight 6 in
+    the 100% figure (GTABase publishes the same weights: story 50, optional 6, gangs 3, robberies and fencing 2, the
+    rest 1).
+  * Every completion is worth 0.99 and the cap is applied at the end (the story row is 100.0 with 103 records), so
+    100 tasks give 99.0, 101 give 99.99 and 102 give 100.0 (THRESHOLD). The guides never mention it because the pool
+    is far larger than 100 (below), so a 100% player passes 102 without noticing.
+
+THE POOL (public guides, round 16)
+  The line asks for any 100 of a few hundred optional tasks (PowerPyx: 'probably 200-300'; GTABase: 'a few hundred').
+  Every purple marker counts: optional missions (black icons with pink letters), each Moses and Randy vehicle
+  delivery, each of Tyrone's Synthetic Labs, each of the 18 meditations (a spot done with both characters counts
+  twice), Cal's fishing challenges and every Strangers & Freaks quest. No public list enumerates them all.
+  So the tasks still needed are not specific tasks: any of them will do.
+  SIDE_MISSIONS: 22 side missions whose content id is expected before they are played, from their mission ids
+  (stats owners). The content id is joaat(mission id), as for the ten side missions already recorded (csc_drt_mall,
+  csc_srs_bybst...); for See You Again and the three Climbing the Cellerichain parts the title's text key is that same
+  hash (csc_mlm_dlvr2 and _dlvr3 were found that way in round 16). The guides place each in a side strand, and
+  PowerPyx: 'all of these add toward the 100 optional tasks'. 19 are graded likely (none recorded yet). The three
+  Cellerichain parts are weak (WEAK_IDS): part 1 was passed in playthrough A (medal 1 from A1) without a record under
+  its own id, so that strand records its completion under another id.
 
 WHAT THE GAME WRITES WHEN A TASK COMPLETES (game-written saves, diffed)
   * A new ScriptGameCompletion record {id, 2} (or 3), inserted in signed-int32 order.
@@ -30,27 +51,28 @@ WHAT THE GAME WRITES WHEN A TASK COMPLETES (game-written saves, diffed)
     Heroes, The Last Mile: Passing the Torch...) also run their mission flow (ScriptFlow, ContentTags, stats owner rows).
   * Then the percentage and the overall figure at the next save.
 
-WHAT IS MISSING IN THE 67.5% SAVE (A6b): 94 of 100
+WHAT IS LEFT IN THE 67.5% SAVE (A6b): 94 of 100
   * 92 type-2 + 2 type-3 records (Twist Wrist, Smash, Grab and Thrillbillies count for both).
-  * Identified missing task: d6b633ab (no title in the game text). Playthrough B completed it (B7as_b: type-2
-    record, objective State 3, Flags 1089, map flag 0xc0, and it counted in the counter). In A6b it is an ambient
-    objective that was never started (State 0, Flags 0) with map flag 0x40.
-  * The other 5 cannot be identified: the save only records tasks once they are done (31 of the 72 optional ids
-    completed in playthrough A appear in no section before completion, 12 of 19 in A0 -> A1; the rest appear only
-    as ambient objectives or map flags, which do not mark a task as optional: A6b holds 134 unfinished ambient
-    objectives), and the full list of optional tasks is game data, not save data. 'notPassed' lists the side missions that have stats rows but were never passed (medal 0, no record);
-    some of them may be the missing tasks (See You Again is in the same strand as two optional tasks), others count
-    as story (type 1) or not at all. It is a list to play from, not a list of the missing 5.
+  * 6 more tasks show 100 / 100; 8 more make the row 100% (THRESHOLD 102). Any tasks will do.
+  * A task done in the other playthrough: d6b633ab (no title in the game text). Playthrough B completed it (B7as_b:
+    type-2 record, objective State 3, Flags 1089, map flag 0xc0, and it counted in the counter). In A6b it is an
+    ambient objective that was never started (State 0, Flags 0) with map flag 0x40. Probably one of Brian's chapter-1
+    jobs (playthrough B did it alongside his jobs; weak).
+  * The save records a task only once it is done (31 of the 72 optional ids completed in playthrough A appear in no
+    section before completion, 12 of 19 in A0 -> A1; the rest appear only as ambient objectives or map flags, which
+    do not mark a task as optional: A6b holds 134 unfinished ambient objectives). 'notPassed' lists the missions that
+    have stats rows but were never passed (medal 0, no record); the side missions among them now carry their strand
+    and the guides' verdict that they count. It is a list to play from.
 
 WHY NOT EDITABLE
-  * The ids of 5 of the 6 missing tasks are not in the save, so their records cannot be written.
+  * The records of unplayed tasks would have to be invented, and most of their ids are not in the save.
   * Writing records for tasks that were not played leaves their own state behind: the ambient objective stays
     State 0/1/2 and is still offered, side missions keep their flow nodes, and any reward the game gives on completion
     (vehicles to collect, gifts, contacts) is not granted. What the game does when a recorded task is offered again
     is unknown.
   * A counter-only edit (possible through the stats editor) changes the screen but completes nothing, and the next
     real optional task resets the counter to the record count (B7a -> B7as_b), so the line would drop back.
-  * One identified task (d6b633ab) would give 95 / 100 and 0.06 points of the 100% figure, at the cost of an
+  * One task with a known id (d6b633ab) would give 95 / 100 and 0.06 points of the 100% figure, at the cost of an
     ambient objective whose content is unknown. Not worth the risk to a finished story save.
 
 RISK: none (read-only).
@@ -75,6 +97,49 @@ FOR_100 = 100
 TYPES = {1: 'story', 2: 'optional', 3: 'story and optional'}
 PROFILE_OWNERS = {fl.joaat(x) for x in ('story000', 'charlucia', 'charjason', 'withpartner', 'withpartnerfreeroam')}
 B_MEDAL = fl.joaat('highestmedal')
+PER_TASK = 0.99                      # each completion is worth 0.99 points of the row
+
+
+def percent_for(n):
+    """The row's cached percentage for a counter value: min(100, f32(f32(f32(n / 100) * 0.99) * 100))."""
+    return min(100.0, fl.f32(fl.f32(fl.f32(n / 100.0) * fl.f32(PER_TASK)) * 100.0))
+
+
+THRESHOLD = next(n for n in range(FOR_100, 2 * FOR_100) if percent_for(n) >= 100.0)      # 102
+
+# Side missions whose content id is known before they are played: id = joaat(mission id) -> (title, mission id, strand).
+# Graded likely (round 16): the rule holds for the 10 side missions already recorded; none of these has been seen yet.
+SIDE_MISSIONS = {
+    0x11609837: ('Spin on This', 'com_dlr_cook', 'Tyrone'),
+    0xe8e69f02: ('Mansion Thrax', 'com_show_ferry', 'Randy'),
+    0x69804b7d: ('Delivery Day', 'com_show_trailer', 'Randy'),
+    0x42c1fe07: ('Dodo, Rise!', 'csc_eco_finale', 'Dodos Rising'),
+    0x143ade4f: ('Twin Flames', 'csc_eco_frack', 'Dodos Rising'),
+    0xc14e510a: ('Bring Out the Chimp', 'csc_eco_monk', 'Dodos Rising'),
+    0xdfdfe85f: ('Sisters of the Sea', 'csc_eco_whale', 'Dodos Rising'),
+    0x5f4ae7b9: ('Climbing the Cellerichain (part 1)', 'csc_mlm_dlvr1', 'Andy (Cellerica)'),
+    0x4d084334: ('Climbing the Cellerichain (part 2)', 'csc_mlm_dlvr2', 'Andy (Cellerica)'),
+    0x0018a952: ('Climbing the Cellerichain (part 3)', 'csc_mlm_dlvr3', 'Andy (Cellerica)'),
+    0x1ad63200: ('See You Again', 'csc_srs_meet', 'Yago'),
+    0x45a85dea: ('The AudaCity', 'csc_stu_party', 'Papa Audacity'),
+    0x612225c1: ('Catching a Whale', 'csc_stu_plane', 'Papa Audacity'),
+    0x512baeb5: ('Quit Your Job, Sell Your House', 'csc_stu_stadm', 'Papa Audacity'),
+    0x8acced29: ('Maritime Disputes', 'csc_trh_plane', 'Kenton (treasure hunting)'),
+    0x8286bde8: ('Treasure Hunter - Rivals', 'csc_trh_rival', 'Kenton (treasure hunting)'),
+    0x82c3e446: ('Aerial Application', 'css_farmcd', 'Kyle'),
+    0x8037df2a: ('Hazardous Materials', 'css_farmcw', 'Kyle'),
+    0xd1d619dd: ('Buddy...?', 'css_farmtr', 'Kyle'),
+    0xcb69e1a3: ('Advanced Skunk Apeonomics', 'css_mmghh', 'Kirk'),
+    0xcc35fe30: ('Skunk Apeology 101', 'css_mmgmp', 'Kirk'),
+    0xd4f31cf4: ('The Final Flush', 'css_skymr', 'Dr. Merle (No Flushers)'),
+}
+# The three Climbing the Cellerichain ids are weak: in playthrough A part 1 got its medal (highestmedal 1, A0 -> A1) but no
+# record was written under joaat('csc_mlm_dlvr1'), so this strand records its completion under another id (one A1 record,
+# 900bf652, matches joaat('csc_mlm_ovrol'): 1 hit for 4 targets against 0 for 80 decoys, weak).
+WEAK_IDS = frozenset((0x5f4ae7b9, 0x4d084334, 0x0018a952))
+# Missions with stats rows that are main missions in the walkthroughs (no record under these ids in a 100%-story save).
+STORY_MISSION_OWNERS = {fl.joaat(n) for n in ('cti_mech_stfc', 'cti_show_hath', 'cti_pil_rd_sh', 'com_kbos_plndate', 'air_cater',
+                                              'air_final', 'air_trstp')}
 
 # Every content id recorded as an optional task (CompletionType 2 or 3) in the 15 game-written saves of this console:
 # id -> (title from the game text or None, mission id from the stats owner names or None).
@@ -200,8 +265,13 @@ def _not_passed(st, recs, titles, names):
             continue
         name = names.get(o)
         strand = name.rsplit('_', 1)[0] if name and name.count('_') >= 2 else None
-        out.append({'id': fl.hexid(o), 'mission': name, 'title': title,
-                    'strandDone': sorted(by_strand.get(strand, [])) if strand else []})
+        side = SIDE_MISSIONS.get(o)
+        out.append({'id': fl.hexid(o), 'mission': name, 'title': title or (side[0] if side else None),
+                    'strandDone': sorted(by_strand.get(strand, [])) if strand else [],
+                    'contact': side[2] if side else None,
+                    'countsAs': ('optional task (%s: the guides count every side mission)' % ('weak' if o in WEAK_IDS else 'likely') if side else
+                                 'story mission' if o in STORY_MISSION_OWNERS else
+                                 'strand: each car or lab in it is its own optional task' if name and name.startswith('ao_') else None)})
     return out
 
 
@@ -237,8 +307,17 @@ def read(b):
         e['mapFlags'] = None if h not in flags else '0x%x' % flags[h]
         e['recordedAs'] = TYPES.get(recs[h]) if h in recs else None
         known_missing.append(e)
-    expected = checklist.percent_for('optionaltasks', counter or 0)
+    expected = percent_for(counter or 0)
     by_type = {name: sum(1 for t in recs.values() if t == k) for k, name in TYPES.items()}
+    side = []
+    for h, (title, mission, contact) in SIDE_MISSIONS.items():
+        t = recs.get(h)
+        medal = st.value(B_MEDAL, 0, h)
+        state = 'done (%s)' % TYPES.get(t, str(t)) if t is not None else (
+            'passed (medal %d), no record under this id' % medal if medal else 'not done')
+        side.append({'id': fl.hexid(h), 'title': title, 'mission': mission, 'contact': contact,
+                     'grade': 'weak' if h in WEAK_IDS else 'likely', 'state': state, 'medal': medal,
+                     'mapFlags': None if h not in flags else '0x%x' % flags[h]})
     return {'feature': FEATURE,
             'checklist': {'label': 'OPTIONAL TASKS COMPLETED', 'value': counter, 'of': FOR_100, 'shown': min(counter or 0, FOR_100),
                           'percent': pct, 'percentExpected': expected,
@@ -249,18 +328,29 @@ def read(b):
             'records': by_type,
             'done': done,
             'missing': missing,
+            'threshold': {'shownOf': FOR_100, 'fullPercent': THRESHOLD, 'perTask': PER_TASK,
+                          'percentAt': {str(n): percent_for(n) for n in (FOR_100, FOR_100 + 1, THRESHOLD)},
+                          'formula': 'min(100, f32(f32(f32(n / 100) * 0.99) * 100))',
+                          'note': '100 tasks show 100 / 100 but give 99%%; %d give the full 6 points of the 100%% figure.' % THRESHOLD},
+            'left': max(0, THRESHOLD - (counter or 0)),
+            'leftToShow100': missing,
+            'pool': 'a few hundred optional tasks (guides: 200-300); any of them count, so the tasks still needed are not specific ones',
             'knownMissing': known_missing,
             'unidentified': max(0, missing - len(known_missing)),
+            'sideMissions': side,
             'notPassed': _not_passed(st, recs, titles, names),
             'editable': False,
             'risk': 'not offered',
-            'why': ['The ids of most missing tasks are not in the save: tasks are recorded only once done, and the list of all '
-                    'optional tasks is game data.',
+            'why': ['Unplayed tasks have no record, and most of their ids are not in the save: tasks are recorded only once done.',
                     'Recording a task that was not played leaves its own state behind (the ambient objective is still offered, '
                     'mission flow and rewards are not given).',
                     'The game resets sidetaskscompleted to the number of records when the next task completes, so a counter-only '
                     'edit would not last.'],
-            'notes': ['The screen reads sidetaskscompleted; the percentage (count x 0.99) is rebuilt from it when the game saves.',
+            'notes': ['The screen reads sidetaskscompleted; the percentage (0.99 per task, capped at 100) is rebuilt from it when '
+                      'the game saves.',
+                      'left: tasks still needed for the full 6 points (%d in all); leftToShow100 (= missing): for the line to '
+                      'read 100 / 100. Any optional tasks count.' % THRESHOLD,
                       'knownMissing: tasks recorded as optional in another save of this console but not done here.',
-                      'notPassed: missions with stats rows that were never passed. Some may count as optional tasks; the save '
-                      'does not say which. strandDone gives the types of the missions already done in the same strand.']}
+                      'sideMissions: side missions whose content id is known before they are played (likely).',
+                      'notPassed: missions with stats rows that were never passed; countsAs says what the guides make of them. '
+                      'strandDone gives the types of the missions already done in the same strand.']}
