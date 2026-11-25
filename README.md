@@ -20,6 +20,7 @@ your browser, and the PS5 takes it back the same way.
 | **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. | Tested on PS5, except times, distances and the story and styles percentages |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Tested on PS5 |
 | **Completion** | Marks every stunt jump, base jump, under-the-bridge flight and knife flight done, with the counters the 100% checklist reads. | Not tested yet |
+| **World** | The time of day (the date stays the same), health up to overpowered, and full armour for both characters. | Not tested yet |
 | **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for many more. | Can break your save |
 | **Trophies** | Not editable. The Trophies page in the app explains what a save edit can and can't do for them. | |
 

@@ -370,6 +370,8 @@ def summarize(plog):
         elif w == 'ammo':
             out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
+        elif w == 'world':
+            out.append({'kind': 'stat', 'label': x['label'], 'from': x['from'], 'to': x['to']})
         elif w == 'stat':
             label = x.get('label') or 'Stat'
             same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
@@ -513,7 +515,7 @@ def job_patch(slot_file, edits):
         data, plog = savedit.apply(src.read_bytes(), edits)
     except money.SaveError as e:
         raise Fail('save_' + str(e))
-    if not any(x.get('what') in ('money', 'ammo', 'stat') for x in plog):
+    if not any(x.get('what') in ('money', 'ammo', 'stat', 'world') for x in plog):
         raise Fail('no_change')
     mod = sess / 'mod' / Path(slot['dir']).name
     if mod.exists():
@@ -666,6 +668,15 @@ class H(BaseHTTPRequestHandler):
         if path == '/api/state':
             LAST_SEEN['t'] = time.time()
             return self._send(200, public_state())
+        if path == '/api/world':                        # time of day, health and armour
+            slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
+            if not slot:
+                return self._send(404, {'error': 'no_slot'})
+            try:
+                import world
+                return self._send(200, world.read(slot_bytes(slot)))
+            except Exception as e:
+                return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
         if path == '/api/completion':                   # the Completion tab: stunts and their counters
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
@@ -747,6 +758,10 @@ class H(BaseHTTPRequestHandler):
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
                 if not all(isinstance(v, list) for v in edits.values()):
                     raise ValueError('edits must be lists')
+                if body.get('world'):
+                    if not isinstance(body['world'], dict):
+                        raise ValueError('world must be an object')
+                    edits['world'] = {k: body['world'][k] for k in ('time', 'health', 'armour') if body['world'].get(k) is not None}
                 return self._send(200, {'job': start_job('patch', lambda: job_patch(slot, edits))})
             if path == '/api/restore':
                 return self._send(200, {'job': start_job('restore', job_restore)})

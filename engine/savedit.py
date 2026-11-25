@@ -269,7 +269,19 @@ def _apply_ammo(txt, changes):
 
 # ---------------------------------------------------------------- whole-file
 def apply(b, edits):
-    """edits: {'money': [...], 'ammo': [...], 'stats': [...]} applied to the original file -> (bytes, log)."""
+    """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'world': {...}} applied to the original file -> (bytes, log)."""
+    b, log = _apply_core(b, edits)
+    if edits.get('world'):
+        import world
+        try:
+            b, wlog = world.apply(b, edits['world'])
+        except (world.WorldError, KeyError, ValueError, TypeError) as e:
+            raise SaveError(str(e) if isinstance(e, world.WorldError) else 'bad_request') from e
+        log += wlog
+    return b, log
+
+
+def _apply_core(b, edits):
     log = []
     if edits.get('money'):
         try:

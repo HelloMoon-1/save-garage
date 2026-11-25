@@ -44,6 +44,7 @@
     save_protected_stat: 'That stat is kept in sync by the Money tab and can’t be edited directly.',
     save_bad_value: 'One of the new values isn’t valid for its field.',
     save_out_of_range: 'One of the new values is outside the allowed range.',
+    save_bad_time: 'The time of day needs an hour from 0 to 23 and a minute from 0 to 59.',
     save_bad_request: 'The edit didn’t match this save. Reload the page and try again.',
     no_change: 'Nothing changed. Edit a value first.',
     port_in_use: 'Ports 1004 to 1006 are already in use. Close any other save-transfer tool or another copy of Save Garage.',
@@ -60,7 +61,7 @@
 
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
-    slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
+    slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, world: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
     find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
 
   // ------------------------------------------------------------ api
@@ -127,7 +128,7 @@
     const jobKey = job.id + ':' + job.status;
     const sig = slotsSig(st);
     if (sig !== S.sig) {                         // new download: forget per-save data
-      S.sig = sig; S.detail = {}; S.stats = {}; S.comp = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
+      S.sig = sig; S.detail = {}; S.stats = {}; S.comp = {}; S.world = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
       const slots = sortedSlots(st);
       S.slot = slots.length ? slots[0].file : null;
     }
@@ -293,7 +294,7 @@
     const st = S.state;
     const s = slotOf(S.slot);
     if (!s) return '<div class="empty">No story saves were found in this download.</div>';
-    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['all', 'All stats'], ['trophies', 'Trophies']];
+    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1>${esc(missionName(s))}</h1>
         <p>${moneySummary(s) || 'No money balances in this save'}.${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
@@ -316,6 +317,8 @@
     if (S.tab === 'all' && S.stats[s.file]?.failed) return `<div class="callout danger">${esc(ERR[S.stats[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`;
     if (S.tab === 'ammo') return panelAmmo(s, d);
     if (S.tab === 'stats') return panelStats(s, d);
+    if (S.tab === 'world') return S.world[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.world[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
+      : S.world[s.file] ? panelWorld(s) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'completion') return S.comp[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.comp[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
       : S.comp[s.file] ? panelCompletion(s) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'all') return S.stats[s.file] ? panelAll(s) : '<div class="empty">Loading every stat in this save…</div>';
@@ -328,18 +331,20 @@
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
-    const d = {money: {}, ammo: {}, stats: {}};
+    const d = {money: {}, ammo: {}, stats: {}, world: {}};
     const a = s.applied || {};
+    if (a.world) d.world = {...a.world};
     for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
     for (const c of a.ammo || []) d.ammo[`${c.inv}:${c.idx}`] = c;
     for (const c of a.stats || []) d.stats[`${c.group}:${c.row}`] = c;
     S.drafts[s.file] = d;
   }
 
-  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}});
-  const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats)});
-  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length;
-  const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort()));
+  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}});
+  const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})}});
+  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length;
+  const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
+  const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world);
   const dirty = s => norm(draftList(draftOf(s.file))) !== norm(s.applied);
 
   // a numeric input cell. kind: money|ammo|stat; init = value shown in the field
@@ -544,6 +549,49 @@
         <div class="fields">${c.groups.map(row).join('')}</div></div>`;
   }
 
+  // ---- world: time of day, health, armour
+  const two = n => String(n).padStart(2, '0');
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function panelWorld(s) {
+    const w = S.world[s.file], d = draftOf(s.file).world, c = w.clock;
+    const t = d.time || {hour: c.hour, minute: c.minute};
+    const hp = d.health ?? w.health;
+    return `<div class="section-head"><h2>World</h2>${riskTag('caution')}
+        <p>The time of day, health and armour the save was made with. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
+      <div class="fields">
+        <div class="field"><div class="name">Time of day<span class="help">Now ${two(c.hour)}:${two(c.minute)} on ${c.day} ${MONTHS[c.month - 1] || ''} ${c.year} in the game. The date stays the same.</span></div>
+          <div class="inputs"><div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-hour">Hour</label><span class="with-unit"><input id="w-hour" type="number" min="0" max="23" step="1" value="${t.hour}" data-world="hour"></span></div>
+            <div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-min">Minute</label><span class="with-unit"><input id="w-min" type="number" min="0" max="59" step="1" value="${two(t.minute)}" data-world="minute"></span></div></div></div>
+        <div class="field"><div class="name">Health<span class="help">Now ${nf2.format(w.health)}. Up to ${nf.format(w.healthMax)}; above 100 is overpowered health.</span></div>
+          <div class="inputs"><div class="cell ${d.health != null ? 'changed' : ''}"><label for="w-hp">Health</label><span class="with-unit"><input id="w-hp" type="number" min="1" max="${w.healthMax}" step="any" value="${hp}" data-world="health">
+            <button class="btn small" data-act="world-fill" data-what="health">Max</button></span></div></div></div>
+        <div class="field"><div class="name">Armour<span class="help">Now ${nf2.format(w.armour)} of ${nf2.format(w.armourMax)}, for both characters’ armour together.</span></div>
+          <div class="inputs">${d.armour === 'full' ? '<span class="note">Will be filled. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="armour">Undo</button>'
+            : `<button class="btn small" data-act="world-fill" data-what="armour" ${w.armour >= w.armourMax ? 'disabled' : ''}>${w.armour >= w.armourMax ? 'Already full' : 'Fill armour'}</button>`}</div></div>
+      </div>`;
+  }
+
+  function onWorld(el) {
+    const s = slotOf(S.slot);
+    if (!s || !S.world[s.file]) return;
+    const w = S.world[s.file], d = draftOf(s.file).world, c = w.clock;
+    const what = el.dataset.world, v = Number(el.value);
+    if (what === 'hour' || what === 'minute') {
+      const t = {hour: d.time?.hour ?? c.hour, minute: d.time?.minute ?? c.minute};
+      t[what] = v;
+      const ok = el.value !== '' && Number.isInteger(v) && v >= 0 && v <= (what === 'hour' ? 23 : 59);
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      if (!ok) { delete d.time; }
+      else if (t.hour === c.hour && t.minute === c.minute) delete d.time;
+      else d.time = t;
+    } else if (what === 'health') {
+      const ok = el.value !== '' && v >= 1 && v <= w.healthMax;
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      if (!ok || v === w.health) delete d.health; else d.health = v;
+    }
+    renderPending(); renderCounts();
+  }
+
   async function setStunts(file, ids) {
     const d = draftOf(file);
     for (const k of S.stuntKeys[file] || []) delete d.stats[k];
@@ -582,6 +630,10 @@
       try { S.stats[file] = await api('/api/stats?file=' + encodeURIComponent(file)); } catch (e) { S.stats[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
+    if (S.tab === 'world' && !S.world[file]) {
+      try { S.world[file] = await api('/api/world?file=' + encodeURIComponent(file)); } catch (e) { S.world[file] = {failed: e.code || 'request_failed'}; }
+      S.mainKey = ''; renderMain(); return;
+    }
     if (S.tab === 'completion' && !S.comp[file]) {
       try { S.comp[file] = await api('/api/completion?file=' + encodeURIComponent(file)); } catch (e) { S.comp[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
@@ -594,7 +646,7 @@
     const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length, stats: 0, all: 0};
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
     const stunt = S.stuntKeys[S.slot] || new Set();
-    n.completion = 0;
+    n.completion = 0; n.world = Object.keys(d.world || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     for (const el of $$('[data-count]')) el.textContent = n[el.dataset.count] || '';
   }
@@ -700,7 +752,11 @@
     const isDirty = dirty(s);
     const busy = running();
     if (!n && !s.modified) { pendingEl.hidden = true; return; }
-    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats)];
+    const w = d.world || {}, now = S.world[s.file];
+    const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
+      w.health != null && {label: 'Health', value: now ? now.health : '', newValue: w.health},
+      w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'}].filter(Boolean);
+    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
@@ -805,6 +861,14 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'world-fill' || a === 'world-undo') {
+      const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world;
+      if (b.dataset.what === 'health') d.health = w.healthMax;
+      else if (a === 'world-fill') d.armour = 'full';
+      else delete d.armour;
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
     if (a === 'stunts' || a === 'stunts-undo') {
       const file = S.slot, sel = new Set(S.stuntSel[file] || []);
       const g = b.dataset.group;
@@ -822,7 +886,7 @@
       }
       return;
     }
-    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; S.mainKey = ''; renderMain(); return; }
+    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; S.mainKey = ''; renderMain(); return; }
     if (a === 'more') { S.find.limit += 300; $('#allrows').innerHTML = allRows(slotOf(S.slot)); return; }
     if (a === 'review') { S.reviewOpen = !S.reviewOpen; renderPending(); return; }
     if (a === 'discard') {
@@ -832,8 +896,9 @@
     if (a === 'save') {
       const s = slotOf(S.slot);
       const d = draftList(draftOf(s.file));
-      if (!d.money.length && !d.ammo.length && !d.stats.length && !s.modified) return;
-      if (!d.money.length && !d.ammo.length && !d.stats.length) {
+      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length;
+      if (none && !s.modified) return;
+      if (none) {
         if (confirm('You removed every edit for this save. Put its original back instead?')) act('/api/restore', {}, () => { S.drafts = {}; });
         return;
       }
@@ -854,6 +919,7 @@
   document.addEventListener('input', e => {
     const el = e.target;
     if (el.dataset.edit && el.type !== 'checkbox') onEdit(el);
+    if (el.dataset.world) onWorld(el);
     if (el.dataset.find === 'q') {
       S.find.q = el.value; S.find.limit = 150;
       clearTimeout(S.findT);
