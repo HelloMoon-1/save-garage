@@ -352,7 +352,7 @@
   const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms'].filter(k => c && c[k]).length;
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles'].filter(k => c && c[k]).length;
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
                          + Object.keys(d.raw || {}).length + compCount(d.completion);
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
@@ -556,7 +556,8 @@
     };
     const left = c.groups.filter(g => g.done < g.count && !sel.has(g.id)).length;
     return `<div class="section-head"><h2>Completion</h2>${riskTag('caution')}
-        <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, and the counters the game keeps are set to match. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
+        <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, the counters the game keeps are set to match, and the 100% figure is worked out again the way the game does it. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
+      ${checklistTable(s)}
       <div class="group"><div class="section-head"><h3>Stunts</h3>${left > 1 ? '<button class="btn small" data-act="stunts" data-group="all">Mark every stunt done</button>' : ''}
         <p>The 100% checklist needs any ${nf.format(c.for100)} of the game’s 397 stunts. Unique stunts done in this save: ${c.uniqueTotal == null ? 'unknown' : nf.format(c.uniqueTotal)}. Under-the-bridge flights and knife flights can’t be told apart in the save, so they’re marked together.</p></div>
         <div class="fields">${c.groups.map(row).join('')}</div></div>
@@ -591,7 +592,79 @@
     const gymBox = `<div class="group"><div class="section-head"><h3>Gym memberships</h3><p>The 100% checklist needs all 8. Owned in this save: ${owned}. A membership is added the way the game adds one; the gyms marked “not seen yet” have never been bought in a real save, so their item IDs come from the game’s text.</p></div>
       <div class="fields"><div class="field"><div class="name">All gym memberships<span class="help">${gyms.map(g => `${esc(g.label)}${g.owned ? ' (owned)' : g.grade !== 'confirmed' ? ' (not seen yet)' : ''}`).join(', ')}.</span></div>
         <div class="inputs">${d.gyms ? pending('gyms', 'Will be added.') : `<button class="btn small" data-act="comp-add" data-feature="gyms" data-value="all" ${owned >= gyms.length ? 'disabled' : ''}>${owned >= gyms.length ? 'All owned' : 'Add all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox;
+    // meditation spots
+    const m = C.activities.meditation;
+    const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
+      <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
+        <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
+    return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + leftToPlay(s);
+  }
+
+  // activities, hoops and the vehicle compendium
+  function activityParts(s) {
+    const C = S.comp[s.file], d = draftOf(s.file).completion;
+    if (!C.activities2 || !C.hoops || !C.vehicles) return '';
+    const label = t => t.charAt(0) + t.slice(1).toLowerCase().replace(/bret's/, 'Bret’s');
+    const chosen = new Set(d.activities2?.lines || []);
+    const lines = C.activities2.lines;
+    const open = lines.filter(l => !l.done_line && l.counter < l.of && !chosen.has(l.key) && l.key !== 'bret');
+    const help = l => l.confidence === 'verified' ? 'Marks each one played.' : l.key === 'bret' ? 'Sets the count only: deck progress isn’t in the save.' : 'Sets the checklist count; the individual results aren’t written, since no save has one played to copy.';
+    const acts = `<div class="group"><div class="section-head"><h3>Activities</h3>${open.length > 1 ? '<button class="btn small" data-act="act-line" data-value="all">Complete all</button>' : ''}<p>Races, ranges, video games, pool, mini golf, drone trials and Bret’s target decks. Prize money, rewards and trophies for them aren’t given.</p></div>
+      <div class="fields">${lines.map(l => `<div class="field"><div class="name">${esc(label(l.label))}<span class="help">${nf.format(l.counter)} of ${nf.format(l.of)}. ${help(l)}</span></div>
+        <div class="inputs">${chosen.has(l.key) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="act-line-undo" data-value="${l.key}">Undo</button>`
+          : `<button class="btn small" data-act="act-line" data-value="${l.key}" ${l.counter >= l.of ? 'disabled' : ''}>${l.counter >= l.of ? 'Done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
+    const h = C.hoops, ht = h.countyTotals || {};
+    const hoopBox = `<div class="group"><div class="section-head"><h3>Basketball hoops</h3><p>The 100% checklist needs 90 of the game’s 100 hoops. Found ${h.found}, scored ${h.scored}. Every hoop is marked found and scored, with each county’s count (${Object.entries(ht).map(([k, v]) => `${esc(k)} ${v}`).join(', ')}, from the game’s own hoop numbers on public maps).</p></div>
+      <div class="fields"><div class="field"><div class="name">Every hoop<span class="help">${h.scored} of ${h.total} scored.</span></div>
+        <div class="inputs">${d.hoops ? `<span class="note">Will be scored. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="hoops">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="hoops" data-value="all" ${h.scored >= h.total ? 'disabled' : ''}>${h.scored >= h.total ? 'All scored' : 'Score all'}</button>`}</div></div></div></div>`;
+    const v = C.vehicles;
+    const veh = `<div class="group"><div class="section-head"><h3>Vehicle compendium</h3><p>BASE MODEL VEHICLES on the 100% checklist: ${v.checklist.value} of ${v.checklist.of}. Adds the ${v.needed} cars and utility vehicles still needed to the compendium, each counted on its own page. Boats, aircraft and a few special cars aren’t added: their compendium IDs aren’t known.</p></div>
+      <div class="fields"><div class="field"><div class="name">Discover ${v.needed} more vehicles<span class="help">${v.candidates} candidates on the car and utility pages.</span></div>
+        <div class="inputs">${d.vehicles ? `<span class="note">Will be discovered. Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="vehicles">Undo</button>` : `<button class="btn small" data-act="comp-add" data-feature="vehicles" data-value="min" ${!v.needed || v.candidates < v.needed ? 'disabled' : ''}>${!v.needed ? 'Done' : v.candidates < v.needed ? 'Not enough candidates' : 'Discover'}</button>`}</div></div></div></div>`;
+    return acts + hoopBox + veh;
+  }
+
+  // robberies and fencing: lines of the checklist, each marked as the game records it
+  function robberyParts(s) {
+    const C = S.comp[s.file], d = draftOf(s.file).completion;
+    if (!C.robberies || !C.fencing) return '';
+    const fmtv = l => l.of >= 1000 ? `$${nf.format(l.value)} of $${nf.format(l.of)}` : `${nf.format(l.value)} of ${nf.format(l.of)}`;
+    const part = (feat, title, intro, lines) => {
+      const chosen = new Set(d[feat]?.lines || []);
+      const open = lines.filter(l => !l.done && !chosen.has(l.key));
+      return `<div class="group"><div class="section-head"><h3>${title}</h3>${open.length > 1 ? `<button class="btn small" data-act="comp-line" data-feature="${feat}" data-value="all">Complete all</button>` : ''}<p>${intro}</p></div>
+        <div class="fields">${lines.map(l => `<div class="field"><div class="name">${esc(l.label.charAt(0) + l.label.slice(1).toLowerCase())}<span class="help">${fmtv(l)}${l.missing ? `, $${nf.format(l.missing)} to go` : ''}.</span></div>
+          <div class="inputs">${chosen.has(l.key) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="comp-line-undo" data-feature="${feat}" data-value="${l.key}">Undo</button>`
+            : `<button class="btn small" data-act="comp-line" data-feature="${feat}" data-value="${l.key}" ${l.done ? 'disabled' : ''}>${l.done ? 'Done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
+    };
+    return part('robberies', 'Robberies', 'Marks robbery locations fully hit the way the game records it, with the per-type counters and the checklist rows. No cash, goods or robbery counts are added. Vaults: the save doesn’t say which 8 banks have one, so the vaults of all 12 large banks are marked.', C.robberies.lines)
+      + part('fencing', 'Fencing', 'Records one sale per unfinished line, worth exactly what’s missing, to the fence the game uses most for it, as Lucia. The earnings totals that a real sale raises go up with it.', C.fencing.lines);
+  }
+
+  // optional tasks and gang operations can't be completed by editing the save: show what's left to play
+  function leftToPlay(s) {
+    const C = S.comp[s.file], t = C.tasks, g = C.gangs;
+    if (!t || !g) return '';
+    const taskList = (t.notPassed || []).map(x => esc(x.title || x.mission)).join(', ');
+    const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.missing} are left to play.${(t.knownMissing || []).length ? ` One of them was finished in your other playthrough.` : ''}</p></div>
+      ${taskList ? `<p class="note">Side missions not passed in this save, a good place to look: ${taskList}.</p>` : ''}</div>`;
+    const left = (g.locations || []).filter(x => !x.cleared);
+    const byGang = Object.fromEntries((g.gangs || []).map(x => [x.key, x.name]));
+    const gangs = `<div class="group"><div class="section-head"><h3>Gang operations</h3><p>${g.checklist.value} of ${g.checklist.of} cleared. These can’t be completed by editing the save either: a clear is written in three places, many operations have no record yet, and each one hands out its own weapons, vehicles and safes. Left to clear:</p></div>
+      <table class="raw"><thead><tr><th>Operation</th><th>Gang</th><th>State</th></tr></thead><tbody>${left.map(x => `
+        <tr><td class="key">${esc(x.label || x.owner || x.id)}${x.hint ? `<small>${esc(x.hint)}</small>` : ''}</td><td>${esc(byGang[x.gang] || x.gang || '')}</td><td>${esc(x.state || '')}</td></tr>`).join('')}</tbody></table></div>`;
+    return tasks + gangs;
+  }
+
+  // the game's 100% checklist, line by line, with what this tab can do about each
+  function checklistTable(s) {
+    const c = S.comp[s.file].checklist;
+    if (!c || !c.lines) return '';
+    const here = l => l.grade === 'a' || l.grade === 'done' ? 'On this tab' : l.grade === 'b' ? 'Not yet: tied to missions, or not certain enough' : 'Can’t be done from the save';
+    const fmtv = l => l.of == null ? (typeof l.value === 'number' ? nf2.format(l.value) + (l.label.includes('COMPLETION') ? '%' : '') : '') : `${nf.format(l.value)} / ${nf.format(l.of)}`;
+    return `<details class="checklist"><summary>The game’s 100% checklist: ${nf2.format(c.overall?.stored ?? c.overall)}% in this save</summary>
+      <table class="raw"><thead><tr><th>Line</th><th>In this save</th><th>Weight</th><th>Here</th></tr></thead><tbody>${c.lines.map(l => `
+        <tr><td>${esc(l.label)}</td><td>${esc(fmtv(l))}</td><td>${l.weight}%</td><td>${esc(here(l))}</td></tr>`).join('')}</tbody></table></details>`;
   }
 
   // ---- world: time of day, health, armour
@@ -777,7 +850,8 @@
     const done = job.kind === 'upload' && job.stage === 'uploaded';
     const edited = (st.slots || []).filter(x => x.modified);
     const summary = edited.length ? `<div class="panel"><h3>What’s being sent</h3><ul class="review" style="max-height:none;margin-top:8px">${edited.map(x =>
-      (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('') ||
+      (x.changes || []).slice(0, 60).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('')
+      + ((x.changes || []).length > 60 ? `<li><span>${esc(missionName(x))}: and ${nf.format(x.changes.length - 60)} more changes</span><span></span></li>` : '') ||
       `<li><span>${esc(missionName(x))}</span><span>edited</span></li>`).join('')}</ul></div>` : '';
     const all = sortedSlots(st);
     const total = Math.max(st.fileCount || 0, all.length);
@@ -888,7 +962,13 @@
     const compList = [cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
       cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
-      cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'}].filter(Boolean);
+      cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
+      cp.activities && {label: 'Meditation spots: all, as ' + (cp.activities.character === 'jason' ? 'Jason' : 'Lucia'), value: '', newValue: 'completed'},
+      cp.robberies && {label: 'Robberies: ' + cp.robberies.lines.join(', '), value: '', newValue: 'fully hit'},
+      cp.fencing && {label: 'Fencing: ' + cp.fencing.lines.join(', '), value: '', newValue: 'completed'},
+      cp.activities2 && {label: 'Activities: ' + cp.activities2.lines.join(', '), value: '', newValue: 'completed'},
+      cp.hoops && {label: 'Basketball hoops: all', value: '', newValue: 'scored'},
+      cp.vehicles && {label: 'Vehicle compendium: up to 200 base models', value: '', newValue: 'discovered'}].filter(Boolean);
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
@@ -995,6 +1075,28 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'act-line' || a === 'act-line-undo') {
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
+      const lines = C.activities2.lines, v = b.dataset.value;
+      const cur = new Set(d.activities2?.lines || []);
+      if (a === 'act-line') { if (v === 'all') lines.filter(l => l.counter < l.of && l.key !== 'bret').forEach(l => cur.add(l.key)); else cur.add(v); } else cur.delete(v);
+      if (cur.size) {
+        const level = {};
+        for (const k of cur) level[k] = (lines.find(l => l.key === k) || {}).confidence === 'verified' ? 'full' : 'counter';
+        d.activities2 = {lines: [...cur], level, unverified_ok: cur.has('bret')};
+      } else delete d.activities2;
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
+    if (a === 'comp-line' || a === 'comp-line-undo') {
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
+      const feat = b.dataset.feature, v = b.dataset.value, all = C[feat].lines.filter(l => !l.done).map(l => l.key);
+      const cur = new Set(d[feat]?.lines || []);
+      if (a === 'comp-line') { if (v === 'all') all.forEach(k => cur.add(k)); else cur.add(v); } else cur.delete(v);
+      if (cur.size) d[feat] = feat === 'robberies' ? {lines: [...cur], vaults: 'large'} : {lines: [...cur], character: 'lucia'}; else delete d[feat];
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
     if (a === 'comp-add' || a === 'comp-undo') {
       const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
       const [feat, sub] = (a === 'comp-add' ? b.dataset.feature : b.dataset.feature).split(':');
@@ -1003,6 +1105,9 @@
         if (feat === 'compendium') { const g = new Set(d.compendium?.groups || []); g.add(v); d.compendium = {groups: [...g]}; }
         if (feat === 'discovery') d.discovery = {categories: 'all'};
         if (feat === 'gyms') d.gyms = {gyms: 'all'};
+        if (feat === 'activities') d.activities = {spots: 'all', character: 'lucia'};
+        if (feat === 'hoops') d.hoops = {hoops: 'all', scored: true, county_counters: 'update'};
+        if (feat === 'vehicles') d.vehicles = {count: 'min'};
         if (feat === 'challenges') {
           if (v === 'all') d.challenges = {categories: 'all'};
           else { const cur = d.challenges ? (d.challenges.categories === 'all' ? C.challenges.categories.map(x => x.key) : d.challenges.categories) : [];
