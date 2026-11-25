@@ -9,11 +9,12 @@ import itemnames
 import money
 import savekeys
 import statnames
+import textlabels
 
 M32 = 0xffffffff
 _D = None
 KIND_WORDS = {'item': 'Item', 'slot': 'Inventory slot', 'stat': 'Stat', 'name': 'Name', 'mission': 'Mission or task', 'place': 'Place',
-              'key': 'Save data key', 'section': 'Section'}
+              'text': 'Game text', 'key': 'Save data key', 'section': 'Section'}
 
 
 def _table():
@@ -52,6 +53,8 @@ def _table():
             put(x[0], 'place', label=x[2])
     for h, l in gangs.ITEM_LABELS.items():
         put(h, 'item', label=l)
+    for h, t in textlabels.TEXT.items():         # IDs that are the key of their own on-screen text
+        put(h, 'text', label=t)
     for h, n in savekeys.KEY_NAMES.items():
         put(h, 'key', name=n)
     for h, n in savekeys.SECTION_NAMES.items():
