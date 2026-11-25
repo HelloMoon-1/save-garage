@@ -77,6 +77,12 @@ Nothing else is uploaded. The editor runs only on your computer, and by default 
 Originals and backups stay in `%LOCALAPPDATA%\SaveGarage` on Windows, `~/Library/Application Support/SaveGarage`
 on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folder when you run from source.
 
+## Related
+
+- [GTA 6 hash database](https://github.com/NotHGM/gta6-hash-database): every name Save Garage has decoded (stats, items,
+  vehicles, missions, save keys) with the evidence for each, plus 1.1 million GTA VI hashes from the community's name
+  lists, as searchable text tables.
+
 ## Good to know
 
 - **Money is capped by the game.** Each account holds money in boxes of a fixed size. Family Savings gets the larger
