@@ -50,9 +50,10 @@ except Exception:
     pass
 G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
 
-STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None,
+STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
          'slots': [], 'readyToUpload': False, 'network': None}
-JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'log': []}
+JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None, 'log': []}
+CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
 PROC = {'p': None}
 RELAY = {'r': None}
 
@@ -106,21 +107,21 @@ def start_job(kind, fn):
     with LOCK:
         if JOB['status'] == 'running':
             raise Fail('busy')
-        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, log=[])
+        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None, log=[])
 
     def run():
         try:
             fn()
             with LOCK:
-                JOB.update(status='done', needPower=False)
+                JOB.update(status='done', needPower=False, accounts=None)
         except Fail as e:
             log('FAIL %s %s' % (e.code, e.detail))
             with LOCK:
-                JOB.update(status='error', error={'code': e.code, 'detail': str(e.detail)[:300]}, needPower=False)
+                JOB.update(status='error', error={'code': e.code, 'detail': str(e.detail)[:300]}, needPower=False, accounts=None)
         except Exception as e:
             log(traceback.format_exc()[-600:])
             with LOCK:
-                JOB.update(status='error', error={'code': 'internal', 'detail': repr(e)[:300]}, needPower=False)
+                JOB.update(status='error', error={'code': 'internal', 'detail': repr(e)[:300]}, needPower=False, accounts=None)
         finally:
             kill_proc()
     threading.Thread(target=run, daemon=True).start()
@@ -449,7 +450,7 @@ def restore_session():
         return
     with LOCK:
         STATE.update(session=str(sess), user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
-                     slots=slots, readyToUpload=any(s['modified'] for s in slots))
+                     slots=slots, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
 
@@ -465,7 +466,7 @@ def job_download():
             'waitForSelection': True, 'titles': GTA_TITLES}
     p = spawn(['dl_worker', json.dumps(opts)])
     stage('connecting')
-    entries, users, nosave, err, files = [], [], False, None, 0
+    entries, users, nosave, err, files, chosen = [], [], False, None, 0, None
     for line in p.stdout:
         line = line.rstrip()
         if line.startswith('[file] saved'):
@@ -488,6 +489,18 @@ def job_download():
             stage('downloading', needPower=False)
         elif t == 'entries':
             entries, users = ev['entries'], ev.get('users') or []
+        elif t == 'accounts':                   # several PS5 accounts have a save: ask which one, then tell the worker
+            CHOICE['owner'] = None; CHOICE['event'].clear()
+            stage('choose_account', accounts=ev.get('accounts') or [])
+            while not CHOICE['event'].wait(0.5):
+                if p.poll() is not None:        # cancelled or the worker died
+                    break
+            if p.poll() is not None or not CHOICE['owner']:
+                raise Fail('download_failed', 'cancelled while choosing the account')
+            p.stdin.write(json.dumps({'owner': CHOICE['owner']}) + '\n'); p.stdin.flush()
+            stage('downloading', accounts=None)
+        elif t == 'owner':
+            chosen = ev.get('owner')
         elif t == 'nosave':
             nosave = True
         elif t == 'error':
@@ -500,7 +513,7 @@ def job_download():
         raise Fail('power_timeout' if 'timed out' in m or 'timeout' in m else 'console_rejected' if 'rejected' in m else 'download_failed', err)
     if nosave or not entries:
         raise Fail('no_gta_save')
-    e = entries[0]; owner = e['owner']
+    e = next((x for x in entries if chosen and x['owner'].lower() == chosen.lower()), entries[0]); owner = e['owner']
     uname = next((u['name'] for u in users if u['id'].lower() == owner.lower()), 'user')
     save_dir = lib / 'Saves' / owner / e['title']
     imgs = sorted(save_dir.glob('sdimg_*'))
@@ -518,8 +531,19 @@ def job_download():
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False)
+        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
     stage('ready')
+
+
+def choose_account(owner):
+    """Called when the user picks a PS5 account during a download; unblocks job_download."""
+    with LOCK:
+        if JOB['status'] != 'running' or JOB['stage'] != 'choose_account':
+            raise Fail('bad_request')
+        if str(owner or '').lower() not in [str(a['id']).lower() for a in JOB['accounts'] or []]:
+            raise Fail('bad_request')
+        CHOICE['owner'] = str(owner)
+    CHOICE['event'].set()
 
 
 def job_patch(slot_file, edits):
@@ -786,6 +810,9 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {'job': start_job('pair', job_pair)})
             if path == '/api/download':
                 return self._send(200, {'job': start_job('download', job_download)})
+            if path == '/api/choose-account':
+                choose_account(body.get('owner'))
+                return self._send(200, {'ok': True})
             if not STATE['session']:
                 raise Fail('no_session')
             if path == '/api/stunt-edits':             # stat edits that mark whole stunt types done

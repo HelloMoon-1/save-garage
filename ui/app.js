@@ -26,7 +26,7 @@
   const STAGE = {
     pair_waiting_console: 'Waiting for the PS5', pair_reading: 'Reading the pairing request', paired: 'Paired',
     connecting: 'Connecting to your PS5', need_power: 'Press the PS5 power button', reading_list: 'Reading the save list',
-    downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
+    choose_account: 'Choose the PS5 account', downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
     patching: 'Applying your edits', encrypting: 'Encrypting the edited save', importing: 'Getting the save ready to send',
     ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
@@ -55,6 +55,7 @@
     tool_failed: 'Save processing failed. Open the details below.',
     internal: 'Something went wrong. Open the details below.',
     busy: 'Another task is running. Wait for it to finish.',
+    bad_request: 'That choice is no longer available. Start the download again.',
     no_console: 'No PS5 selected. Connect first.',
     no_session: 'No save downloaded yet.',
     nothing_to_upload: 'There are no saved edits to send.',
@@ -299,6 +300,7 @@
     const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1>${esc(missionName(s))}</h1>
+        ${st.user?.name ? `<p>PS5 account: <strong>${esc(st.user.name)}</strong></p>` : ''}
         <p>${moneySummary(s) || 'No money balances in this save'}.${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
       <div class="saves" role="group" aria-label="Choose a save">${sortedSlots(st).map(x => `
         <button class="save" data-act="slot" data-file="${esc(x.file)}" aria-pressed="${x.file === s.file}">
@@ -851,6 +853,11 @@
       (x.changes || []).slice(0, 60).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('')
       + ((x.changes || []).length > 60 ? `<li><span>${esc(missionName(x))}: and ${nf.format(x.changes.length - 60)} more changes</span><span></span></li>` : '') ||
       `<li><span>${esc(missionName(x))}</span><span>edited</span></li>`).join('')}</ul></div>` : '';
+    const all = sortedSlots(st);
+    const total = Math.max(st.fileCount || 0, all.length);
+    const allList = all.length ? `<div class="panel"><h3>All ${total} saves are sent back</h3>
+      <p class="detail" style="margin:6px 0 10px">Everything the PS5 had for ${esc(st.user?.name || 'this account')} in GTA VI goes back, not only the save you edited. Edited saves carry your changes. The others are sent exactly as downloaded.</p>
+      <ul class="review" style="max-height:none;margin-top:8px">${all.map(x => `<li><span>${esc(label(x))}: ${esc(missionName(x))}</span><span>${x.modified ? 'edited' : 'unchanged'}</span></li>`).join('')}${total > all.length ? `<li><span>${total - all.length} other file${total - all.length > 1 ? 's' : ''}</span><span>unchanged</span></li>` : ''}</ul></div>` : '';
     if (done) {
       return `<section class="title-card"><span class="chip">Done</span><h1>Your save is back on the PS5</h1>
           <p>Start GTA VI and load the save you edited. Check the values in the game before you play on.</p></section>
@@ -870,9 +877,10 @@
     }
     return `
       <section class="title-card"><span class="chip">Step 5</span><h1>Send your save back</h1>
-        <p>Your edits are encrypted and waiting. The PS5 won’t overwrite a save, so the old one has to be deleted first. The originals stay backed up on this computer.</p></section>
+        <p>Your edits are encrypted and waiting. The PS5 won’t overwrite a save, so the old ones have to be deleted first. Every save of this account comes back, and the originals stay backed up on this computer.</p></section>
       <div class="stack">
         ${summary}
+        ${allList}
         <ol class="how">
           <li><strong>Optional: upload your GTA VI save to PS Plus cloud storage.</strong><span class="path">That gives you a second backup. Turn off auto-sync for GTA VI until you know the edited save works.</span></li>
           <li><strong>Delete the GTA VI save on the PS5.</strong><span class="path">${PS5_DELETE}, then pick Grand Theft Auto VI.</span>
@@ -909,8 +917,11 @@
             <div class="bar ${pct != null ? 'fixed' : ''}"><span ${pct != null ? `style="width:${pct}%"` : ''}></span></div>
             ${job.needPower ? `<div class="power"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 12a16 16 0 1 0 18 0"/><line x1="24" y1="5" x2="24" y2="22"/></svg>
               <div><strong>Press the PS5 power button once</strong>Let go when it beeps. The PS5 restarts into transfer mode. You have about 5 minutes.</div></div>` : ''}
+            ${job.stage === 'choose_account' && job.accounts ? `<div class="accounts"><strong>Which account’s save do you want to edit?</strong>
+              <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
+              <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
-            ${['waiting_console', 'pair_waiting_console', 'connecting', 'need_power'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
+            ${['waiting_console', 'pair_waiting_console', 'connecting', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${logBlock(job)}</div>`;
         } else if (job.status === 'error') {
           const code = job.error?.code || 'internal';
@@ -1050,6 +1061,7 @@
     if (a === 'pick') { act('/api/console', {host: b.dataset.host}, st => { S.manualView = null; onState(st); }); return; }
     if (a === 'pair') { act('/api/pair'); return; }
     if (a === 'download') { act('/api/download'); return; }
+    if (a === 'choose-account') { act('/api/choose-account', {owner: b.dataset.owner}); return; }
     if (a === 'cancel') { act('/api/cancel'); return; }
     if (a === 'upload') { act('/api/upload'); return; }
     if (a === 'restore') {
