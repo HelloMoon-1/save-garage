@@ -18,7 +18,7 @@ The whole app state, polled about once a second by the UI.
   "slots": [{
     "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
     "subtitle": "Mission name",
-    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 1985000}],
+    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "spendable": 85000, "stuck": 0}],
     "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 9999}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
@@ -35,6 +35,8 @@ The whole app state, polled about once a second by the UI.
 ## GET /api/slot?file=…
 
 Editor data for one save: featured stats with the exact rows to edit, ammo and the weapons each character carries.
+For the bank, `max` is what the bank's own money boxes hold, `spendable` is the money the game can spend, and `stuck` is money an
+older version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it).
 For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes.
 Each weapon is
 `{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:

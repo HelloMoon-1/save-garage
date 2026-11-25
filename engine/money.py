@@ -14,10 +14,19 @@ How money is stored (each part checked on a real PS5, November 2026):
     wallet        - money box - currency_cash      cash (slot slotid_currency_cash_20000)
 
   The game's limit is the total capacity of the boxes: an amount above it is cut back when the save loads.
-  Going past the limit means adding boxes under the account. Item and slot ids are joaat hashes of their names.
+  Item and slot ids are joaat hashes of their names.
+
+  Checking (BuckMe) has boxes of its own, which the game adds as the story raises the limit:
+  0x26457c8e (15,000), 0x33894998 (85,000), 0x00fc0216 and 0xdb44180c. The game fills them in that order when money
+  comes in and empties them in that order when money goes out. Only money in these boxes counts as BuckMe funds:
+  the balance the game spends from (and writes to stat 262) leaves out any other box under checking, while the BuckMe
+  app still shows it. So checking cannot go past the capacity of its own boxes. The large 400,000 / 500,000 / 1,000,000
+  boxes belong to Family Savings, and earlier versions that put them under checking made money that shows but cannot
+  be spent (GitHub issue #3). Editing the bank now empties such boxes and puts the money in checking's own boxes.
 
   Three mirrors must change too or the numbers disagree: the stats block (ids 262 checking, 274 cash plus checking,
-  275 Family Savings), the last checking-ledger entry and the last savings-ledger entry.
+  275 Family Savings), the last checking-ledger entry and the last savings-ledger entry. Checking is one account
+  shared by both protagonists: its ledger is one running balance, so the mirror is the last entry of either of them.
 """
 import json, struct
 
@@ -34,14 +43,23 @@ MONEY_CAT = joaat('currency_cash')                      # 2084597891
 BOX_SLOT = joaat('slotid_currency_cash_container')      # slot a money box takes under an account
 CASH_SLOT = joaat('slotid_currency_cash_20000')         # 4163145158
 CASH_MAX = 20000
-# The three large boxes (box item, money slot, capacity). Ids follow the pattern of the first two savings boxes; the game's unlock catalog lists all three.
-# They work under the savings and the checking account (on a PS5: savings 2,000,000, checking 1,985,000).
+# The three large boxes (box item, money slot, capacity): Family Savings' third to fifth boxes, one numbered family with
+# its first two. Under checking they show in the BuckMe app but the game does not spend from them (issue #3).
 BIG_BOXES = ((0xa61b8949, joaat('slotid_currency_cash_400000'), 400000),
              (0x6ab81283, joaat('slotid_currency_cash_500000'), 500000),
              (0x88e64edf, joaat('slotid_currency_cash_1000000'), 1000000))
+# Checking's own boxes in the game's fill order (box item, money slot, capacity). The slot names are unknown, the ids
+# come from game-written saves. 15,000 is exact (the box sits full at 15,000). 85,000 is the capacity known so far
+# (a PS5 kept it). The third box's real capacity is unknown: 123,844 is the most natural play is known to have put in
+# it, so a box that already holds more counts as that much. The fourth own box, 0xdb44180c, has never held money in a
+# save, so its money slot and capacity are unknown; like any other box not listed here, its money is kept as it is.
+CHECKING_BOXES = ((0x26457c8e, 0x006854cf, 15000),
+                  (0x33894998, 0x81cc2559, 85000),
+                  (0x00fc0216, 0x9e5f7b71, 123844))
+# Family Savings' boxes. Under checking (where only earlier versions of this editor put them) the game does not spend from them.
+SAVINGS_BOXES = {0xcfefdcf1, 0xb84a2da6} | {box for box, _, _ in BIG_BOXES}
 ACCOUNTS = {
-    # The second checking box's slot name is unknown; only its id and capacity are. The account also has an empty box 0x26457c8e (probably 15,000), left alone.
-    'bank': (joaat('bank_checking'), ((0x33894998, 2177639769, 85000),) + BIG_BOXES),
+    'bank': (joaat('bank_checking'), CHECKING_BOXES),
     'savings': (joaat('bank_savings'), ((0xcfefdcf1, joaat('slotid_currency_cash_5000'), 5000),
                                         (0xb84a2da6, joaat('slotid_currency_cash_95000'), 95000)) + BIG_BOXES),
 }
@@ -169,7 +187,8 @@ def _children(v, row):
 
 
 def _account(v, kind):
-    """Money boxes under an account: [{box, box_row, money_row or None, qty, cap or None}], or None without the account."""
+    """Money boxes under an account: [{box, box_row, money_row or None, qty, cap or None, foreign}], or None without the account.
+    foreign: a Family Savings box under checking (the game does not spend from it)."""
     root_item, table = ACCOUNTS[kind]
     if root_item not in v['item']:
         return None
@@ -179,8 +198,27 @@ def _account(v, kind):
         if v['slot'][r] != BOX_SLOT:
             continue
         m = next((c for c in _children(v, r) if v['item'][c] == MONEY_CAT), None)
-        out.append({'box': v['item'][r], 'box_row': r, 'money_row': m, 'qty': v['qty'][m] if m is not None else 0, 'cap': caps.get(v['item'][r])})
+        out.append({'box': v['item'][r], 'box_row': r, 'money_row': m, 'qty': v['qty'][m] if m is not None else 0, 'cap': caps.get(v['item'][r]),
+                    'foreign': kind == 'bank' and v['item'][r] in SAVINGS_BOXES})
     return out
+
+
+def _checking_caps(boxes):
+    """{box: capacity} for checking's own boxes that the save has: the known capacity, or what the box already holds if more."""
+    caps = {}
+    for box, _, cap in CHECKING_BOXES:
+        held = [x['qty'] for x in boxes if x['box'] == box]
+        if held:
+            caps[box] = max([cap] + held)
+    return caps
+
+
+def _limit(kind, boxes):
+    """The most an account can hold. Checking: the capacity of the own boxes the save has (it gets no new boxes).
+    Savings: every box it can have, since missing ones are added."""
+    if kind == 'bank':
+        return sum(_checking_caps(boxes).values()) + sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
+    return sum(cap for _, _, cap in ACCOUNTS[kind][1]) + sum(x['qty'] for x in boxes if x['cap'] is None)
 
 
 def scan(b):
@@ -199,8 +237,12 @@ def scan(b):
             if not rows:
                 continue
             seen |= set(rows)
-            items.append({'inv': n, 'idx': rows[0], 'type': v['slot'][rows[0]], 'kind': kind, 'value': sum(x['qty'] for x in boxes),
-                          'max': sum(cap for _, _, cap in ACCOUNTS[kind][1]) + sum(x['qty'] for x in boxes if x['cap'] is None)})
+            item = {'inv': n, 'idx': rows[0], 'type': v['slot'][rows[0]], 'kind': kind, 'value': sum(x['qty'] for x in boxes),
+                    'max': _limit(kind, boxes)}
+            if kind == 'bank':      # value is what the BuckMe app shows; spendable is what the game can spend; stuck is the rest
+                item['spendable'] = sum(x['qty'] for x in boxes if not x['foreign'])
+                item['stuck'] = item['value'] - item['spendable']
+            items.append(item)
         for k, q in enumerate(v['qty']):
             if v['item'][k] == MONEY_CAT and k not in seen:
                 cash = v['slot'][k] == CASH_SLOT
@@ -209,12 +251,16 @@ def scan(b):
     st = json.loads(secs[_sec(ents, SEC_STAT)])['$0x7a47cb05']['$0x0635cbd9']['$0x97232209']
     stats = st['$0x450ce2f0']['$data']
     info = {'items': items, 'stats': stats, 'statIds': st['$0x92f37a48']['$data'], 'statChars': st['$0x46be9d78']['$data'],
-            'statCash': [stats[i] for i in STAT_CASH], 'ledger': None, 'savings': None, 'ledgers': {}}
+            'statCash': [stats[i] for i in STAT_CASH], 'ledger': None, 'savings': None, 'ledgers': {}, 'ledger_last': None}
     try:
         book = json.loads(secs[_sec(ents, SEC_LEDGER)])['$0x24d043f2']['$0x6296c122']['$0x45a134ec']
         for l in book[LEDGER_CHECKING]:                     # both protagonists' checking entries are mixed; take the last one of each
             info['ledgers'][l[K_OWNER] - 0xc0000002] = {'entry': l[K_ENTRY], 'amount': l[K_DELTA], 'balance': l[K_BALANCE]}
         info['ledger'] = info['ledgers'].get(0)
+        both = [l for l in book[LEDGER_CHECKING] if l[K_OWNER] in (0xc0000002, 0xc0000003)]
+        if both:                                            # one running balance for the shared account: the newest entry of either
+            l = max(both, key=lambda l: l[K_ENTRY])
+            info['ledger_last'] = {'entry': l[K_ENTRY], 'amount': l[K_DELTA], 'balance': l[K_BALANCE]}
         l = book[LEDGER_SAVINGS][-1]
         info['savings'] = {'entry': l[K_ENTRY], 'amount': l[K_DELTA], 'balance': l[K_BALANCE]}
     except Exception:
@@ -255,13 +301,23 @@ def _parent_index(txt, nth, guid):
 
 
 def _set_account(txt, nth, kind, target):
-    """Set an account total to target: fill existing boxes first, then add boxes from smallest to largest."""
+    """Set an account total to target: fill existing boxes first, then add boxes from smallest to largest.
+    Checking is filled only in its own boxes, in the game's order, and gets no new boxes. Boxes under it that are not its
+    own (left by earlier versions) are emptied, since the game does not spend from them."""
     root_item, table = ACCOUNTS[kind]
     boxes = _account(_inventory(txt, nth), kind)
-    left = target - sum(x['qty'] for x in boxes if x['cap'] is None)
+    left = target - sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
     if left < 0:
         raise SaveError('out_of_range')
+    for x in boxes:
+        if x['foreign'] and x['money_row'] is not None and x['qty']:
+            txt = _set(txt, _qty_span(txt, nth), x['money_row'], x['qty'], 0)
+    own = _checking_caps(boxes) if kind == 'bank' else None
     for box, slot, cap in table:
+        if own is not None:
+            if box not in own:
+                continue                # the game adds checking's boxes as the story raises the limit; one it has not added may not count
+            cap = own[box]
         amount = min(cap, left); left -= amount
         v = _inventory(txt, nth)
         cur = next((x for x in _account(v, kind) if x['box'] == box), None)
@@ -300,7 +356,7 @@ def patch(b, changes):
         if not 0 <= nv <= 2147483647:
             raise SaveError('out_of_range')
         nv = min(nv, it.get('max', nv)); old = it['value']
-        if nv == old:
+        if nv == old and not it.get('stuck'):      # same total, but money the game cannot spend still has to be moved
             continue
         if it['kind'] in ACCOUNTS:
             secs[i_inv] = _set_account(secs[i_inv], it['inv'], it['kind'], nv)
@@ -309,15 +365,17 @@ def patch(b, changes):
         log.append({'what': 'inventory', 'kind': it['kind'], 'from': old, 'to': nv})
         ids, chars, vals = info['statIds'], info['statChars'], info['stats']
         if it['kind'] == 'bank':
+            spend = it.get('spendable', old)    # the game writes stat 262 from checking's own boxes: after an earlier edit it is this, not old
             for si, sid in enumerate(ids):                  # stats owners 1 / 2 are inventories 0 / 1
                 if chars[si] != it['inv'] + 1:
                     continue
-                if sid == STAT_CHECKING and vals[si] == old:
-                    stat(si, old, nv); log.append({'what': 'stat_bank'})
-                elif sid == STAT_CASH_PLUS_CHECKING and vals[si] >= old:
-                    stat(si, vals[si], vals[si] - old + nv); log.append({'what': 'stat_bank'})
-            led = info['ledgers'].get(it['inv'])
-            if led:     # the last ledger entry's balance must equal checking; also fixes mismatches left by older inventory-only edits
+                if sid == STAT_CHECKING and vals[si] in (old, spend):
+                    stat(si, vals[si], nv); log.append({'what': 'stat_bank'})
+                elif sid == STAT_CASH_PLUS_CHECKING and vals[si] >= spend:
+                    basis = old if vals[si] >= old else spend
+                    stat(si, vals[si], vals[si] - basis + nv); log.append({'what': 'stat_bank'})
+            led = info['ledger_last']
+            if led:     # the newest ledger entry's balance must equal checking (the account is shared); also fixes mismatches left by older inventory-only edits
                 i_led = _sec(ents, SEC_LEDGER)
                 secs[i_led] = _ledger_set(secs[i_led], LEDGER_CHECKING, led['entry'], led['amount'], led['balance'], led['amount'] + nv - led['balance'], nv)
                 log.append({'what': 'ledger'})
