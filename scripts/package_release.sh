@@ -112,6 +112,7 @@ zip_dir "$STAGE/mac" SaveGarage "$OUT/SaveGarage-$VERSION-macos.zip"
 
 # ---------------------------------------------------------------- Linux (PyInstaller)
 ./scripts/build_linux.sh >/dev/null
+cp LICENSE CREDITS.md README.md README.zh-CN.md build_out/dist/SaveGarage/
 cat > build_out/dist/SaveGarage/README.txt <<'TXT'
 Save Garage for Linux
 

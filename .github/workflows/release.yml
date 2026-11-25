@@ -1,0 +1,75 @@
+name: Build and publish Save Garage
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (for example, v1.14.0-zh.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Validate release tag
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Expected a version tag such as v1.14.0-zh.1"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG"; then
+            echo "::error::Tag already exists. Choose a new release tag."
+            exit 1
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then exit "$status"; fi
+          fi
+
+      - name: Build Windows, macOS and Linux packages
+        run: ./scripts/package_release.sh
+
+      - name: Verify release files
+        run: |
+          (cd build_out/release && sha256sum --check SHA256SUMS.txt)
+          for archive in build_out/release/*.zip; do
+            python -m zipfile -t "$archive"
+          done
+          tar -tzf build_out/release/SaveGarage-*-linux-x64.tar.gz > "$RUNNER_TEMP/linux-archive.txt"
+          grep -Fx 'SaveGarage/LICENSE' "$RUNNER_TEMP/linux-archive.txt"
+          grep -Fx 'SaveGarage/README.zh-CN.md' "$RUNNER_TEMP/linux-archive.txt"
+          build_out/dist/SaveGarage/SaveGarage --help
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Save Garage 简体中文构建，包含中英文界面和中文使用指南。
+
+          - Windows x64：解压后运行 `Start Save Garage.bat`。
+          - macOS：解压后运行 `Start Save Garage.command`，首次启动会安装 Python 依赖。
+          - Linux x64：解压后运行 `./SaveGarage --open`。
+          - `SHA256SUMS.txt` 提供三个发行包的校验值。
+
+          GPL-3.0 许可证和贡献者署名随发行包提供。
+          NOTES
+          gh release create "$RELEASE_TAG" build_out/release/* \
+            --target "$GITHUB_SHA" --title "Save Garage $RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
