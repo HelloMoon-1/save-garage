@@ -26,6 +26,7 @@ The whole app state, polled about once a second by the UI.
   }],
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "log": []},
+  "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
   "version": "1.16.0",
   "canQuit": false                                    // true in the desktop builds
 }
@@ -54,6 +55,7 @@ that are known, the rows that change between the downloaded saves (`varies`) and
 | `/api/console` | `{"host": "192.168.1.20"}` | Selects a console |
 | `/api/pair` | none | Starts pairing (once per console) |
 | `/api/download` | none | Downloads, backs up and decrypts the GTA VI saves |
+| `/api/choose-account` | `{"owner": "<account id>"}` | Answers the download's question when several PS5 accounts have a GTA VI save: while the job's stage is `choose_account`, `job.accounts` lists `{id, name, saves}` and only those ids are accepted |
 | `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send |
 | `/api/restore` | none | Puts the original saves back, ready to send |
 | `/api/upload` | none | Starts sending the save back to the PS5 |

@@ -53,7 +53,8 @@ your original save, and the original is backed up on your computer before anythi
    expected: pairing has already happened.
 4. **Download.** In GTA VI, save your game and go back to the PS5 home screen. Click Download save. When the app
    asks, press the PS5 power button once and let go at the beep. The console restarts into transfer mode, and
-   again when the download is done.
+   again when the download is done. If more than one account on the PS5 has a GTA VI save, the app asks which
+   account's save to edit; pick one straight away, while the PS5 waits in transfer mode.
 5. **Edit.** Pick a save (the autosave is what Continue loads), change what you want and click Save edits.
 6. **Send back.** Delete the GTA VI save on the PS5 (it won't overwrite an existing one): Settings, then Saved
    Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete. Then click Send save to
