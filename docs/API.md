@@ -48,6 +48,27 @@ label doesn't say it.
 Every stat in the save as compact columns per typed group (`base`, `qual`, `owner`, `value`), the readable names
 that are known, the rows that change between the downloaded saves (`varies`) and the protected rows.
 
+## GET /api/completion?file=…
+
+Everything the Completion tab shows, one key per part: `stunts`, `compendium`, `discovery`, `challenges`, `gyms`,
+`activities`, `checklist` (the game's 100% checklist: `lines` with `key`, `label`, `section`, `value`, `of`, `percent`,
+`weight`, `grade`, `module`, `done`, plus `overall`), `tasks`, `gangs`, `robberies`, `fencing`, `activities2`, `hoops`,
+`vehicles` and `collectibles`. A part a save can't show yet (an early save lacks some records) is `null`, and
+`errors` says why, so the other parts still work.
+
+## GET /api/world?file=…
+
+The time of day (`clock`), `health` and `healthMax` (250, the game's overpowered maximum), and the armour of both
+characters' outfits (`armour`, `armourMax`).
+
+## GET /api/savedata?file=…[&section=…&path=…&offset=…]
+
+Without `section`: every section of the save (`hash`, `name` where known, `bytes`, `readOnly` reason, `risky`).
+With `section` and a JSON `path`: up to 200 members of that object or list, each with its `key`, `label`, `kind` and
+`raw` value, or `count` for an object or list. `means` names what a value stands for when it is the ID of something
+known (`{"kind": "Item", "text": "…"}`), and `readOnly` or `min` and `max` mark single fields with their own rule
+(maximum health is read-only; health is 1 to 250).
+
 ## POST endpoints
 
 | Path | Body | What it does |
@@ -58,7 +79,9 @@ that are known, the rows that change between the downloaded saves (`varies`) and
 | `/api/pair` | none | Starts pairing (once per console) |
 | `/api/download` | none | Downloads, backs up and decrypts the GTA VI saves |
 | `/api/choose-account` | `{"owner": "<account id>"}` | Answers the download's question when several PS5 accounts have a GTA VI save: while the job's stage is `choose_account`, `job.accounts` lists `{id, name, saves}` and only those ids are accepted |
-| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send |
+| `/api/stunt-edits` | `{"file": "…", "groups": ["jumps", "base", "bridges"]}` | The stat edits that mark those stunt types found and completed, for the page to add to `stats` |
+| `/api/preview` | `{"file": "…", "stats": [...], "completion": {...}}` | Works out the 100% checklist as it would be after these edits, without writing anything: `{"ok": true, "overall": {...}, "lines": [{key, value, of, percent, done}]}`, or `{"ok": false, "failed": [part names]}` naming the parts that fail on this save |
+| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...], "completion": {...}, "world": {...}, "raw": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send. `completion` holds one choice per part (see the Completion tab), `world` the time, health and armour, `raw` single Save data values |
 | `/api/restore` | none | Puts the original saves back, ready to send |
 | `/api/upload` | none | Starts sending the save back to the PS5 |
 | `/api/cancel` | none | Stops the current task |
