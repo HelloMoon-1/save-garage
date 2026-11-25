@@ -284,9 +284,9 @@ def apply(b, edits):
         log += rlog
     comp = edits.get('completion') or {}
     if comp:
-        import compendium, discovery, challenges, gyms, activities, checklist
+        import compendium, discovery, challenges, gyms, activities, checklist, robberies, fencing
         steps = [(compendium, comp.get('compendium')), (discovery, comp.get('discovery')), (challenges, comp.get('challenges')), (gyms, comp.get('gyms')),
-                 (activities, comp.get('activities'))]
+                 (activities, comp.get('activities')), (robberies, comp.get('robberies')), (fencing, comp.get('fencing'))]
         if comp.get('stuntDiscovery'):         # the stunt categories in the map's Discovery section follow the stunts
             steps.append((discovery, {'categories': [STUNT_DISCOVERY[i] for g in comp['stuntDiscovery'] for i in STUNT_DISCOVERY_IDS.get(g, ())],
                                       'allow_stunt': True}))
@@ -299,7 +299,7 @@ def apply(b, edits):
                 except (KeyError, ValueError, TypeError) as e:
                     raise SaveError('bad_request') from e
                 log += [dict(x, what='completion', step=x.get('what')) for x in clog]
-        if any(comp.get(k) for k in ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'stuntDiscovery')):
+        if any(comp.get(k) for k in ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'stuntDiscovery')):
             b, clog = checklist.apply(b, {'overall': 'recompute'})     # the 100% figure, as the game works it out
             log += [dict(x, what='completion', step=x.get('what'), label='100% completion') for x in clog]
     if edits.get('world'):

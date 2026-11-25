@@ -350,7 +350,7 @@
   const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities'].filter(k => c && c[k]).length;
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing'].filter(k => c && c[k]).length;
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
                          + Object.keys(d.raw || {}).length + compCount(d.completion);
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
@@ -595,7 +595,24 @@
     const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
       <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
         <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox + med + leftToPlay(s);
+    return comp + disc + chal + gymBox + med + robberyParts(s) + leftToPlay(s);
+  }
+
+  // robberies and fencing: lines of the checklist, each marked as the game records it
+  function robberyParts(s) {
+    const C = S.comp[s.file], d = draftOf(s.file).completion;
+    if (!C.robberies || !C.fencing) return '';
+    const fmtv = l => l.of >= 1000 ? `$${nf.format(l.value)} of $${nf.format(l.of)}` : `${nf.format(l.value)} of ${nf.format(l.of)}`;
+    const part = (feat, title, intro, lines) => {
+      const chosen = new Set(d[feat]?.lines || []);
+      const open = lines.filter(l => !l.done && !chosen.has(l.key));
+      return `<div class="group"><div class="section-head"><h3>${title}</h3>${open.length > 1 ? `<button class="btn small" data-act="comp-line" data-feature="${feat}" data-value="all">Complete all</button>` : ''}<p>${intro}</p></div>
+        <div class="fields">${lines.map(l => `<div class="field"><div class="name">${esc(l.label.charAt(0) + l.label.slice(1).toLowerCase())}<span class="help">${fmtv(l)}${l.missing ? `, $${nf.format(l.missing)} to go` : ''}.</span></div>
+          <div class="inputs">${chosen.has(l.key) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="comp-line-undo" data-feature="${feat}" data-value="${l.key}">Undo</button>`
+            : `<button class="btn small" data-act="comp-line" data-feature="${feat}" data-value="${l.key}" ${l.done ? 'disabled' : ''}>${l.done ? 'Done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
+    };
+    return part('robberies', 'Robberies', 'Marks robbery locations fully hit the way the game records it, with the per-type counters and the checklist rows. No cash, goods or robbery counts are added. Vaults: the save doesn’t say which 8 banks have one, so the vaults of all 12 large banks are marked.', C.robberies.lines)
+      + part('fencing', 'Fencing', 'Records one sale per unfinished line, worth exactly what’s missing, to the fence the game uses most for it, as Lucia. The earnings totals that a real sale raises go up with it.', C.fencing.lines);
   }
 
   // optional tasks and gang operations can't be completed by editing the save: show what's left to play
@@ -910,7 +927,9 @@
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
       cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
       cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
-      cp.activities && {label: 'Meditation spots: all, as ' + (cp.activities.character === 'jason' ? 'Jason' : 'Lucia'), value: '', newValue: 'completed'}].filter(Boolean);
+      cp.activities && {label: 'Meditation spots: all, as ' + (cp.activities.character === 'jason' ? 'Jason' : 'Lucia'), value: '', newValue: 'completed'},
+      cp.robberies && {label: 'Robberies: ' + cp.robberies.lines.join(', '), value: '', newValue: 'fully hit'},
+      cp.fencing && {label: 'Fencing: ' + cp.fencing.lines.join(', '), value: '', newValue: 'completed'}].filter(Boolean);
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
@@ -1014,6 +1033,15 @@
     if (a === 'fill') {
       const input = b.parentElement.querySelector('input[type="number"]');
       if (input) { input.value = b.dataset.to; onEdit(input); }
+      return;
+    }
+    if (a === 'comp-line' || a === 'comp-line-undo') {
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
+      const feat = b.dataset.feature, v = b.dataset.value, all = C[feat].lines.filter(l => !l.done).map(l => l.key);
+      const cur = new Set(d[feat]?.lines || []);
+      if (a === 'comp-line') { if (v === 'all') all.forEach(k => cur.add(k)); else cur.add(v); } else cur.delete(v);
+      if (cur.size) d[feat] = feat === 'robberies' ? {lines: [...cur], vaults: 'large'} : {lines: [...cur], character: 'lucia'}; else delete d[feat];
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
       return;
     }
     if (a === 'comp-add' || a === 'comp-undo') {
