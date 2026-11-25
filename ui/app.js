@@ -26,7 +26,7 @@
   const STAGE = {
     pair_waiting_console: 'Waiting for the PS5', pair_reading: 'Reading the pairing request', paired: 'Paired',
     connecting: 'Connecting to your PS5', need_power: 'Press the PS5 power button', reading_list: 'Reading the save list',
-    downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
+    choose_account: 'Choose the PS5 account', downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
     patching: 'Applying your edits', encrypting: 'Encrypting the edited save', importing: 'Getting the save ready to send',
     ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
@@ -55,6 +55,7 @@
     tool_failed: 'Save processing failed. Open the details below.',
     internal: 'Something went wrong. Open the details below.',
     busy: 'Another task is running. Wait for it to finish.',
+    bad_request: 'That choice is no longer available. Start the download again.',
     no_console: 'No PS5 selected. Connect first.',
     no_session: 'No save downloaded yet.',
     nothing_to_upload: 'There are no saved edits to send.',
@@ -299,6 +300,7 @@
     const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1>${esc(missionName(s))}</h1>
+        ${st.user?.name ? `<p>PS5 account: <strong>${esc(st.user.name)}</strong></p>` : ''}
         <p>${moneySummary(s) || 'No money balances in this save'}.${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
       <div class="saves" role="group" aria-label="Choose a save">${sortedSlots(st).map(x => `
         <button class="save" data-act="slot" data-file="${esc(x.file)}" aria-pressed="${x.file === s.file}">
@@ -350,7 +352,7 @@
   const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing'].filter(k => c && c[k]).length;
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms'].filter(k => c && c[k]).length;
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
                          + Object.keys(d.raw || {}).length + compCount(d.completion);
   const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
@@ -554,8 +556,7 @@
     };
     const left = c.groups.filter(g => g.done < g.count && !sel.has(g.id)).length;
     return `<div class="section-head"><h2>Completion</h2>${riskTag('caution')}
-        <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, the counters the game keeps are set to match, and the 100% figure is worked out again the way the game does it. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
-      ${checklistTable(s)}
+        <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, and the counters the game keeps are set to match. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
       <div class="group"><div class="section-head"><h3>Stunts</h3>${left > 1 ? '<button class="btn small" data-act="stunts" data-group="all">Mark every stunt done</button>' : ''}
         <p>The 100% checklist needs any ${nf.format(c.for100)} of the game’s 397 stunts. Unique stunts done in this save: ${c.uniqueTotal == null ? 'unknown' : nf.format(c.uniqueTotal)}. Under-the-bridge flights and knife flights can’t be told apart in the save, so they’re marked together.</p></div>
         <div class="fields">${c.groups.map(row).join('')}</div></div>
@@ -590,55 +591,7 @@
     const gymBox = `<div class="group"><div class="section-head"><h3>Gym memberships</h3><p>The 100% checklist needs all 8. Owned in this save: ${owned}. A membership is added the way the game adds one; the gyms marked “not seen yet” have never been bought in a real save, so their item IDs come from the game’s text.</p></div>
       <div class="fields"><div class="field"><div class="name">All gym memberships<span class="help">${gyms.map(g => `${esc(g.label)}${g.owned ? ' (owned)' : g.grade !== 'confirmed' ? ' (not seen yet)' : ''}`).join(', ')}.</span></div>
         <div class="inputs">${d.gyms ? pending('gyms', 'Will be added.') : `<button class="btn small" data-act="comp-add" data-feature="gyms" data-value="all" ${owned >= gyms.length ? 'disabled' : ''}>${owned >= gyms.length ? 'All owned' : 'Add all'}</button>`}</div></div></div></div>`;
-    // meditation spots
-    const m = C.activities.meditation;
-    const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
-      <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
-        <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox + med + robberyParts(s) + leftToPlay(s);
-  }
-
-  // robberies and fencing: lines of the checklist, each marked as the game records it
-  function robberyParts(s) {
-    const C = S.comp[s.file], d = draftOf(s.file).completion;
-    if (!C.robberies || !C.fencing) return '';
-    const fmtv = l => l.of >= 1000 ? `$${nf.format(l.value)} of $${nf.format(l.of)}` : `${nf.format(l.value)} of ${nf.format(l.of)}`;
-    const part = (feat, title, intro, lines) => {
-      const chosen = new Set(d[feat]?.lines || []);
-      const open = lines.filter(l => !l.done && !chosen.has(l.key));
-      return `<div class="group"><div class="section-head"><h3>${title}</h3>${open.length > 1 ? `<button class="btn small" data-act="comp-line" data-feature="${feat}" data-value="all">Complete all</button>` : ''}<p>${intro}</p></div>
-        <div class="fields">${lines.map(l => `<div class="field"><div class="name">${esc(l.label.charAt(0) + l.label.slice(1).toLowerCase())}<span class="help">${fmtv(l)}${l.missing ? `, $${nf.format(l.missing)} to go` : ''}.</span></div>
-          <div class="inputs">${chosen.has(l.key) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="comp-line-undo" data-feature="${feat}" data-value="${l.key}">Undo</button>`
-            : `<button class="btn small" data-act="comp-line" data-feature="${feat}" data-value="${l.key}" ${l.done ? 'disabled' : ''}>${l.done ? 'Done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
-    };
-    return part('robberies', 'Robberies', 'Marks robbery locations fully hit the way the game records it, with the per-type counters and the checklist rows. No cash, goods or robbery counts are added. Vaults: the save doesn’t say which 8 banks have one, so the vaults of all 12 large banks are marked.', C.robberies.lines)
-      + part('fencing', 'Fencing', 'Records one sale per unfinished line, worth exactly what’s missing, to the fence the game uses most for it, as Lucia. The earnings totals that a real sale raises go up with it.', C.fencing.lines);
-  }
-
-  // optional tasks and gang operations can't be completed by editing the save: show what's left to play
-  function leftToPlay(s) {
-    const C = S.comp[s.file], t = C.tasks, g = C.gangs;
-    if (!t || !g) return '';
-    const taskList = (t.notPassed || []).map(x => esc(x.title || x.mission)).join(', ');
-    const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.missing} are left to play.${(t.knownMissing || []).length ? ` One of them was finished in your other playthrough.` : ''}</p></div>
-      ${taskList ? `<p class="note">Side missions not passed in this save, a good place to look: ${taskList}.</p>` : ''}</div>`;
-    const left = (g.locations || []).filter(x => !x.cleared);
-    const byGang = Object.fromEntries((g.gangs || []).map(x => [x.key, x.name]));
-    const gangs = `<div class="group"><div class="section-head"><h3>Gang operations</h3><p>${g.checklist.value} of ${g.checklist.of} cleared. These can’t be completed by editing the save either: a clear is written in three places, many operations have no record yet, and each one hands out its own weapons, vehicles and safes. Left to clear:</p></div>
-      <table class="raw"><thead><tr><th>Operation</th><th>Gang</th><th>State</th></tr></thead><tbody>${left.map(x => `
-        <tr><td class="key">${esc(x.label || x.owner || x.id)}${x.hint ? `<small>${esc(x.hint)}</small>` : ''}</td><td>${esc(byGang[x.gang] || x.gang || '')}</td><td>${esc(x.state || '')}</td></tr>`).join('')}</tbody></table></div>`;
-    return tasks + gangs;
-  }
-
-  // the game's 100% checklist, line by line, with what this tab can do about each
-  function checklistTable(s) {
-    const c = S.comp[s.file].checklist;
-    if (!c || !c.lines) return '';
-    const here = l => l.grade === 'a' || l.grade === 'done' ? 'On this tab' : l.grade === 'b' ? 'Not yet: tied to missions, or not certain enough' : 'Can’t be done from the save';
-    const fmtv = l => l.of == null ? (typeof l.value === 'number' ? nf2.format(l.value) + (l.label.includes('COMPLETION') ? '%' : '') : '') : `${nf.format(l.value)} / ${nf.format(l.of)}`;
-    return `<details class="checklist"><summary>The game’s 100% checklist: ${nf2.format(c.overall?.stored ?? c.overall)}% in this save</summary>
-      <table class="raw"><thead><tr><th>Line</th><th>In this save</th><th>Weight</th><th>Here</th></tr></thead><tbody>${c.lines.map(l => `
-        <tr><td>${esc(l.label)}</td><td>${esc(fmtv(l))}</td><td>${l.weight}%</td><td>${esc(here(l))}</td></tr>`).join('')}</tbody></table></details>`;
+    return comp + disc + chal + gymBox;
   }
 
   // ---- world: time of day, health, armour
@@ -826,6 +779,11 @@
     const summary = edited.length ? `<div class="panel"><h3>What’s being sent</h3><ul class="review" style="max-height:none;margin-top:8px">${edited.map(x =>
       (x.changes || []).map(c => `<li><span>${esc(missionName(x))}: ${esc(changeLabel(c))}</span><span>${c.count > 1 ? `${nf.format(c.count)} changes` : c.from === '' || c.from == null ? esc(fmtChange(c.to)) : `${esc(fmtChange(c.from))} to ${esc(fmtChange(c.to))}`}</span></li>`).join('') ||
       `<li><span>${esc(missionName(x))}</span><span>edited</span></li>`).join('')}</ul></div>` : '';
+    const all = sortedSlots(st);
+    const total = Math.max(st.fileCount || 0, all.length);
+    const allList = all.length ? `<div class="panel"><h3>All ${total} saves are sent back</h3>
+      <p class="detail" style="margin:6px 0 10px">Everything the PS5 had for ${esc(st.user?.name || 'this account')} in GTA VI goes back, not only the save you edited. Edited saves carry your changes. The others are sent exactly as downloaded.</p>
+      <ul class="review" style="max-height:none;margin-top:8px">${all.map(x => `<li><span>${esc(label(x))}: ${esc(missionName(x))}</span><span>${x.modified ? 'edited' : 'unchanged'}</span></li>`).join('')}${total > all.length ? `<li><span>${total - all.length} other file${total - all.length > 1 ? 's' : ''}</span><span>unchanged</span></li>` : ''}</ul></div>` : '';
     if (done) {
       return `<section class="title-card"><span class="chip">Done</span><h1>Your save is back on the PS5</h1>
           <p>Start GTA VI and load the save you edited. Check the values in the game before you play on.</p></section>
@@ -845,9 +803,10 @@
     }
     return `
       <section class="title-card"><span class="chip">Step 5</span><h1>Send your save back</h1>
-        <p>Your edits are encrypted and waiting. The PS5 won’t overwrite a save, so the old one has to be deleted first. The originals stay backed up on this computer.</p></section>
+        <p>Your edits are encrypted and waiting. The PS5 won’t overwrite a save, so the old ones have to be deleted first. Every save of this account comes back, and the originals stay backed up on this computer.</p></section>
       <div class="stack">
         ${summary}
+        ${allList}
         <ol class="how">
           <li><strong>Optional: upload your GTA VI save to PS Plus cloud storage.</strong><span class="path">That gives you a second backup. Turn off auto-sync for GTA VI until you know the edited save works.</span></li>
           <li><strong>Delete the GTA VI save on the PS5.</strong><span class="path">${PS5_DELETE}, then pick Grand Theft Auto VI.</span>
@@ -884,8 +843,11 @@
             <div class="bar ${pct != null ? 'fixed' : ''}"><span ${pct != null ? `style="width:${pct}%"` : ''}></span></div>
             ${job.needPower ? `<div class="power"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 12a16 16 0 1 0 18 0"/><line x1="24" y1="5" x2="24" y2="22"/></svg>
               <div><strong>Press the PS5 power button once</strong>Let go when it beeps. The PS5 restarts into transfer mode. You have about 5 minutes.</div></div>` : ''}
+            ${job.stage === 'choose_account' && job.accounts ? `<div class="accounts"><strong>Which account’s save do you want to edit?</strong>
+              <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
+              <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
-            ${['waiting_console', 'pair_waiting_console', 'connecting', 'need_power'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
+            ${['waiting_console', 'pair_waiting_console', 'connecting', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${logBlock(job)}</div>`;
         } else if (job.status === 'error') {
           const code = job.error?.code || 'internal';
@@ -926,10 +888,7 @@
     const compList = [cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
       cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
-      cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
-      cp.activities && {label: 'Meditation spots: all, as ' + (cp.activities.character === 'jason' ? 'Jason' : 'Lucia'), value: '', newValue: 'completed'},
-      cp.robberies && {label: 'Robberies: ' + cp.robberies.lines.join(', '), value: '', newValue: 'fully hit'},
-      cp.fencing && {label: 'Fencing: ' + cp.fencing.lines.join(', '), value: '', newValue: 'completed'}].filter(Boolean);
+      cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'}].filter(Boolean);
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
@@ -1022,6 +981,7 @@
     if (a === 'pick') { act('/api/console', {host: b.dataset.host}, st => { S.manualView = null; onState(st); }); return; }
     if (a === 'pair') { act('/api/pair'); return; }
     if (a === 'download') { act('/api/download'); return; }
+    if (a === 'choose-account') { act('/api/choose-account', {owner: b.dataset.owner}); return; }
     if (a === 'cancel') { act('/api/cancel'); return; }
     if (a === 'upload') { act('/api/upload'); return; }
     if (a === 'restore') {
@@ -1035,15 +995,6 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
-    if (a === 'comp-line' || a === 'comp-line-undo') {
-      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
-      const feat = b.dataset.feature, v = b.dataset.value, all = C[feat].lines.filter(l => !l.done).map(l => l.key);
-      const cur = new Set(d[feat]?.lines || []);
-      if (a === 'comp-line') { if (v === 'all') all.forEach(k => cur.add(k)); else cur.add(v); } else cur.delete(v);
-      if (cur.size) d[feat] = feat === 'robberies' ? {lines: [...cur], vaults: 'large'} : {lines: [...cur], character: 'lucia'}; else delete d[feat];
-      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
-      return;
-    }
     if (a === 'comp-add' || a === 'comp-undo') {
       const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
       const [feat, sub] = (a === 'comp-add' ? b.dataset.feature : b.dataset.feature).split(':');
@@ -1052,7 +1003,6 @@
         if (feat === 'compendium') { const g = new Set(d.compendium?.groups || []); g.add(v); d.compendium = {groups: [...g]}; }
         if (feat === 'discovery') d.discovery = {categories: 'all'};
         if (feat === 'gyms') d.gyms = {gyms: 'all'};
-        if (feat === 'activities') d.activities = {spots: 'all', character: 'lucia'};
         if (feat === 'challenges') {
           if (v === 'all') d.challenges = {categories: 'all'};
           else { const cur = d.challenges ? (d.challenges.categories === 'all' ? C.challenges.categories.map(x => x.key) : d.challenges.categories) : [];

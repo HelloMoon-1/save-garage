@@ -284,5 +284,7 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 
 .crumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
 
-.checklist { margin: 0 0 18px; }
-.checklist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.accounts { margin-top: 14px; padding: 16px; border-radius: var(--r-panel); background: rgba(255, 182, 72, .1); border: 1px solid rgba(255, 182, 72, .45); }
+.accounts strong { display: block; margin-bottom: 12px; font: 400 24px var(--display); color: #ffd395; letter-spacing: .01em; }
+.accounts .row { flex-wrap: wrap; gap: 10px; }
+.accounts .detail { margin-top: 10px; }
