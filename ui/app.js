@@ -4,6 +4,7 @@
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const T = s => window.SGI18N?.tr(s) ?? s;          // text shown outside the page (dialogs) in the chosen language
   const nf = new Intl.NumberFormat('en-US');
   const nf2 = new Intl.NumberFormat('en-US', {maximumFractionDigits: 2});
   const main = $('#main'), routeEl = $('#route'), statusEl = $('#status'), pendingEl = $('#pending'), toastEl = $('#toast');
@@ -65,6 +66,7 @@
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
     slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, world: {}, sd: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
+    preview: {}, compExp: {}, keep: {},
     find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
 
   // ------------------------------------------------------------ api
@@ -151,7 +153,7 @@
   function jobDone(job) {
     const s = slotOf(S.slot);
     const msg = {pair: 'PS5 paired. Next: download your save.', download: 'Save downloaded. Pick what to change.',
-                 patch: 'Edits saved' + (s ? ' to ' + missionName(s) : '') + '. Send the save back when you’re done.',
+                 patch: 'Edits saved. Send the save back when you’re done.',
                  restore: 'Originals are back in place. Send them to the PS5 to undo your edits.', upload: 'Save sent to the PS5.'}[job.kind];
     if (job.kind === 'patch') passed('Edits saved', 'Ready to send back to your PS5');
     else if (job.kind === 'upload') passed('Save delivered', 'Load it in GTA VI to check your changes');
@@ -194,7 +196,7 @@
     statusEl.innerHTML = [
       S.offline ? '<span class="pill"><span class="dot bad"></span><b>Editor service not answering</b></span>' : '',
       c ? `<span class="pill"><span class="dot ${st.paired ? 'ok' : 'wait'}"></span><b>${esc(c.name)}</b>${st.paired ? 'paired' : 'not paired'}</span>` : '<span class="pill"><span class="dot"></span>No PS5 selected</span>',
-      `<span class="pill"><span class="dot ${net ? (net.ok ? 'ok' : 'bad') : 'wait'}"></span>Decryption service ${net ? (net.ok ? 'online' : 'offline') : 'checking'}</span>`
+      `<span class="pill"><span class="dot ${net ? (net.ok ? 'ok' : 'bad') : 'wait'}"></span>${net ? (net.ok ? 'Decryption service online' : 'Decryption service offline') : 'Checking the decryption service'}</span>`
     ].join('');
   }
 
@@ -245,8 +247,20 @@
           <div class="inputs"><button class="btn primary small" data-act="pick" data-host="${esc(c.host)}">Use this PS5</button></div></div>`).join('')}</div>`
           : '<div class="empty">No PS5 answered. Check it is on and on the same network, or type its IP address.</div>') : ''}
         ${jobBox('connect')}
-      </div>`;
+      </div>
+      <section class="caps" aria-labelledby="caps-h"><h2 id="caps-h">What you can change</h2>
+        <p class="note">Story mode only. Every edit is made on a copy, checked against the value it replaces, and can be put back.</p>
+        <dl>${CAPS.map(([name, what, risk]) => `<div><dt>${name}</dt><dd>${what}</dd><dd class="r">${riskTag(risk)}</dd></div>`).join('')}</dl>
+      </section>`;
   }
+
+  const CAPS = [
+    ['Money', 'Bank account and Family Savings, up to what the game can hold.', 'tested'],
+    ['Ammo', 'Refill or set the ammo for every weapon Lucia and Jason carry.', 'tested'],
+    ['Stats', 'Fitness, overpowers and buffs, time played, distances, earnings, wanted levels and trophy counters, with the game’s own labels.', 'tested'],
+    ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5.', 'caution'],
+    ['World', 'Time of day, health and armour.', 'caution'],
+    ['All stats and Save data', 'Every one of the save’s values, with names or descriptions for almost all of them. For experts.', 'danger']];
 
   const fw = f => /^[0-9a-f]{8}$/i.test(f || '') ? `${Number(f.slice(0, 2))}.${f.slice(2, 4)}` : (f || 'unknown');
 
@@ -282,6 +296,22 @@
       </div>`;
   }
 
+  // the save's 100% figure, from the Completion tab's checklist when it's loaded, else from the stats
+  function overallOf(s) {
+    const c = S.comp[s.file]?.checklist?.overall;
+    if (c) return c.stored ?? c.computed;
+    const f = (S.detail[s.file]?.featured || []).find(x => x.id === 'overall_pct');
+    const v = f?.entries?.[0]?.value;
+    return typeof v === 'number' ? v : null;
+  }
+
+  // the figure after the edits picked so far, once the app has worked it out
+  function afterOf(s) {
+    const P = S.preview[s.file], d = S.drafts[s.file];
+    if (!P?.data?.ok || P.busy || !d || (!Object.keys(d.completion || {}).length && !Object.keys(d.stats || {}).length)) return null;
+    return P.data.overall.computed;
+  }
+
   function sortedSlots(st) {
     return [...(st.slots || [])].sort((a, b) => (b.file === 'sdimg_sce_sdmemory') - (a.file === 'sdimg_sce_sdmemory') || b.file.localeCompare(a.file));
   }
@@ -299,12 +329,12 @@
     if (!s) return '<div class="empty">No story saves were found in this download.</div>';
     const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
-      <section class="title-card"><span class="chip">${label(s)}</span><h1>${esc(missionName(s))}</h1>
+      <section class="title-card"><span class="chip">${label(s)}</span><h1 data-no-i18n>${esc(missionName(s))}</h1>
         ${st.user?.name ? `<p>PS5 account: <strong>${esc(st.user.name)}</strong></p>` : ''}
-        <p>${moneySummary(s) || 'No money balances in this save'}.${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
+        <p>${moneySummary(s) || 'No money balances in this save'}.${overallOf(s) != null ? ` 100% completion: <strong>${nf2.format(overallOf(s))}%</strong>${afterOf(s) != null ? `, <strong class="gold">${nf2.format(afterOf(s))}%</strong> after your edits` : ''}.` : ''}${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
       <div class="saves" role="group" aria-label="Choose a save">${sortedSlots(st).map(x => `
         <button class="save" data-act="slot" data-file="${esc(x.file)}" aria-pressed="${x.file === s.file}">
-          <span class="k">${label(x)}</span><span class="t">${esc(missionName(x))}</span>${x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
+          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span>${x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
       <div class="editor">
         <div class="tabs" role="tablist" aria-label="What to edit">${tabs.map(([id, name]) => `
           <button role="tab" aria-selected="${S.tab === id}" data-act="tab" data-tab="${id}">${name}<span class="count" data-count="${id}"></span></button>`).join('')}</div>
@@ -402,7 +432,9 @@
   function panelMoney(s) {
     const items = (s.items || []).filter(x => x.kind !== 'other');
     const name = x => ({bank: 'Bank account', savings: 'Family Savings', cash: 'Cash, ' + (x.inv === 0 ? 'Lucia' : 'Jason')})[x.kind];
-    const help = x => ({bank: `Up to $${nf.format(x.max)}. Above your current limit the editor adds extra money boxes, the same way the game does for Family Savings goals.`,
+    const help = x => ({bank: x.stuck > 0
+                          ? `BuckMe shows $${nf.format(x.value)}, but $${nf.format(x.stuck)} of it sits in Family Savings boxes that an older version of Save Garage put under the bank, and the game can’t spend it. Moving it puts as much as fits, up to $${nf.format(x.max)}, in the bank’s own money boxes.`
+                          : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops only spend money from these boxes, so the editor doesn’t go past them. The limit grows as the story goes on.`,
                         savings: `Up to $${nf.format(x.max)}.`, cash: `Up to $${nf.format(x.max)}, the size of the wallet.`})[x.kind];
     return `
       <div class="group"><div class="section-head"><h2>Money</h2>${riskTag('tested')}
@@ -410,7 +442,8 @@
       ${items.length ? `<div class="fields">${items.map(x => `
         <div class="field"><div class="name">${esc(name(x))}<span class="help">${esc(help(x))}</span></div>
           <div class="inputs">${cell({kind: 'money', key: `${x.inv}:${x.idx}`, label: 'Amount in dollars', value: x.value, display: String(x.value), unit: 'money', type: 'int', max: x.max, wide: true, money: true,
-            attrs: `data-inv="${x.inv}" data-idx="${x.idx}" data-label="${esc(name(x))}"`, extra: `<button class="btn small" data-act="fill" data-to="${x.max}">Max</button>`})}</div></div>`).join('')}</div>`
+            attrs: `data-inv="${x.inv}" data-idx="${x.idx}" data-label="${esc(name(x))}"`, extra: `<button class="btn small" data-act="fill" data-to="${x.max}">Max</button>`
+              + (x.stuck > 0 ? ` <button class="btn small primary" data-act="unstick" data-inv="${x.inv}" data-idx="${x.idx}" data-value="${x.value}" data-to="${Math.min(x.value, x.max)}">Make it spendable</button>` : '')})}</div></div>`).join('')}</div>`
         : '<div class="empty">This save has no money balances to edit.</div>'}</div>`;
   }
 
@@ -548,9 +581,206 @@
   }
 
   // ---- trophies
-  // ---- completion: whole groups of the 100% checklist at once
-  function panelCompletion(s) {
+  // ---- completion: the game's own 100% checklist, line by line, with what can be picked for each
+  // how a checklist line is completed here: [kind, feature or key, line key]
+  const LINE_PICK = {
+    bankjobs: ['rob', 'robberies', 'bankjobs'], paydayloans: ['rob', 'robberies', 'paydayloans'], smashngrabs: ['rob', 'robberies', 'smashngrabs'],
+    stickups: ['rob', 'robberies', 'stickups'], vaults: ['rob', 'robberies', 'vaults'], narcotics: ['rob', 'fencing', 'narcotics'],
+    jewelry: ['rob', 'fencing', 'jewelry'], markedbills: ['rob', 'fencing', 'markedbills'], vehiclesfenced: ['rob', 'fencing', 'vehicles'],
+    cardsets: ['coll', 'cards'], magazines: ['coll', 'magazines'], styles: ['coll', 'watches'],
+    meditation: ['feat', 'activities'], hoops: ['feat', 'hoops'], vehicles: ['feat', 'vehicles'], challenges: ['feat', 'challenges'],
+    animals: ['comp', 'animals'], weapons: ['comp', 'weapons'], stunts: ['stunts'],
+    races: ['act', 'races'], racechallenges: ['act', 'racechallenges'], shootingranges: ['act', 'shootingranges'], videogames: ['act', 'videogames'],
+    pool: ['act', 'pool'], minigolf: ['act', 'minigolf'], drones: ['act', 'drones'], bret: ['act', 'bret']};
+  // why the other lines have to be played
+  const LINE_WHY = {
+    story: 'Play the missions.', optionaltasks: 'Play them. The game records a task only once it’s played.',
+    gangs: 'Play them. A clear is written in three places and hands out its own weapons, vehicles and safes.',
+    kenton: 'Not possible yet: no save has a finished set to copy.', waink: 'Not possible yet: the save doesn’t show which locations they are.',
+    underwater: 'Not possible yet: the save doesn’t show which discoveries they are.',
+    flamingos_or_playlists_1: 'Cocaine flamingos can be tried as an experiment below. Playlists aren’t possible yet.',
+    flamingos_or_playlists_2: 'Cocaine flamingos can be tried as an experiment below. Playlists aren’t possible yet.'};
+  const EXP_LINES = new Set(['bret']);                                         // lines only offered as experiments
+  const TESTED_LINES = new Set(['narcotics', 'jewelry', 'markedbills', 'vehiclesfenced', 'meditation']);   // seen in the game's stats after a PS5 test
+  const EXP_COLL = ['bookswaps', 'magazinestyles', 'flamingos'];               // collectibles only offered as experiments
+  const FEAT_ALL = {discovery: {categories: 'all'}, gyms: {gyms: 'all'}, activities: {spots: 'all', character: 'lucia'},
+    hoops: {hoops: 'all', scored: true, county_counters: 'update'}, vehicles: {count: 'min'}, challenges: {categories: 'all'}};
+  // the game's checklist lines are in capitals: shown in sentence case, keeping the names that have their own spelling
+  const sentence = t => {
+    const x = String(t || ''), letters = x.replace(/[^A-Za-z]/g, ''), caps = letters.replace(/[^A-Z]/g, '').length;
+    if (!letters || caps / letters.length < .7) return x;
+    return (x.charAt(0) + x.slice(1).toLowerCase()).replace(/\bwaink\b/i, 'WAiNK').replace(/\bbret's\b/i, 'Bret’s').replace(/\bkenton\b/i, 'Kenton');
+  };
+
+  function pickRob(file, feat, key, on) {
+    const d = draftOf(file).completion, cur = new Set(d[feat]?.lines || []);
+    if (on) cur.add(key); else cur.delete(key);
+    if (cur.size) d[feat] = feat === 'robberies' ? {lines: [...cur], vaults: 'large'} : {lines: [...cur], character: 'lucia'}; else delete d[feat];
+  }
+  function pickColl(file, key, on) {
+    const d = draftOf(file).completion, cur = new Set(d.collectibles?.categories || []);
+    if (on) cur.add(key); else cur.delete(key);
+    const exp = [...cur].filter(k => EXP_COLL.includes(k));
+    if (cur.size) d.collectibles = {categories: [...cur], card_items: 'skip', watch_items: 'skip', ...(exp.length ? {experimental: exp} : {})};
+    else delete d.collectibles;
+  }
+  function pickAct(file, key, on) {
+    const d = draftOf(file).completion, lines = S.comp[file].activities2?.lines || [], cur = new Set(d.activities2?.lines || []);
+    if (on) cur.add(key); else cur.delete(key);
+    if (cur.size) {
+      const level = {};
+      for (const k of cur) level[k] = (lines.find(l => l.key === k) || {}).confidence === 'verified' ? 'full' : 'counter';
+      d.activities2 = {lines: [...cur], level, unverified_ok: cur.has('bret')};
+    } else delete d.activities2;
+  }
+  function pickComp(file, group, on) {
+    const d = draftOf(file).completion, g = new Set(d.compendium?.groups || []);
+    if (on) g.add(group); else g.delete(group);
+    if (g.size) d.compendium = {groups: [...g]}; else delete d.compendium;
+  }
+  function pickFeat(file, feat, on) {
+    const d = draftOf(file).completion;
+    if (on) d[feat] = JSON.parse(JSON.stringify(FEAT_ALL[feat])); else delete d[feat];
+  }
+  const openStunts = file => (S.comp[file].stunts?.groups || []).filter(g => g.done < g.count).map(g => g.id);
+
+  function linePicked(file, key) {
+    const d = draftOf(file).completion, p = LINE_PICK[key];
+    if (!p) return false;
+    if (p[0] === 'rob') return !!d[p[1]]?.lines?.includes(p[2]);
+    if (p[0] === 'coll') return !!d.collectibles?.categories?.includes(p[1]);
+    if (p[0] === 'act') return !!d.activities2?.lines?.includes(p[1]);
+    if (p[0] === 'comp') return !!d.compendium?.groups?.includes(p[1]);
+    if (p[0] === 'feat') return p[1] === 'challenges' ? d.challenges?.categories === 'all' : !!d[p[1]];
+    return (S.stuntSel[file] || new Set()).size > 0;
+  }
+  // a line whose part of the save couldn't be read can't be picked
+  const lineReady = (file, key) => {
+    const p = LINE_PICK[key], C = S.comp[file];
+    if (!p) return false;
+    const need = {rob: p[1], coll: 'collectibles', act: 'activities2', comp: 'compendium', stunts: 'stunts'}[p[0]] || p[1];
+    return !!C[need];
+  };
+
+  function setLine(file, key, on) {
+    const p = LINE_PICK[key];
+    if (!p || !lineReady(file, key)) return;
+    if (p[0] === 'rob') pickRob(file, p[1], p[2], on);
+    else if (p[0] === 'coll') pickColl(file, p[1], on);
+    else if (p[0] === 'act') pickAct(file, p[1], on);
+    else if (p[0] === 'comp') pickComp(file, p[1], on);
+    else if (p[0] === 'feat') pickFeat(file, p[1], on);
+  }
+
+  // every line that can be done, plus the extras that go with them (map discoveries, gyms, convenience stores);
+  // experimental parts only when asked for
+  async function pickEverything(file, withExp) {
+    const C = S.comp[file], lines = C.checklist?.lines || [];
+    for (const l of lines) {
+      const p = LINE_PICK[l.key];
+      if (!p || p[0] === 'stunts' || l.done || (l.percent ?? 0) >= 100 || (EXP_LINES.has(l.key) && !withExp)) continue;
+      setLine(file, l.key, true);
+    }
+    if (C.discovery) pickFeat(file, 'discovery', true);
+    if (C.gyms) pickFeat(file, 'gyms', true);
+    if (C.robberies?.lines?.some(l => l.key === 'convenience' && !l.done)) pickRob(file, 'robberies', 'convenience', true);
+    if (C.collectibles) for (const k of EXP_COLL) pickColl(file, k, !!withExp && (C.collectibles.categories || []).some(c => c.key === k && c.found < c.entries));
+    if (withExp && C.activities2) pickAct(file, 'bret', true);
+    const st = C.stunts ? openStunts(file) : [];
+    if (st.length) await setStunts(file, st);
+    else { S.mainKey = ''; renderMain(); renderPending(); renderCounts(); }
+  }
+  async function clearPicks(file) {
+    const d = draftOf(file);
+    d.completion = {};
+    await setStunts(file, []);
+  }
+
+  // the checklist as it would be after the picks so far, worked out by the app (nothing is written)
+  function schedulePreview(file) {
+    const P = S.preview[file] || (S.preview[file] = {});
+    const d = draftOf(file);
+    const body = {file, stats: Object.values(d.stats), completion: d.completion};
+    const sig = JSON.stringify(body);
+    if (sig === P.want) return;
+    P.want = sig;
+    clearTimeout(P.t);
+    if (!Object.keys(d.completion || {}).length && !Object.keys(d.stats).length) { P.data = null; P.sig = sig; P.busy = false; return; }
+    P.busy = true;
+    P.t = setTimeout(async () => {
+      let data;
+      try { data = await api('/api/preview', body); } catch (e) { data = {ok: false, failed: [], detail: e.code}; }
+      if (P.want !== sig) return;                  // a newer pick is on its way
+      P.data = data; P.sig = sig; P.busy = false;
+      if (S.tab === 'completion' && S.slot === file) { S.mainKey = ''; renderMain(); }
+    }, 500);
+  }
+
+  function compSummary(s) {
+    const C = S.comp[s.file], ck = C.checklist, P = S.preview[s.file] || {}, d = draftOf(s.file);
+    const now = ck?.overall ? (ck.overall.stored ?? ck.overall.computed) : null;
+    const picks = compCount(d.completion) + ((S.stuntSel[s.file]?.size) ? 1 : 0);
+    const ready = P.data?.ok && !P.busy;
+    const after = picks && ready ? P.data.overall.computed : null;
+    const pct = v => v == null ? '–' : `${nf2.format(v)}%`;
+    const w = v => `${Math.max(0, Math.min(100, v || 0))}%`;
+    const failed = P.data && !P.data.ok && !P.busy ? (P.data.failed || []) : [];
+    const exp = !!S.compExp[s.file];
+    return `<div class="comp-summary">
+        <div class="nums">
+          <div><span class="lbl">100% completion now</span><span class="big">${pct(now)}</span></div>
+          <div class="after${picks ? '' : ' muted'}"><span class="lbl">After your picks</span><span class="big">${!picks ? '–' : P.busy ? '…' : pct(after)}</span>
+            ${picks && P.busy ? '<span class="lbl">Working it out</span>' : ''}</div>
+        </div>
+        <div class="meter" role="img" aria-label="${now == null ? '' : `${nf2.format(now)}% now${after != null ? `, ${nf2.format(after)}% after your picks` : ''}`}">
+          <span class="now" style="width:${w(now)}"></span>${after != null && after > now ? `<span class="gain" style="inset-inline-start:${w(now)};width:${w(after - now)}"></span>` : ''}</div>
+        <div class="row">
+          <button class="btn primary" data-act="pick-all">Pick everything that can be done</button>
+          ${picks ? '<button class="btn" data-act="pick-none">Clear picks</button>' : ''}
+          <label class="toggle small"><input type="checkbox" data-act="pick-exp" ${exp ? 'checked' : ''}> Include experiments (Bret’s decks, book swaps, magazine styles, cocaine flamingos)</label>
+        </div>
+        ${failed.length ? `<div class="callout danger">These picks don’t work on this save, so saving would fail: ${failed.map(esc).join(', ')}. Undo them, or reload the save.</div>` : ''}
+        <p class="note">Each pick marks things found and completed the way the game records them, sets the counters to match, and works the 100% figure out again. Prize money, rewards and trophies aren’t given.</p>
+        <p class="note">Tested on a PS5 with every pick at once: the save loads and plays, and gym memberships, map discoveries, meditation spots and fencing show in the game’s stats as written. The other lines only show on the game’s 100% screen, which hasn’t been checked yet.</p>
+      </div>`;
+  }
+
+  function lineRow(s, l, a) {
+    const money = l.of != null && l.of >= 1000;
+    const fmt = (v, of) => of == null ? (typeof v === 'number' ? nf2.format(v) + '%' : '') : money ? `$${nf.format(v)} of $${nf.format(of)}` : `${nf.format(v)} of ${nf.format(of)}`;
+    const p = LINE_PICK[l.key], picked = linePicked(s.file, l.key), exp = EXP_LINES.has(l.key);
+    const full = l.done || (l.percent ?? 0) >= 100;
+    let act;
+    if (full) act = '<span class="done-mark">Done</span>';
+    else if (!p) act = `<span class="why">${esc(LINE_WHY[l.key] || 'Not possible from the save yet.')}</span>`;
+    else if (!lineReady(s.file, l.key)) act = '<span class="why">This part of the save can’t be read yet.</span>';
+    else act = `<button class="btn small pick${picked ? ' on' : ''}" data-act="line-pick" data-line="${esc(l.key)}" aria-pressed="${picked}">${picked ? 'Picked' : exp ? 'Try it' : 'Complete'}</button>${exp ? '<small>Experiment</small>' : TESTED_LINES.has(l.key) ? '<small class="tested">Tested on PS5</small>' : ''}`;
+    const moved = a && a.value !== l.value;
+    const pctNow = Math.max(0, Math.min(100, l.percent ?? 0)), pctAfter = moved ? Math.max(0, Math.min(100, a.percent ?? 0)) : pctNow;
+    return `<tr class="${picked ? 'picked' : ''}${full ? ' full' : ''}">
+        <td class="key">${esc(sentence(l.label))}${l.grade === 'partial' ? '<small>Only part of this can be done here.</small>' : ''}
+          <span class="mini" aria-hidden="true"><span style="width:${pctNow}%"></span>${pctAfter > pctNow ? `<span class="add" style="inset-inline-start:${pctNow}%;width:${pctAfter - pctNow}%"></span>` : ''}</span></td>
+        <td class="num">${fmt(l.value, l.of)}${moved ? `<small class="after">${fmt(a.value, a.of)} after</small>` : ''}</td>
+        <td class="num">${l.weight}%</td><td class="act">${act}</td></tr>`;
+  }
+
+  function checklistSections(s) {
+    const C = S.comp[s.file], ck = C.checklist, P = S.preview[s.file] || {};
+    if (!ck?.lines) return '<div class="callout danger">This save’s 100% checklist can’t be read, so the lines below can’t be shown. The parts further down still work.</div>';
+    const after = P.data?.ok && !P.busy ? Object.fromEntries(P.data.lines.map(l => [l.key, l])) : {};
+    const secs = [...new Set(ck.lines.map(l => l.section))];
+    return secs.map(sec => {
+      const lines = ck.lines.filter(l => l.section === sec);
+      const done = lines.filter(l => l.done || (l.percent ?? 0) >= 100).length;
+      return `<div class="group"><div class="section-head"><h3>${esc(sentence(sec).replace(' & ', ' and '))}</h3><span class="note">${done} of ${lines.length} lines done</span></div>
+        <table class="raw ck"><thead><tr><th>Line</th><th class="num">In this save</th><th class="num">Worth</th><th></th></tr></thead>
+          <tbody>${lines.map(l => lineRow(s, l, after[l.key])).join('')}</tbody></table></div>`;
+    }).join('');
+  }
+
+  function stuntGroups(s) {
     const c = S.comp[s.file].stunts;
+    if (!c) return '';
     const sel = S.stuntSel[s.file] || new Set();
     const row = g => {
       const marked = sel.has(g.id), all = g.done >= g.count;
@@ -559,49 +789,60 @@
           : `<button class="btn small" data-act="stunts" data-group="${g.id}" ${all ? 'disabled' : ''}>${all ? 'All done' : 'Mark all done'}</button>`}</div></div>`;
     };
     const left = c.groups.filter(g => g.done < g.count && !sel.has(g.id)).length;
-    return `<div class="section-head"><h2>Completion</h2>${riskTag('caution')}
-        <p>Mark whole parts of the 100% checklist done. Each one is marked found and completed, the counters the game keeps are set to match, and the 100% figure is worked out again the way the game does it. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
-      ${checklistTable(s)}
-      <div class="group"><div class="section-head"><h3>Stunts</h3>${left > 1 ? '<button class="btn small" data-act="stunts" data-group="all">Mark every stunt done</button>' : ''}
+    return `<div class="group"><div class="section-head"><h3>Stunts</h3>${left > 1 ? '<button class="btn small" data-act="stunts" data-group="all">Mark every stunt done</button>' : ''}
         <p>The 100% checklist needs any ${nf.format(c.for100)} of the game’s 397 stunts. Unique stunts done in this save: ${c.uniqueTotal == null ? 'unknown' : nf.format(c.uniqueTotal)}. Under-the-bridge flights and knife flights can’t be told apart in the save, so they’re marked together.</p></div>
-        <div class="fields">${c.groups.map(row).join('')}</div></div>
-      ${compParts(s)}`;
+        <div class="fields">${c.groups.map(row).join('')}</div></div>`;
+  }
+
+  function panelCompletion(s) {
+    const C = S.comp[s.file];
+    const missing = Object.keys(C.errors || {});
+    schedulePreview(s.file);
+    return `<div class="section-head"><h2>Completion</h2>${riskTag('caution')}
+        <p>The game’s own 100% checklist for this save. Pick the lines to complete, or pick everything at once, and the figure it would reach shows before you save.</p></div>
+      ${compSummary(s)}
+      ${missing.length ? `<div class="callout">Some parts can’t be read in this save yet, usually because it’s early in the story: ${missing.map(esc).join(', ')}. Everything else works.</div>` : ''}
+      ${checklistSections(s)}
+      <details class="more-opts" data-keep="compMore" ${S.keep.compMore ? 'open' : ''}><summary>Every option, part by part</summary>
+        <p class="note">The same edits in finer steps, plus extras the checklist doesn’t count: map discoveries, gym memberships, convenience-store robberies, single challenge categories, and the experiments.</p>
+        ${stuntGroups(s)}${compParts(s)}</details>
+      <details class="more-opts" data-keep="compLeft" ${S.keep.compLeft ? 'open' : ''}><summary>What’s left to play in the game</summary>${leftToPlay(s) || '<p class="note">Not available for this save.</p>'}</details>`;
   }
 
   function compParts(s) {
     const C = S.comp[s.file], d = draftOf(s.file).completion;
     const pending = (k, text) => `<span class="note">${esc(text)} Save edits to apply it.</span> <button class="btn small" data-act="comp-undo" data-feature="${k}">Undo</button>`;
     // compendium: animals and weapons (vehicles aren't offered: the game's vehicle pages don't match the save's list)
-    const types = (C.compendium.types || []).filter(t => t.group === 'animals' || t.group === 'weapons');
+    const types = (C.compendium?.types || []).filter(t => t.group === 'animals' || t.group === 'weapons');
     const cg = new Set(d.compendium?.groups || []);
-    const comp = `<div class="group"><div class="section-head"><h3>Compendium</h3><p>Marks animals and weapons as discovered in the game’s compendium, with the counters and the 100% checklist rows that go with them. Vehicles aren’t offered: the game’s vehicle pages don’t match the list in the save.</p></div>
+    const comp = !C.compendium ? '' : `<div class="group"><div class="section-head"><h3>Compendium</h3><p>Marks animals and weapons as discovered in the game’s compendium, with the counters and the 100% checklist rows that go with them. Vehicles aren’t offered: the game’s vehicle pages don’t match the list in the save.</p></div>
       <div class="fields">${types.map(t => `<div class="field"><div class="name">${t.group === 'animals' ? 'Animals' : 'Weapons'}<span class="help">${nf.format(t.discovered)} of ${nf.format(t.candidates)} discovered in this save.</span></div>
         <div class="inputs">${cg.has(t.group) ? pending('compendium:' + t.group, 'Will be marked discovered.') : `<button class="btn small" data-act="comp-add" data-feature="compendium" data-value="${t.group}" ${t.discovered >= t.candidates ? 'disabled' : ''}>${t.discovered >= t.candidates ? 'All discovered' : 'Mark all discovered'}</button>`}</div></div>`).join('')}</div></div>`;
     // map discoveries: shop and place categories
-    const places = (C.discovery.categories || []).filter(x => x.kind === 'place');
+    const places = (C.discovery?.categories || []).filter(x => x.kind === 'place');
     const placeDone = places.filter(x => x.state === 'complete').length;
-    const disc = `<div class="group"><div class="section-head"><h3>Map discoveries</h3><p>Shops and places on the map, by kind: ${nf.format(placeDone)} of ${nf.format(places.length)} kinds fully discovered. Completing a kind marks all its locations discovered, the way the game records a finished kind. Stunt and gang locations aren’t touched here.</p></div>
-      <div class="fields"><div class="field"><div class="name">Every shop and place<span class="help">${places.filter(x => x.state !== 'complete').map(x => `${esc(x.label)} ${x.found}/${x.locations}`).join(', ') || 'All done.'}</span></div>
+    const disc = !C.discovery ? '' : `<div class="group"><div class="section-head"><h3>Map discoveries</h3>${riskTag('tested')}<p>Shops and places on the map, by kind: ${nf.format(placeDone)} of ${nf.format(places.length)} kinds fully discovered. Completing a kind marks all its locations discovered, the way the game records a finished kind. Stunt and gang locations aren’t touched here.</p></div>
+      <div class="fields"><div class="field"><div class="name">Every shop and place<span class="help">${places.some(x => x.state !== 'complete') ? `<span data-no-i18n>${places.filter(x => x.state !== 'complete').map(x => `${esc(x.label)} ${x.found}/${x.locations}`).join(', ')}</span>` : 'All done.'}</span></div>
         <div class="inputs">${d.discovery ? pending('discovery', 'Will be discovered.') : `<button class="btn small" data-act="comp-add" data-feature="discovery" data-value="all" ${placeDone >= places.length ? 'disabled' : ''}>${placeDone >= places.length ? 'All discovered' : 'Discover all'}</button>`}</div></div></div></div>`;
     // challenges by category
-    const cats = C.challenges.categories || [];
+    const cats = C.challenges?.categories || [];
     const chosen = d.challenges ? (d.challenges.categories === 'all' ? new Set(cats.map(x => x.key)) : new Set(d.challenges.categories)) : new Set();
-    const chal = `<div class="group"><div class="section-head"><h3>Challenges</h3>${cats.some(x => x.done < x.of && !chosen.has(x.key)) ? '<button class="btn small" data-act="comp-add" data-feature="challenges" data-value="all">Complete every challenge</button>' : ''}
-        <p>The 100% checklist needs 70 of the game’s 80 challenges. Completed in this save: ${nf.format(C.challenges.done)}. Completing one sets it done and moves its counters; rewards the game hands out itself, such as vehicles, may not unlock.</p></div>
+    const chal = !C.challenges ? '' : `<div class="group"><div class="section-head"><h3>Challenges</h3>${cats.some(x => x.done < x.of && !chosen.has(x.key)) ? '<button class="btn small" data-act="comp-add" data-feature="challenges" data-value="all">Complete every challenge</button>' : ''}
+        <p>The 100% checklist needs 70 of the game’s 80 challenges. Completed in this save: ${nf.format(C.challenges?.done ?? 0)}. Completing one sets it done and moves its counters; rewards the game hands out itself, such as vehicles, may not unlock.</p></div>
       <div class="fields">${cats.map(x => `<div class="field"><div class="name">${esc(x.label)}<span class="help">${x.done} of ${x.of} completed.</span></div>
         <div class="inputs">${chosen.has(x.key) ? pending('challenges:' + x.key, 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="challenges" data-value="${x.key}" ${x.done >= x.of ? 'disabled' : ''}>${x.done >= x.of ? 'All done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
     // gym memberships
-    const gyms = C.gyms.gyms || [];
+    const gyms = C.gyms?.gyms || [];
     const owned = gyms.filter(g => g.owned).length;
-    const gymBox = `<div class="group"><div class="section-head"><h3>Gym memberships</h3><p>The 100% checklist needs all 8. Owned in this save: ${owned}. A membership is added the way the game adds one; the gyms marked “not seen yet” have never been bought in a real save, so their item IDs come from the game’s text.</p></div>
-      <div class="fields"><div class="field"><div class="name">All gym memberships<span class="help">${gyms.map(g => `${esc(g.label)}${g.owned ? ' (owned)' : g.grade !== 'confirmed' ? ' (not seen yet)' : ''}`).join(', ')}.</span></div>
+    const gymBox = !C.gyms ? '' : `<div class="group"><div class="section-head"><h3>Gym memberships</h3>${riskTag('tested')}<p>The 100% checklist needs all 8. Owned in this save: ${owned}. A membership is added the way the game adds one; the gyms marked “not seen yet” have never been bought in a real save, so their item IDs come from the game’s text.</p></div>
+      <div class="fields"><div class="field"><div class="name">All gym memberships<span class="help">${gyms.map(g => `<span data-no-i18n>${esc(g.label)}</span>${g.owned ? ' <span>(owned)</span>' : g.grade !== 'confirmed' ? ' <span>(not seen yet)</span>' : ''}`).join(', ')}.</span></div>
         <div class="inputs">${d.gyms ? pending('gyms', 'Will be added.') : `<button class="btn small" data-act="comp-add" data-feature="gyms" data-value="all" ${owned >= gyms.length ? 'disabled' : ''}>${owned >= gyms.length ? 'All owned' : 'Add all'}</button>`}</div></div></div></div>`;
     // meditation spots
-    const m = C.activities.meditation;
-    const med = `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
+    const m = C.activities?.meditation;
+    const med = !m ? '' : `<div class="group"><div class="section-head"><h3>Meditation spots</h3><p>The 100% checklist needs 15; the save has ${m.total} spots and ${m.done} are done. Completing them records a meditation at each spot, for Lucia, with the counters and the checklist row in step. Focus training rewards aren’t given.</p></div>
       <div class="fields"><div class="field"><div class="name">Every meditation spot<span class="help">${m.done} of ${m.total} done.</span></div>
         <div class="inputs">${d.activities ? pending('activities', 'Will be completed.') : `<button class="btn small" data-act="comp-add" data-feature="activities" data-value="all" ${m.done >= m.total ? 'disabled' : ''}>${m.done >= m.total ? 'All done' : 'Complete all'}</button>`}</div></div></div></div>`;
-    return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + collectibleParts(s) + leftToPlay(s);
+    return comp + disc + chal + gymBox + med + robberyParts(s) + activityParts(s) + collectibleParts(s);
   }
 
   // collectibles: the proven kinds, the experimental ones (no save has one to copy), and the ones that can't be written yet
@@ -622,7 +863,7 @@
         : `<button class="btn small" data-act="coll-add" data-value="${c.key}" ${c.found >= c.entries ? 'disabled' : ''}>${c.found >= c.entries ? 'All found' : 'Mark found'}</button>`}</div></div>`).join('');
     const refused = (C.collectibles.categories || []).filter(c => c.state === 'refused').map(c => esc((c.label || c.key).charAt(0) + (c.label || c.key).slice(1).toLowerCase().replace('waink', 'WAiNK')));
     return `<div class="group"><div class="section-head"><h3>Collectibles</h3><p>Marked found the way the game records a pickup. Marking one found may stop it appearing in the world, so keep your backup until the PS5 shows it counted.</p></div>
-      <div class="fields">${rows}</div>${refused.length ? `<p class="note">Not possible yet, because the save doesn’t show which entries they are or how the game records them: ${refused.join(', ')}.</p>` : ''}</div>`;
+      <div class="fields">${rows}</div>${refused.length ? `<p class="note">Not possible yet, because the save doesn’t show which entries they are or how the game records them: <span data-no-i18n>${refused.join(', ')}</span>.</p>` : ''}</div>`;
   }
 
   // activities, hoops and the vehicle compendium
@@ -671,31 +912,22 @@
     const C = S.comp[s.file], t = C.tasks, g = C.gangs;
     if (!t || !g) return '';
     const np = t.notPassed || [], titled = np.filter(x => x.title), untitled = np.length - titled.length;
-    const taskList = titled.length ? titled.map(x => esc(x.title)).join(', ') + (untitled ? `, and ${untitled} more without a title in the game’s text` : '') : '';
+    const taskList = titled.length ? `<span data-no-i18n>${titled.map(x => esc(x.title)).join(', ')}</span>` + (untitled ? `<span>, and ${untitled} more without a title in the game’s text</span>` : '') : '';
     const tasks = `<div class="group"><div class="section-head"><h3>Optional tasks</h3><p>${t.checklist.value} of ${t.checklist.of} done. These can’t be completed by editing the save: the game records a task only once it’s played, and recording one that wasn’t played would leave it still on offer in the world, without its rewards. ${t.missing} are left to play.${(t.knownMissing || []).length ? ` One of them was finished in your other playthrough.` : ''}</p></div>
       ${taskList ? `<p class="note">Side missions not passed in this save, a good place to look: ${taskList}.</p>` : ''}</div>`;
     const left = (g.locations || []).filter(x => !x.cleared);
     const byGang = Object.fromEntries((g.gangs || []).map(x => [x.key, x.name]));
     const gangs = `<div class="group"><div class="section-head"><h3>Gang operations</h3><p>${g.checklist.value} of ${g.checklist.of} cleared. These can’t be completed by editing the save either: a clear is written in three places, many operations have no record yet, and each one hands out its own weapons, vehicles and safes. Left to clear:</p></div>
       <table class="raw"><thead><tr><th>Operation</th><th>Gang</th><th>State</th></tr></thead><tbody>${left.map(x => `
-        <tr><td class="key">${esc(x.label || x.owner || x.id)}${x.hint ? `<small>${esc(x.hint)}</small>` : ''}</td><td>${esc(byGang[x.gang] || x.gang || '')}</td><td>${esc(x.state || '')}</td></tr>`).join('')}</tbody></table></div>`;
+        <tr><td class="key" data-no-i18n>${esc(x.label || x.owner || x.id)}${x.hint ? `<small>${esc(x.hint)}</small>` : ''}</td><td data-no-i18n>${esc(byGang[x.gang] || x.gang || '')}</td><td>${esc(x.state || '')}</td></tr>`).join('')}</tbody></table></div>`;
     return tasks + gangs;
-  }
-
-  // the game's 100% checklist, line by line, with what this tab can do about each
-  function checklistTable(s) {
-    const c = S.comp[s.file].checklist;
-    if (!c || !c.lines) return '';
-    const here = l => l.grade === 'a' || l.grade === 'done' ? 'On this tab' : l.grade === 'partial' ? 'Partly, on this tab' : l.grade === 'b' ? 'Not yet: tied to missions, or not certain enough' : 'Can’t be done from the save';
-    const fmtv = l => l.of == null ? (typeof l.value === 'number' ? nf2.format(l.value) + (l.label.includes('COMPLETION') ? '%' : '') : '') : `${nf.format(l.value)} / ${nf.format(l.of)}`;
-    return `<details class="checklist"><summary>The game’s 100% checklist: ${nf2.format(c.overall?.stored ?? c.overall)}% in this save</summary>
-      <table class="raw"><thead><tr><th>Line</th><th>In this save</th><th>Weight</th><th>Here</th></tr></thead><tbody>${c.lines.map(l => `
-        <tr><td>${esc(l.label)}</td><td>${esc(fmtv(l))}</td><td>${l.weight}%</td><td>${esc(here(l))}</td></tr>`).join('')}</tbody></table></details>`;
   }
 
   // ---- world: time of day, health, armour
   const two = n => String(n).padStart(2, '0');
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // the month in the page's language (the game's date is kept as it is)
+  const monthName = m => { try { return new Intl.DateTimeFormat(document.documentElement.lang || 'en', {month: 'long', timeZone: 'UTC'}).format(new Date(Date.UTC(2000, m - 1, 1))); } catch { return MONTHS[m - 1] || ''; } };
   function panelWorld(s) {
     const w = S.world[s.file], d = draftOf(s.file).world, c = w.clock;
     const t = d.time || {hour: c.hour, minute: c.minute};
@@ -703,7 +935,7 @@
     return `<div class="section-head"><h2>World</h2>${riskTag('caution')}
         <p>The time of day, health and armour the save was made with. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
       <div class="fields">
-        <div class="field"><div class="name">Time of day<span class="help">Now ${two(c.hour)}:${two(c.minute)} on ${c.day} ${MONTHS[c.month - 1] || ''} ${c.year} in the game. The date stays the same.</span></div>
+        <div class="field"><div class="name">Time of day<span class="help">Now ${two(c.hour)}:${two(c.minute)} on ${c.day} ${monthName(c.month)} ${c.year} in the game. The date stays the same.</span></div>
           <div class="inputs"><div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-hour">Hour</label><span class="with-unit"><input id="w-hour" type="number" min="0" max="23" step="1" value="${t.hour}" data-world="hour"></span></div>
             <div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-min">Minute</label><span class="with-unit"><input id="w-min" type="number" min="0" max="59" step="1" value="${two(t.minute)}" data-world="minute"></span></div></div></div>
         <div class="field"><div class="name">Health<span class="help">Now ${nf2.format(w.health)}. Up to ${nf.format(w.healthMax)}; above 100 is overpowered health.</span></div>
@@ -743,7 +975,7 @@
         <p>Every section of the save, with names where they’re known. A number that is the ID of an item, stat, place or vehicle the app knows shows that name under it. Numbers and true/false values can be changed one at a time; text, the story flow, heists, vehicle records and anything another tab handles stay read-only. Most of these values have unknown meanings, so change one thing, send the save and check it loads.</p></div>`;
     if (!sd.cur) {
       return head + `<table class="raw"><thead><tr><th>Section</th><th>Size</th><th></th></tr></thead><tbody>${sd.sections.map(x => `
-        <tr><td class="key">${esc(x.name || '0x' + x.hash)}<small>0x${x.hash}${x.readOnly ? ', read-only: ' + esc(x.readOnly) : x.risky ? ', not recommended' : ''}</small></td>
+        <tr><td class="key"><span data-no-i18n>${esc(x.name || '0x' + x.hash)}</span><small>0x${x.hash}${x.readOnly ? ', read-only: ' + esc(x.readOnly) : x.risky ? ', not recommended' : ''}</small></td>
           <td>${nf.format(x.bytes)} bytes</td><td><button class="btn small" data-act="sd-open" data-section="${x.hash}" data-path="[]">Open</button></td></tr>`).join('')}</tbody></table>`;
     }
     const n = sd.node, sec = sd.sections.find(x => x.hash === sd.cur.section);
@@ -754,12 +986,12 @@
     const rows = n.items.map(x => {
       const path = [...n.path, x.key], k = rawKey(n.section, path), dr = d[k];
       let cell;
-      if (x.kind === 'object' || x.kind === 'array') cell = `<button class="btn small" data-act="sd-open" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-label="${esc(String(x.label))}">Open, ${nf.format(x.count)} ${x.kind === 'array' ? 'items' : 'fields'}</button>`;
-      else if (ro || !['int', 'float', 'bool'].includes(x.kind)) cell = `<span class="lock">${esc(x.raw)}</span>`;
+      if (x.kind === 'object' || x.kind === 'array') cell = `<button class="btn small" data-act="sd-open" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-label="${esc(String(x.label))}">${x.kind === 'array' ? `Open, ${nf.format(x.count)} items` : `Open, ${nf.format(x.count)} fields`}</button>`;
+      else if (ro || x.readOnly || !['int', 'float', 'bool'].includes(x.kind)) cell = `<span class="lock">${esc(x.raw)}${x.readOnly ? `, read-only: ${esc(x.readOnly)}` : ''}</span>`;
       else if (x.kind === 'bool') { const on = dr ? dr.newValue : x.raw === 'true';
         cell = `<label class="toggle"><input type="checkbox" data-raw="1" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" ${on ? 'checked' : ''}> ${on ? 'true' : 'false'}</label>`; }
-      else cell = `<input type="number" step="any" data-raw="1" data-kind="${x.kind}" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" value="${esc(dr ? String(dr.newValue) : x.raw)}">`;
-      return `<tr class="${dr ? 'changed' : ''}"><td class="key">${esc(String(x.label))}${typeof x.key === 'string' && x.label !== x.key ? `<small>${esc(x.key)}</small>` : ''}</td><td>${esc(x.kind)}</td><td>${cell}${x.means ? `<small class="means">${esc(x.means.kind)}: ${esc(x.means.text)}</small>` : ''}</td></tr>`;
+      else cell = `<input type="number" step="any" ${x.min != null ? `min="${x.min}" max="${x.max}"` : ''} data-raw="1" data-kind="${x.kind}" data-section="${n.section}" data-path='${esc(JSON.stringify(path))}' data-orig="${esc(x.raw)}" data-label="${esc(String(x.label))}" value="${esc(dr ? String(dr.newValue) : x.raw)}">`;
+      return `<tr class="${dr ? 'changed' : ''}"><td class="key" data-no-i18n>${esc(String(x.label))}${typeof x.key === 'string' && x.label !== x.key ? `<small>${esc(x.key)}</small>` : ''}</td><td>${esc(x.kind)}</td><td>${cell}${x.means ? `<small class="means">${esc(x.means.kind)}: ${esc(x.means.text)}</small>` : ''}</td></tr>`;
     }).join('');
     const more = n.total > n.offset + n.items.length ? `<div class="more"><button class="btn small" data-act="sd-more">Show more (${nf.format(n.total - n.offset - n.items.length)} left)</button></div>` : '';
     return head + `<div class="crumbs">${crumbs.join(' ')}</div>${ro ? `<div class="callout">Read-only: ${esc(ro)}.</div>` : n.risky ? '<div class="callout">Not recommended: this section is tied to the story or its meaning isn’t known.</div>' : ''}
@@ -792,9 +1024,10 @@
     if (el.type === 'checkbox') { nv = el.checked; const lab = el.closest('label'); if (lab && lab.lastChild?.nodeType === 3) lab.lastChild.textContent = ' ' + String(nv); }
     else {
       nv = Number(el.value);
-      const ok = el.value.trim() !== '' && Number.isFinite(nv) && (el.dataset.kind !== 'int' || Number.isInteger(nv));
+      const ok = el.value.trim() !== '' && Number.isFinite(nv) && (el.dataset.kind !== 'int' || Number.isInteger(nv))
+        && (el.min === '' || nv >= Number(el.min)) && (el.max === '' || nv <= Number(el.max));
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
-      if (!ok) { delete d[k]; renderPending(); renderCounts(); return; }
+      if (!ok) { delete d[k]; renderPending(); renderCounts(); if (el.max !== '') toast(`Health can be 1 to ${el.max}.`); return; }
     }
     const orig = el.dataset.orig;
     const same = el.type === 'checkbox' ? String(nv) === orig : Number(orig) === nv;
@@ -998,14 +1231,14 @@
       cp.collectibles && {label: 'Collectibles: ' + cp.collectibles.categories.join(', '), value: '', newValue: 'found'}].filter(Boolean);
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
-      ? `<div class="sum">${esc(missionName(s))} already has edits waiting<small>They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
+      ? `<div class="sum">Edits waiting to be sent<small><span data-no-i18n>${esc(missionName(s))}.</span> They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
       : isDirty
-      ? `<div class="sum">${n} change${n === 1 ? '' : 's'} to ${esc(missionName(s))}<small>Not saved yet. Saving encrypts the save through GarlicSaves and gets it ready to send.</small></div>
+      ? `<div class="sum">${n === 1 ? '1 change not saved yet' : `${n} changes not saved yet`}<small><span data-no-i18n>${esc(missionName(s))}.</span> Saving encrypts the save through GarlicSaves and gets it ready to send.</small></div>
          <div class="row"><button class="btn small" data-act="review">${S.reviewOpen ? 'Hide list' : 'Review'}</button>
            <button class="btn small" data-act="discard">Discard</button>
            <button class="btn primary" data-act="save" ${busy ? 'disabled' : ''}>${busy && st.job.kind === 'patch' ? 'Saving…' : 'Save edits to this save'}</button></div>`
-      : `<div class="sum">Edits saved to ${esc(missionName(s))}<small>${n} change${n === 1 ? '' : 's'}. Edit another save, or send them back to the PS5.</small></div>
+      : `<div class="sum">Edits saved<small><span data-no-i18n>${esc(missionName(s))}.</span> ${n === 1 ? '1 change.' : `${n} changes.`} Edit another save, or send them back to the PS5.</small></div>
          <div class="row"><button class="btn small" data-act="review">${S.reviewOpen ? 'Hide list' : 'Review'}</button>
            <button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`;
     const review = S.reviewOpen ? `<ul class="review">${list.map(c => `<li><span>${esc(c.label || 'Change')}</span><span>${esc(fmtChange(c.value))} to ${esc(fmtChange(c.newValue))}</span></li>`).join('')}</ul>` : '';
@@ -1072,11 +1305,13 @@
   }
 
   // ------------------------------------------------------------ events
+  document.addEventListener('toggle', e => { const k = e.target?.dataset?.keep; if (k) S.keep[k] = e.target.open; }, true);
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
     const a = b.dataset.act;
     if (a === 'deleted') { S.deleted = b.checked; const up = $('[data-act="upload"]'); if (up) up.disabled = !(S.deleted && !running()); return; }
+    if (a === 'pick-exp') { S.compExp[S.slot] = b.checked; return; }
     if (b.tagName === 'A') return;
     e.preventDefault();
     if (a === 'go') { S.localError = null; S.manualView = b.dataset.view; S.mainKey = ''; renderRoute(); renderMain(); renderJob(); renderPending(); main.focus(); return; }
@@ -1092,16 +1327,32 @@
     if (a === 'cancel') { act('/api/cancel'); return; }
     if (a === 'upload') { act('/api/upload'); return; }
     if (a === 'restore') {
-      if (confirm('Put the original saves back? Every edit you saved here is undone. You still need to send the save to the PS5 afterwards.')) act('/api/restore', {}, () => { S.drafts = {}; });
+      if (confirm(T('Put the original saves back? Every edit you saved here is undone. You still need to send the save to the PS5 afterwards.'))) act('/api/restore', {}, () => { S.drafts = {}; });
       return;
     }
     if (a === 'slot') { S.slot = b.dataset.file; S.reviewOpen = false; S.mainKey = ''; renderMain(); renderPending(); return; }
     if (a === 'tab') { S.tab = b.dataset.tab; S.mainKey = ''; renderMain(); return; }
+    if (a === 'unstick') {      // move bank money out of the Savings boxes an older version used: same or lower total, saved explicitly
+      const s = slotOf(S.slot), d = draftOf(s.file);
+      d.money[`${b.dataset.inv}:${b.dataset.idx}`] = {inv: +b.dataset.inv, idx: +b.dataset.idx, value: +b.dataset.value, newValue: +b.dataset.to, label: 'Bank account (made spendable)'};
+      toast('The bank money will be moved into the bank’s own boxes when you save edits.');
+      renderPending(); renderCounts();
+      return;
+    }
     if (a === 'fill') {
       const input = b.parentElement.querySelector('input[type="number"]');
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'line-pick') {
+      const file = S.slot, key = b.dataset.line, on = !linePicked(file, key);
+      if (LINE_PICK[key]?.[0] === 'stunts') { setStunts(file, on ? openStunts(file) : []); return; }
+      setLine(file, key, on);
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
+    if (a === 'pick-all') { pickEverything(S.slot, !!S.compExp[S.slot]); return; }
+    if (a === 'pick-none') { clearPicks(S.slot); return; }
     if (a === 'coll-add' || a === 'coll-undo') {
       const s = slotOf(S.slot), d = draftOf(s.file).completion, v = b.dataset.value;
       const cur = new Set(d.collectibles?.categories || []);
@@ -1189,7 +1440,7 @@
       }
       return;
     }
-    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; delete S.sd[f]; S.mainKey = ''; renderMain(); return; }
+    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; delete S.sd[f]; delete S.preview[f]; S.mainKey = ''; renderMain(); return; }
     if (a === 'more') { S.find.limit += 300; $('#allrows').innerHTML = allRows(slotOf(S.slot)); return; }
     if (a === 'review') { S.reviewOpen = !S.reviewOpen; renderPending(); return; }
     if (a === 'discard') {
@@ -1202,19 +1453,19 @@
       const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length && !compCount(d.completion);
       if (none && !s.modified) return;
       if (none) {
-        if (confirm('You removed every edit for this save. Put its original back instead?')) act('/api/restore', {}, () => { S.drafts = {}; });
+        if (confirm(T('You removed every edit for this save. Put its original back instead?'))) act('/api/restore', {}, () => { S.drafts = {}; });
         return;
       }
       const stuntKeys = S.stuntKeys[s.file] || new Set();
       const risky = d.stats.some(c => !stuntKeys.has(`${c.group}:${c.row}`) && !(S.detail[s.file]?.featured || []).some(f => f.entries.some(e => e.group === c.group && e.row === c.row)));
-      if (risky && !confirm('Some of these edits come from All stats, where most values have unknown meanings and can break the save. Keep the originals backed up and check the save loads. Continue?')) return;
+      if (risky && !confirm(T('Some of these edits come from All stats, where most values have unknown meanings and can break the save. Keep the originals backed up and check the save loads. Continue?'))) return;
       act('/api/patch', {slot: s.file, ...d});
     }
   });
 
   $('#passed').addEventListener('click', () => { $('#passed').hidden = true; });
   $('#quit').addEventListener('click', () => {
-    if (!confirm('Quit Save Garage? Edits you haven\u2019t saved here are lost.')) return;
+    if (!confirm(T('Quit Save Garage? Edits you haven\u2019t saved here are lost.'))) return;
     api('/api/quit', {}).then(() => { document.body.innerHTML = '<main id="main"><section class="title-card"><h1>Save Garage has closed</h1><p>You can close this tab.</p></section></main>'; })
       .catch(e => toast(ERR[e.code] || ERR.internal));
   });

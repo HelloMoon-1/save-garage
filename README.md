@@ -15,15 +15,16 @@ your browser, and the PS5 takes it back the same way.
 
 | | What | Status |
 |---|---|---|
-| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Goes past the BuckMe limits: up to about $2,000,000 in the bank and in Family Savings, $20,000 cash. | Tested on PS5 |
+| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank goes up to what its own money boxes hold at your point in the story, because shops only spend from those. Cash goes up to $20,000. | Tested on PS5 |
 | **Ammo** | Every ammo type each character is carrying, named the way the game names it, with one click to refill to a full load (for example 300 assault rifle rounds) or to set the maximum of 9,999. Also lists the weapons each character carries. | Tested on PS5 up to a full load; a save with more loads fine |
 | **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. | Tested on PS5, except times, distances and the story and styles percentages |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Tested on PS5 |
-| **Completion** | Marks every stunt done (jumps, base jumps, under-the-bridge flights and knife flights), discovers every animal and seen weapon in the compendium and every kind of shop and place on the map, completes challenges by category, adds all 8 gym memberships, completes the meditation spots, marks every robbery location and vault fully hit, records the fencing still missing, completes races, ranges, video games, pool, mini golf, drone trials and Bret's decks, scores all 100 basketball hoops, fills the vehicle compendium to 200 base models and marks every collectible card, luxury watch and identified magazine found (book swaps, magazine styles and cocaine flamingos as experimental options), each with the counters the 100% checklist reads, then works out the 100% figure the way the game does. Also shows the game's whole 100% checklist and which lines the save can complete. | Not tested yet |
+| **Completion** | Marks every stunt done (jumps, base jumps, under-the-bridge flights and knife flights), discovers every animal and seen weapon in the compendium and every kind of shop and place on the map, completes challenges by category, adds all 8 gym memberships, completes the meditation spots, marks every robbery location and vault fully hit, records the fencing still missing, completes races, ranges, video games, pool, mini golf, drone trials and Bret's decks, scores all 100 basketball hoops, fills the vehicle compendium to 200 base models and marks every collectible card, luxury watch and identified magazine found (book swaps, magazine styles and cocaine flamingos as experimental options), each with the counters the 100% checklist reads, then works out the 100% figure the way the game does. Shows the game's whole 100% checklist, what each line can be set to, and the new 100% figure before you save. | A save with every option loads and plays on PS5; gym memberships, map discoveries, meditation and fencing confirmed in game, the rest not checked yet |
 | **World** | The time of day (the date stays the same), health up to overpowered, and full armour for both characters. | Not tested yet |
 | **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for most of the rest. Where a real name is still unknown, a plain description of what the stat holds is shown instead, so 99% of the rows in a full-story save read as words. | Can break your save |
 | **Save data** | Every section of the save, with names for 64 of the 82 sections and 610 of the 843 keys. Values that are the ID of a known item, stat, place, mission, news article or social media post show its name or opening words. Any number or true/false value can be changed; text, the story flow, heists and vehicle records stay read-only. | Can break your save |
 | **Trophies** | Not editable. The Trophies page in the app explains what a save edit can and can't do for them. | |
+| **Languages** | The app in English (the default), Deutsch, Nederlands, Français, Español, Português (Brasil), Italiano, Polski, Русский, العربية (right to left), 日本語, 한국어 and 中文（简体）. Pick one at the top of the page; the choice is remembered. Names from the game stay as the game writes them. | |
 
 Every edit in the app carries one of those labels, so you always know how safe it is. Edits are always applied to
 your original save, and the original is backed up on your computer before anything changes.
@@ -78,8 +79,11 @@ on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folde
 
 ## Good to know
 
-- **Money is capped by the game.** Each account holds money in boxes of a fixed size. Above your current limit,
-  Save Garage adds the larger boxes the game itself uses for Family Savings goals. Cash stays at the $20,000 wallet.
+- **Money is capped by the game.** Each account holds money in boxes of a fixed size. Family Savings gets the larger
+  boxes the game itself uses for savings goals. The bank stays within its own boxes, because shops only spend money
+  from those: versions before 1.24.0 put extra money in Family Savings boxes under the bank, which BuckMe showed but
+  shops couldn't spend (issue #3). Editing the bank again, or **Make it spendable** on the Money tab, moves it back.
+  Cash stays at the $20,000 wallet.
 - **A balance of 0 can't be edited.** The game doesn't store it. Get a little money in the game, save and download again.
 - **Only ammo you carry is listed.** Pick some up in the game first to add a new type.
 - **Turn off PS Plus auto-sync for GTA VI** while you test an edited save, so it can't replace your cloud backup.

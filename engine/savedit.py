@@ -153,8 +153,15 @@ def _val_span(txt, group, count):
     return s, e
 
 
+# Money earned: TOTAL EARNED and each character's MONEY EARNED are lifetimemoneyearned without a qualifier. They rise
+# with every source of money (tasks, robberies, safes, tills, pickups, fencing), so an edit to a source moves them too.
+# BuckMe is how money was paid, not where it came from, so it isn't added again.
+LIFETIME_EARNED = 0xd5188146
+EARN_SOURCES = {joaat(q) for q in ('tasks', 'robberies', 'safe', 'till', 'pickups')}
+
+
 def _apply_stats(txt, changes):
-    groups, _ = stat_rows(txt)
+    groups, tables = stat_rows(txt)
     final, explicit_total, log = {}, set(), []
     for ch in changes:
         g = ch.get('group')
@@ -196,6 +203,25 @@ def _apply_stats(txt, changes):
         if not _same(G['type'], total, v0):
             final[(g, r0)] = total
             log.append({'what': 'stat_total', 'group': g, 'row': r0, 'from': v0, 'to': total})
+
+    # keep the money-earned totals in step with the sources edited (unless a total was edited itself)
+    A, Q = tables['base'], tables['qual']
+    delta = {1: 0, 2: 0}
+    for (g, r), nv in list(final.items()):
+        G = groups[g]
+        if A[G['base'][r]] == LIFETIME_EARNED and G['qual'][r] and Q[G['qual'][r]] in EARN_SOURCES and G['owner'][r] in (1, 2):
+            delta[G['owner'][r]] += nv - G['value'][r]
+    if delta[1] or delta[2]:
+        for g, G in groups.items():
+            for r in range(len(G['value'])):
+                if A[G['base'][r]] != LIFETIME_EARNED or G['qual'][r] != 0 or (g, r) in final:
+                    continue
+                o = G['owner'][r]
+                add = delta[1] + delta[2] if o == 0 else delta.get(o, 0)
+                if add:
+                    nv = coerce(G['type'], max(0, G['value'][r] + add))
+                    final[(g, r)] = nv
+                    log.append({'what': 'stat_total', 'group': g, 'row': r, 'from': G['value'][r], 'to': nv})
 
     for g in sorted({g for g, _ in final}):
         G = groups[g]
@@ -397,7 +423,7 @@ FEATURED = [
     Spec('busted', 'records', 'Times busted', 'How often you were arrested.', 'caution', 'count', 'busted', 0, LUCIA_JASON),
     Spec('stolen', 'records', 'Vehicles stolen', 'Shown in the game as VEHICLES STOLEN.', 'caution', 'count', 'stolen', 'vehicle', LUCIA_JASON),
     Spec('stolen_slimjim', 'records', 'Vehicles stolen with a slim jim', 'Shown in the game as VEHICLES STOLEN WITH SLIM JIM.', 'caution', 'count', 'stolenvehiclesbymethod', 'slimjim', LUCIA_JASON),
-    Spec('stolen_window', 'records', 'Vehicles stolen by breaking a window', 'Shown in the game as VEHICLES STOLEN BY BREAKING WINDOW.', 'caution', 'count', 'stolenvehiclesbymethod', 'smashedwindow', LUCIA_JASON),
+    Spec('stolen_window', 'records', 'Vehicles stolen by breaking in', 'Shown in the game as VEHICLES STOLEN BY BREAKING IN.', 'caution', 'count', 'stolenvehiclesbymethod', 'smashedwindow', LUCIA_JASON),
     Spec('carjackings', 'records', 'Carjackings', 'Vehicle record.', 'caution', 'count', 'carjackings', 0, LUCIA_JASON),
     Spec('holdups', 'records', 'Holdups', 'Store holdups.', 'caution', 'count', 'holdups', 0, LUCIA_JASON),
     Spec('fish', 'records', 'Fish caught', 'Shown in the game as FISH CAUGHT.', 'caution', 'count', 'totalcaught', 'fish', LUCIA_JASON),
@@ -486,7 +512,9 @@ TESTED_ON_PS5 = {
     'busted', 'stolen', 'stolen_slimjim', 'stolen_window', 'carjackings', 'holdups', 'fish', 'photo_animal', 'rentals', 'taxis',
     'masks', 'armor', 'fenced_packages', 'fenced_doubloons', 'fenced_meteorites', 'stunts_total', 'stunt_jumps', 'base_jumps',
     'knife_flights', 'under_bridges', 'challenges', 'discoverables', 'collectibles', 'collectible_cards', 'collectible_sets', 'vaults',
-    'gadget_metaldetector', 'gadget_masks', 'gadget_headphones'}
+    'gadget_metaldetector', 'gadget_masks', 'gadget_headphones',
+    # seen on the stats screens of a fresh save with every edit (25 Nov): the focus totals, task rewards, time at 6 stars
+    'buffs_focus', 'overpowers_focus', 'earned_tasks', 'wanted_time_l6'}
 EXTRA_HELP = {
     'overall_pct': 'The game shows the value you set; it is not counted again on load.',
     'challenges': 'It also changes CHALLENGES COMPLETED on the 100% checklist.',

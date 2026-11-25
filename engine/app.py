@@ -23,7 +23,7 @@ else:
 DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.23.0'
+VERSION = '1.24.0-test'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -324,6 +324,46 @@ def cached(key, fn):
     if k not in CACHE:
         CACHE[k] = fn()
     return CACHE[k]
+
+
+def completion_readers(b):
+    """(key, reader) for every part of the Completion tab."""
+    import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium
+    import collectibles2 as collectibles
+    return [('stunts', lambda: savedit.stunts(savedit.section(b, money.SEC_STAT))), ('compendium', lambda: compendium.read(b)),
+            ('discovery', lambda: discovery.read(b)), ('challenges', lambda: challenges.read(b)), ('gyms', lambda: gyms.read(b)),
+            ('activities', lambda: activities.read(b)), ('checklist', lambda: checklist.read(b)), ('tasks', lambda: tasks.read(b)),
+            ('gangs', lambda: gangs.read(b)), ('robberies', lambda: robberies.read(b)), ('fencing', lambda: fencing.read(b)),
+            ('activities2', lambda: activities2.read(b)), ('hoops', lambda: hoops.read(b)), ('vehicles', lambda: vehicles_compendium.read(b)),
+            ('collectibles', lambda: collectibles.read(b))]
+
+
+def completion_preview(slot, body):
+    """The game's 100% checklist as it would be after these stat and Completion edits. Nothing is written."""
+    import checklist
+    c = body.get('completion') or {}
+    if not isinstance(c, dict) or not isinstance(body.get('stats') or [], list):
+        raise ValueError('completion must be an object and stats a list')
+    edits = {'stats': body.get('stats') or [], 'completion': {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}}
+    b = slot_bytes(slot)
+    try:
+        nb, _ = savedit.apply(b, edits)
+    except Exception as e:                      # find which parts fail on their own, so the page can say which
+        failed = []
+        for k, v in edits['completion'].items():
+            try:
+                savedit.apply(b, {'completion': {k: v}})
+            except Exception:
+                failed.append(k)
+        if edits['stats']:
+            try:
+                savedit.apply(b, {'stats': edits['stats']})
+            except Exception:
+                failed.append('stats')
+        return {'ok': False, 'failed': failed, 'detail': repr(e)[:200]}
+    r = checklist.read(nb)
+    return {'ok': True, 'overall': r['overall'],
+            'lines': [{'key': l['key'], 'value': l.get('value'), 'of': l.get('of'), 'percent': l.get('percent'), 'done': l.get('done')} for l in r['lines']]}
 
 
 def slot_featured(slot):
@@ -741,16 +781,18 @@ class H(BaseHTTPRequestHandler):
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium
-                import collectibles2 as collectibles
                 b = slot_bytes(slot)
-                return self._send(200, {'stunts': savedit.stunts(savedit.section(b, money.SEC_STAT)), 'compendium': compendium.read(b),
-                                        'discovery': discovery.read(b), 'challenges': challenges.read(b), 'gyms': gyms.read(b),
-                                        'activities': activities.read(b), 'checklist': checklist.read(b), 'tasks': tasks.read(b), 'gangs': gangs.read(b),
-                                        'robberies': robberies.read(b), 'fencing': fencing.read(b), 'activities2': activities2.read(b),
-                                        'hoops': hoops.read(b), 'vehicles': vehicles_compendium.read(b), 'collectibles': collectibles.read(b)})
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
+            # each part on its own: one a save can't show yet (an early save lacks some records) leaves the rest working
+            out, errors = {}, {}
+            for key, fn in completion_readers(b):
+                try:
+                    out[key] = fn()
+                except Exception as e:
+                    out[key], errors[key] = None, repr(e)[:200]
+            out['errors'] = errors
+            return self._send(200, out)
         if path in ('/api/slot', '/api/stats'):       # detail data for the editor
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
@@ -822,6 +864,11 @@ class H(BaseHTTPRequestHandler):
                     raise Fail('no_slot')
                 ids = [i for i in (body.get('groups') or []) if i in {g[0] for g in savedit.STUNT_GROUPS}]
                 return self._send(200, {'edits': savedit.stunt_edits(savedit.section(slot_bytes(slot), money.SEC_STAT), ids)})
+            if path == '/api/preview':                 # the 100% checklist after the edits picked so far (nothing is written)
+                slot = slot_by_file(body.get('file') or '')
+                if not slot:
+                    raise Fail('no_slot')
+                return self._send(200, completion_preview(slot, body))
             if path == '/api/patch':                   # money, ammo and stats in one request
                 slot = body['slot']
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
