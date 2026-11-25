@@ -129,10 +129,11 @@ folder with the official embeddable Python, a Mac launcher, and a self-contained
 
 ## Credits and license
 
-Save Garage is free software under the [GNU GPL v3](LICENSE). It started from
-[gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor) by CoreyLyu76 and includes PS5 Data Transfer code
-from [GarlicTransfer](https://github.com/earthonion/GarlicTransfer) by earthonion, both GPL-3.0. Details in
-[CREDITS.md](CREDITS.md).
+- **Save Garage web UI and artwork** — NotHGM created the interface and artwork for the upstream [Save Garage](https://github.com/NotHGM/save-garage) project.
+- **Original save editor** — CoreyLyu76 wrote [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor). Its local service and money editor are the foundation of Save Garage.
+- **PS5 Data Transfer** — earthonion wrote [GarlicTransfer](https://github.com/earthonion/GarlicTransfer), which provides the transfer code.
+
+Save Garage and both underlying projects use the [GNU GPL v3](LICENSE). See [CREDITS.md](CREDITS.md) for component versions and additional credits.
 
 Save Garage is not affiliated with or endorsed by Rockstar Games, Take-Two Interactive or Sony Interactive
 Entertainment. Grand Theft Auto and PlayStation are trademarks of their owners. Use it on your own single-player saves.

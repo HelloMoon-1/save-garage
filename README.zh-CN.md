@@ -39,6 +39,10 @@ Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的�
 
 ## 署名与许可
 
-Save Garage 按 [GNU 通用公共许可证第 3 版](LICENSE)发布。项目始于 CoreyLyu76 的 [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor)，并包含 earthonion 的 [GarlicTransfer](https://github.com/earthonion/GarlicTransfer) 数据传输代码。完整贡献者署名见 [CREDITS.md](CREDITS.md)。
+- **Save Garage 网页界面与美术**由 NotHGM 创作。本简体中文版基于其 [Save Garage 原项目](https://github.com/NotHGM/save-garage)。
+- **原版存档修改器**由 CoreyLyu76 开发。Save Garage 的本地服务和金钱编辑功能源自其 [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor)。
+- **PS5 数据传输**使用 earthonion 开发的 [GarlicTransfer](https://github.com/earthonion/GarlicTransfer)。
+
+Save Garage 和上述两个基础项目均采用 [GPL-3.0 许可证](LICENSE)。组件版本与其他贡献者署名见 [CREDITS.md](CREDITS.md)。
 
 Grand Theft Auto 和 PlayStation 是其各自权利人的商标。Save Garage 由社区维护，适用于个人故事模式存档。
