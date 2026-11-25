@@ -14,7 +14,7 @@ import textlabels
 M32 = 0xffffffff
 _D = None
 KIND_WORDS = {'item': 'Item', 'slot': 'Inventory slot', 'stat': 'Stat', 'name': 'Name', 'mission': 'Mission or task', 'place': 'Place',
-              'text': 'Game text', 'post': 'Social media post', 'article': 'News article', 'account': 'Social media account',
+              'text': 'Game text', 'post': 'Social media post', 'article': 'News article', 'account': 'Social media account', 'collectible': 'Collectible',
               'key': 'Save data key', 'section': 'Section'}
 
 
@@ -58,6 +58,19 @@ def _table():
         put(h, 'text', label=t)
     for h, (kind, t) in textlabels.SUFFIX_TEXT.items():    # posts, articles and accounts: text keyed by name + suffix
         put(h, kind, label=t)
+    import collectibles2 as c2                    # the keyed collectible tables: hoops, flamingos, magazines, watches, ...
+    for i, h in enumerate(c2.HOOPS):
+        put(h, 'collectible', name='basketballhoop%d' % i)
+    for i, h in enumerate(c2.AHOL, 1):
+        put(h, 'collectible', name='streetartaholtrashloc%03d' % i)
+    for i, h in enumerate(c2.GOLD_DOUBLOONS, 1):
+        put(h, 'collectible', name='golddoubloonlocation%03d' % i)
+    for prefix, table in (('pinkflamingoslocation', c2.FLAMINGOS), ('collectiblemagazine', c2.MAGAZINES), ('collectiblelibrarybook', c2.BOOKSWAPS),
+                          ('watch', c2.WATCHES), ('uniquelook', c2.MAGSTYLES)):
+        for suffix, h in table.items():
+            put(h, 'collectible', name=prefix + suffix)
+    for car, h in c2.WYMAN.items():
+        put(h, 'collectible', name='wyman%svehicle' % car)
     for h, n in savekeys.KEY_NAMES.items():
         put(h, 'key', name=n)
     for h, n in savekeys.SECTION_NAMES.items():

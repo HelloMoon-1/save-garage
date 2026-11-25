@@ -134,10 +134,13 @@ FLAMINGO_SUFFIXES = (
     '071a 072a 073a 074a 075a 076a 077a 078a 079a 080a 081a 082a 083a 084a 085a 086a 087a 088a 089a 090a 091a 092a '
     '093a 094a 095a 096a 097a 098a 099a 100a 101a 102a 103a 104a 105a 106a 107a').split()
 FLAMINGOS = {s: fl.joaat('pinkflamingoslocation' + s) for s in FLAMINGO_SUFFIXES}
-MAGAZINE_TOPICS = ('cars', 'conspiracy', 'fishing', 'fitness', 'guns', 'prepper', 'superrich', 'wealth')
+# The game's document table lists exactly 11 '<Title> - Issue N' magazines; all 11 keys are collectiblemagazine<topic>
+# (the last three cracked in round 16 against the three probable keys, 0 decoy hits: Manly Gaze, Pêche, ¡BOMBAZO!).
+MAGAZINE_TOPICS = ('cars', 'conspiracy', 'fishing', 'fitness', 'guns', 'prepper', 'superrich', 'wealth',
+                   'maleporno', 'femaleporno', 'spanishgossip')
 MAGAZINES = {t: fl.joaat('collectiblemagazine' + t) for t in MAGAZINE_TOPICS}
-MAGAZINE_UNNAMED = {'bddb04f2': 0xbddb04f2}               # the A1 find that moved the line 1 -> 2
-MAGAZINE_PROBABLE = (0xf0fad292, 0x84c90081, 0x8bfd8fef)   # the other foreign-bucket keys: not written
+MAGAZINE_UNNAMED = {'bddb04f2': 0xbddb04f2}               # the A1 find that moved the line 1 -> 2: a book or comic
+MAGAZINE_PROBABLE = ()                                    # all three earlier 'probable' keys are named magazines now
 BOOKSWAPS = {'%03d' % n: fl.joaat('collectiblelibrarybook%03d' % n) for n in range(1, 8)}
 WATCH_BRANDS = (('blancgiroux', 12), ('crowex', 13), ('novak', 9))
 WATCHES = {'%s%03d' % (b, n): fl.joaat('watch%s%03d' % (b, n)) for b, k in WATCH_BRANDS for n in range(1, k + 1)}
