@@ -1338,5 +1338,14 @@
 "The key service was slow, trying again": "キーサービスの応答が遅かったため、再試行しています",
 "The power-button wait timed out. Go back to the PS5 home screen and try again.": "電源ボタンの待機がタイムアウトしました。PS5のホーム画面に戻って、もう一度お試しください。",
 "GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSavesのキーサービスが時間内に応答しませんでした。キーを計算するコンソールが混み合っているため、1分ほど待ってからもう一度お試しください。PS5にもSave Garageにも問題はありません。",
-"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5が応答しませんでした。PS5のホーム画面に戻り、ほかのツールがData Transferを使っていないことを確かめてから、もう一度お試しください。"
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5が応答しませんでした。PS5のホーム画面に戻り、ほかのツールがData Transferを使っていないことを確かめてから、もう一度お試しください。",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them.": "GarlicSavesに現在リクエストが集中しているため、一時的にリクエストが制限されています。",
+"Wait a minute and try again.": "1分ほど待ってからもう一度お試しください。",
+"Trying again in {0} s": "{0}秒後に再試行します",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment.": "現在、GarlicSavesはSave Garageの共有キーからのキーリクエストを受け付けていません。",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment.": "現在、GarlicSavesはSave Garageの共有キーでのセーブデータの復号・暗号化を受け付けていません。",
+"All you can do is update Save Garage or wait and try again later.": "Save Garageをアップデートするか、しばらく待ってからもう一度お試しいただくしかありません。",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSavesに現在リクエストが集中しているため、一時的にリクエストが制限されています。1分ほど待ってからもう一度お試しください。PS5にもSave Garageにも問題はありません。",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "現在、GarlicSavesはSave Garageの共有キーからのキーリクエストを受け付けていません。Save Garageをアップデートするか、しばらく待ってからもう一度お試しいただくしかありません。",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "現在、GarlicSavesはSave Garageの共有キーでのセーブデータの復号・暗号化を受け付けていません。Save Garageをアップデートするか、しばらく待ってからもう一度お試しいただくしかありません。"
 }

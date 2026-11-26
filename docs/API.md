@@ -25,7 +25,7 @@ The whole app state, polled about once a second by the UI.
     "applied": {"money": [], "ammo": [], "stats": []} | null
   }],
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
-          "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "log": []},
+          "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": []},
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
   "version": "1.29.0",
   "canQuit": false                                    // true in the desktop builds
@@ -130,15 +130,35 @@ the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail":
 ### Download errors
 
 A download that fails ends with `job.status` `error` and `job.error` `{"code": "…", "detail": "…"}`, where `detail` is
-the transfer code's own error, such as `TimeoutError: timed out`. A timeout gets its code from when it came and from
-what GarlicSaves' key service did: `power_timeout` while the power prompt was up (stage `need_power`), `key_timeout` when
-a transfer-key derivation didn't give the transfer code its keys within its 30 s wait (it gave up, was still waiting or
-answered later), and `console_timeout` otherwise, for a PS5 that didn't answer. A `key_timeout` before the power prompt,
-with nothing downloaded yet, starts the download once more by itself after 5 s, with the stage `key_retry` in between
-(`/api/cancel` then ends it); a second one ends the download. The other codes are `not_paired`, `garlic_unreachable`,
-`console_rejected`, `download_failed`, `no_gta_save` and `no_story_slot`. The job's `log` has a line for each
-derivation, such as `Key service: answered in 4.2 s (1 request)` or `Key service: no answer after 30 s (3 requests)`:
-timings and request counts only.
+the transfer code's own error, such as `TimeoutError: timed out`. Every copy of Save Garage sends its GarlicSaves jobs
+with the same worker key, and GarlicSaves takes only so many jobs a minute from one key. A transfer-key request it turns
+down decides the code, since the transfer code can't go on without those keys: `key_rate_limited` when it answered 429
+(rate limited) and `key_disabled` when its API answered 403 (or 401) because key requests are turned off for that key
+(a Cloudflare 403 page doesn't count). Their `detail` is the derivation's line below rather than the closed connection
+the transfer code saw. Once a request is refused no more go out for that derivation, and while a rate limit is known
+(its Retry-After, else 60 s) no hedged request does.
+
+Otherwise a timeout gets its code from when it came and from what GarlicSaves' key service did: `power_timeout` while
+the power prompt was up (stage `need_power`), `key_timeout` when a transfer-key derivation didn't give the transfer code
+its keys within its 30 s wait (it gave up, was still waiting or answered later), and `console_timeout` otherwise, for a
+PS5 that didn't answer.
+
+Before the power prompt, with nothing downloaded yet, the download starts once more by itself: 5 s after a
+`key_timeout` (stage `key_retry`), and after a `key_rate_limited` once the Retry-After GarlicSaves gave is over (60 s
+when it gave none, 75 s at most; stage `key_rate_wait`). Meanwhile `job.wait` holds the seconds left and `/api/cancel`
+ends the download. A second failure, a `key_disabled` and any failure after the power prompt end it. Decrypting the
+saves at the end of a download, and encrypting edits (`/api/patch`), use the same key: a decrypt or encrypt job
+GarlicSaves turns down ends with `garlic_rate_limited` (429) or `garlic_key_disabled` (403 or 401), without an automatic
+retry, and a `detail` such as `GarlicSaves is limiting requests (HTTP 429, retry after 60 s)`. The other codes are
+`not_paired`, `garlic_unreachable`, `console_rejected`, `download_failed`, `no_gta_save` and `no_story_slot`.
+
+The job's `log` has a line for each derivation, saying why it gave no keys when it didn't: `Key service: answered in
+4.2 s (1 request)`, `answered too late, after 31.0 s (2 requests)`, `rate limited by GarlicSaves (retry after 60 s)` (or
+`no retry time given`), `refused (key requests turned off for this key)`, `refused (GarlicSaves called the request
+invalid)`, `no worker free after 30 s (3 requests queued)` (no GarlicSaves console took a request), `worker took too
+long (running after 30 s, 3 requests)`, `worker failed (no keys after 30 s, 3 requests)`, `could not reach GarlicSaves
+(no keys after 30 s, 3 requests)`, or `no answer after 30 s (3 requests)` while none of that is known yet. Timings,
+counts and reasons only: never the worker key, key material, the client or server values or an account ID.
 
 ### The World tab's edits
 

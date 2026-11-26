@@ -1338,5 +1338,14 @@
 "The key service was slow, trying again": "Usługa kluczy działała wolno, ponawianie próby",
 "The power-button wait timed out. Go back to the PS5 home screen and try again.": "Minął czas oczekiwania na przycisk zasilania. Wróć do ekranu głównego PS5 i spróbuj ponownie.",
 "GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "Usługa kluczy GarlicSaves nie odpowiedziała na czas. Konsole, które obliczają klucze, są zajęte, więc poczekaj minutę i spróbuj ponownie. Z twoją konsolą PS5 i z Save Garage wszystko jest w porządku.",
-"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "Konsola PS5 nie odpowiedziała. Wróć do ekranu głównego PS5, upewnij się, że żadne inne narzędzie nie używa Data Transfer, i spróbuj ponownie."
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "Konsola PS5 nie odpowiedziała. Wróć do ekranu głównego PS5, upewnij się, że żadne inne narzędzie nie używa Data Transfer, i spróbuj ponownie.",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them.": "GarlicSaves dostaje teraz zbyt wiele zapytań, więc na chwilę je ogranicza.",
+"Wait a minute and try again.": "Poczekaj minutę i spróbuj ponownie.",
+"Trying again in {0} s": "Ponowna próba za {0} s",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment.": "GarlicSaves nie przyjmuje teraz zapytań o klucze ze współdzielonego klucza Save Garage.",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment.": "GarlicSaves nie odszyfrowuje ani nie szyfruje teraz zapisów dla współdzielonego klucza Save Garage.",
+"All you can do is update Save Garage or wait and try again later.": "Możesz tylko zaktualizować Save Garage albo poczekać i spróbować ponownie później.",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSaves dostaje teraz zbyt wiele zapytań, więc na chwilę je ogranicza. Poczekaj minutę i spróbuj ponownie. Z twoją konsolą PS5 i z Save Garage wszystko jest w porządku.",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "GarlicSaves nie przyjmuje teraz zapytań o klucze ze współdzielonego klucza Save Garage. Możesz tylko zaktualizować Save Garage albo poczekać i spróbować ponownie później.",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "GarlicSaves nie odszyfrowuje ani nie szyfruje teraz zapisów dla współdzielonego klucza Save Garage. Możesz tylko zaktualizować Save Garage albo poczekać i spróbować ponownie później."
 }

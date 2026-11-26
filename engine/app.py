@@ -1,5 +1,5 @@
 """Save Garage local service. The web UI only talks to the /api endpoints here; see docs/API.md."""
-import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress
+import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
@@ -54,7 +54,8 @@ G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
          'slots': [], 'readyToUpload': False, 'network': None}
-JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None, 'log': []}
+JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None,
+       'wait': None, 'log': []}
 CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
 CANCEL = threading.Event()                                  # set by /api/cancel, so a job waiting between tries stops
 PROC = {'p': None}
@@ -69,7 +70,7 @@ def log(msg):
 
 def relay():
     if RELAY['r'] is None:
-        RELAY['r'] = garlic.OracleRelay(G, log)
+        RELAY['r'] = garlic.OracleRelay(G, log, wait=KEY_WAIT)
     return RELAY['r']
 
 
@@ -106,12 +107,22 @@ class Fail(Exception):
         super().__init__(code); self.code, self.detail = code, detail
 
 
+# A decrypt or encrypt job GarlicSaves turned down (garlic.GarlicRefused) ends with these codes; an invalid request is 'internal'.
+GARLIC_REFUSED = {'rate_limited': 'garlic_rate_limited', 'key_disabled': 'garlic_key_disabled'}
+
+
 def start_job(kind, fn):
     with LOCK:
         if JOB['status'] == 'running':
             raise Fail('busy')
-        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None, log=[])
+        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None,
+                   wait=None, log=[])
         CANCEL.clear()
+
+    def failed(code, detail):
+        log('FAIL %s %s' % (code, detail))
+        with LOCK:
+            JOB.update(status='error', error={'code': code, 'detail': str(detail)[:300]}, needPower=False, accounts=None, wait=None)
 
     def run():
         try:
@@ -119,9 +130,9 @@ def start_job(kind, fn):
             with LOCK:
                 JOB.update(status='done', needPower=False, accounts=None)
         except Fail as e:
-            log('FAIL %s %s' % (e.code, e.detail))
-            with LOCK:
-                JOB.update(status='error', error={'code': e.code, 'detail': str(e.detail)[:300]}, needPower=False, accounts=None)
+            failed(e.code, e.detail)
+        except garlic.GarlicRefused as e:       # its text is the HTTP status and the wait, never GarlicSaves' words
+            failed(GARLIC_REFUSED.get(e.reason, 'internal'), e)
         except Exception as e:
             log(traceback.format_exc()[-600:])
             with LOCK:
@@ -523,6 +534,11 @@ def restore_session():
 # known, so these waits stay as they are.
 KEY_WAIT = 30
 KEY_RETRY_WAIT = 5                      # seconds before the one automatic second try when the key service was too slow
+# ... and when GarlicSaves rate limited a key request: until its Retry-After is over (60 s when it gave none), at most 75 s
+KEY_LIMIT_WAIT, KEY_LIMIT_MAX = garlic.RATE_WINDOW, 75
+# A key request GarlicSaves refused ends the download with the code for its reason. A refused invalid request has none:
+# the transfer code's own error gives the code then.
+KEY_REFUSED = {'key_disabled': 'key_disabled', 'rate_limited': 'key_rate_limited'}
 
 
 def download_try(opts):
@@ -578,16 +594,36 @@ def download_try(opts):
     return r
 
 
-def download_error(err, reached, late):
-    """The error code for a failed download try. A timeout while the power prompt is up is the power button's; any other
-    timeout is the key service's when a derivation of this try gave the transfer code no keys in time (late), else the
-    PS5's, which didn't answer."""
+def download_error(err, reached, late, refused=None):
+    """The error code for a failed download try. A key request GarlicSaves refused decides it (refused: that derivation's
+    reason, see KEY_REFUSED): the transfer code can't go on without those keys. Otherwise a timeout while the power prompt
+    is up is the power button's; any other timeout is the key service's when a derivation of this try gave the transfer
+    code no keys in time (late), else the PS5's, which didn't answer."""
+    if refused in KEY_REFUSED:
+        return KEY_REFUSED[refused]
     m = err.lower()
     if 'timed out' not in m and 'timeout' not in m:
         return 'console_rejected' if 'rejected' in m else 'download_failed'
     if reached == 'need_power':
         return 'power_timeout'
     return 'key_timeout' if late else 'console_timeout'
+
+
+def pause(seconds):
+    """Wait before the automatic second try, with the seconds left in job.wait for the page. True when Cancel ended it."""
+    end = time.monotonic() + seconds
+    try:
+        while True:
+            left = end - time.monotonic()
+            if left <= 0:
+                return False
+            with LOCK:
+                JOB['wait'] = math.ceil(left)
+            if CANCEL.wait(min(1.0, left)):
+                return True
+    finally:
+        with LOCK:
+            JOB['wait'] = None
 
 
 def job_download():
@@ -606,20 +642,35 @@ def job_download():
         r = download_try(opts)
         if not r['err']:
             break
-        late = [d for d in keys.derivations.since(t0) if d.late(KEY_WAIT)]
+        tried = keys.derivations.since(t0)
+        late = [d for d in tried if d.late(KEY_WAIT)]
         for d in late:                          # the worker stopped waiting for these: say so in the details
             line = d.report_unanswered()
             if line:
                 log(line)
-        code = download_error(r['err'], r['stage'], late)
-        # the key service was too slow before the power prompt and nothing has downloaded: one more try
-        if code == 'key_timeout' and first and r['stage'] == 'connecting' and not (r['files'] or r['entries']):
+        refused = why = None; detail = r['err']
+        for d in tried:                         # a key request GarlicSaves refused: the detail says why, not the closed connection it led to
+            w = d.reason()
+            if w in KEY_REFUSED:
+                refused, why, detail = d, w, d.summary()
+                break
+        code = download_error(r['err'], r['stage'], late, why)
+        # before the power prompt with nothing downloaded yet, one more try: 5 s later when the key service was too slow,
+        # once the rate limit is over when GarlicSaves limited the requests
+        again = first and r['stage'] == 'connecting' and not (r['files'] or r['entries'])
+        if again and code == 'key_timeout':
             log('The key service was slow, trying again')
             stage('key_retry')
-            if CANCEL.wait(KEY_RETRY_WAIT):
-                raise Fail(code, r['err'])
-            continue
-        raise Fail(code, r['err'])
+            wait = KEY_RETRY_WAIT
+        elif again and code == 'key_rate_limited':
+            left = refused.limit_left(KEY_LIMIT_WAIT)
+            wait = min(KEY_LIMIT_WAIT if left is None else left, KEY_LIMIT_MAX)
+            log('GarlicSaves is limiting requests, trying again in %d s' % math.ceil(wait))
+            stage('key_rate_wait')
+        else:
+            raise Fail(code, detail)
+        if pause(wait):
+            raise Fail(code, detail)
     entries, users, chosen = r['entries'], r['users'], r['chosen']
     if r['nosave'] or not entries:
         raise Fail('no_gta_save')

@@ -1338,5 +1338,14 @@
 "The key service was slow, trying again": "De sleuteldienst was traag, er wordt opnieuw geprobeerd",
 "The power-button wait timed out. Go back to the PS5 home screen and try again.": "Het wachten op de aan/uit-knop duurde te lang. Ga terug naar het startscherm van de PS5 en probeer het opnieuw.",
 "GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "De sleuteldienst van GarlicSaves reageerde niet op tijd. De consoles die daar de sleutels berekenen zijn bezet, dus wacht een minuut en probeer het opnieuw. Er is niets mis met je PS5 of met Save Garage.",
-"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "De PS5 reageerde niet. Ga terug naar het startscherm van de PS5, zorg dat geen andere tool Data Transfer gebruikt en probeer het opnieuw."
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "De PS5 reageerde niet. Ga terug naar het startscherm van de PS5, zorg dat geen andere tool Data Transfer gebruikt en probeer het opnieuw.",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them.": "GarlicSaves krijgt op dit moment te veel verzoeken en beperkt ze daarom even.",
+"Wait a minute and try again.": "Wacht een minuut en probeer het opnieuw.",
+"Trying again in {0} s": "Nieuwe poging over {0} s",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment.": "GarlicSaves accepteert op dit moment geen sleutelverzoeken van de gedeelde sleutel van Save Garage.",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment.": "GarlicSaves ontsleutelt en versleutelt op dit moment geen savegames voor de gedeelde sleutel van Save Garage.",
+"All you can do is update Save Garage or wait and try again later.": "Je kunt alleen Save Garage bijwerken, of wachten en het later opnieuw proberen.",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSaves krijgt op dit moment te veel verzoeken en beperkt ze daarom even. Wacht een minuut en probeer het opnieuw. Er is niets mis met je PS5 of met Save Garage.",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "GarlicSaves accepteert op dit moment geen sleutelverzoeken van de gedeelde sleutel van Save Garage. Je kunt alleen Save Garage bijwerken, of wachten en het later opnieuw proberen.",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "GarlicSaves ontsleutelt en versleutelt op dit moment geen savegames voor de gedeelde sleutel van Save Garage. Je kunt alleen Save Garage bijwerken, of wachten en het later opnieuw proberen."
 }

@@ -27,15 +27,23 @@
   const STAGE = {
     pair_waiting_console: 'Waiting for the PS5', pair_reading: 'Reading the pairing request', paired: 'Paired',
     connecting: 'Connecting to your PS5', key_retry: 'The key service was slow, trying again', need_power: 'Press the PS5 power button', reading_list: 'Reading the save list',
+    key_rate_wait: 'GarlicSaves is getting too many requests right now, so it is briefly limiting them.',
     choose_account: 'Choose the PS5 account', downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
     patching: 'Applying your edits', encrypting: 'Encrypting the edited save', importing: 'Getting the save ready to send',
     ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
+  // GarlicSaves limits the jobs it takes from the one key every copy of Save Garage shares: in a download's key requests
+  // (key_rate_limited) or in decrypting and encrypting a save (garlic_rate_limited)
+  const RATE_LIMITED = 'GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.';
   const ERR = {
     garlic_unreachable: 'The decryption service (garlicsaves.com) can’t be reached. Check your internet connection, then try again.',
     not_paired: 'This PS5 isn’t paired yet. Pair it first.',
     power_timeout: 'The power-button wait timed out. Go back to the PS5 home screen and try again.',
     key_timeout: 'GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.',
+    key_rate_limited: RATE_LIMITED,
+    key_disabled: 'GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.',
+    garlic_rate_limited: RATE_LIMITED,
+    garlic_key_disabled: 'GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.',
     console_timeout: 'The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.',
     console_rejected: 'The PS5 refused the request. Sign in with the account you paired with, or pair again.',
     no_gta_save: 'No GTA VI save was found on the PS5. Save once in the game, then try again.',
@@ -1358,6 +1366,7 @@
           const pct = p && p.total ? Math.round(100 * p.files / p.total) : null;
           html = `<div class="job"><div class="stage">${esc(stage)}</div>
             ${p ? `<div class="detail">${p.total ? `File ${p.files} of ${p.total}` : `${p.files} files so far`}</div>` : ''}
+            ${job.stage === 'key_rate_wait' && job.wait != null ? `<div class="detail">Trying again in ${esc(job.wait)} s</div>` : ''}
             <div class="bar ${pct != null ? 'fixed' : ''}"><span ${pct != null ? `style="width:${pct}%"` : ''}></span></div>
             ${job.needPower ? `<div class="power"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 12a16 16 0 1 0 18 0"/><line x1="24" y1="5" x2="24" y2="22"/></svg>
               <div><strong>Press the PS5 power button once</strong>Let go when it beeps. The PS5 restarts into transfer mode. You have about 5 minutes.</div></div>` : ''}
@@ -1365,7 +1374,7 @@
               <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
-            ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
+            ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'key_rate_wait', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${logBlock(job)}</div>`;
         } else if (job.status === 'error') {
           const code = job.error?.code || 'internal';

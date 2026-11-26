@@ -1338,5 +1338,14 @@
 "The key service was slow, trying again": "密钥服务响应较慢，正在重试",
 "The power-button wait timed out. Go back to the PS5 home screen and try again.": "等待电源键超时。请返回 PS5 主画面，然后重试。",
 "GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSaves 的密钥服务没有及时响应。负责计算密钥的主机正忙，请等一分钟后重试。你的 PS5 和 Save Garage 都没有问题。",
-"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5 没有响应。请返回 PS5 主画面，确认没有其他工具在使用 Data Transfer，然后重试。"
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5 没有响应。请返回 PS5 主画面，确认没有其他工具在使用 Data Transfer，然后重试。",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them.": "GarlicSaves 目前收到的请求太多，正在暂时限制请求。",
+"Wait a minute and try again.": "请等一分钟后重试。",
+"Trying again in {0} s": "{0} 秒后重试",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment.": "GarlicSaves 目前不接受来自 Save Garage 共享密钥的密钥请求。",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment.": "GarlicSaves 目前不为 Save Garage 的共享密钥解密或加密存档。",
+"All you can do is update Save Garage or wait and try again later.": "你只能更新 Save Garage，或者稍后再试。",
+"GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSaves 目前收到的请求太多，正在暂时限制请求。请等一分钟后重试。你的 PS5 和 Save Garage 都没有问题。",
+"GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "GarlicSaves 目前不接受来自 Save Garage 共享密钥的密钥请求。你只能更新 Save Garage，或者稍后再试。",
+"GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.": "GarlicSaves 目前不为 Save Garage 的共享密钥解密或加密存档。你只能更新 Save Garage，或者稍后再试。"
 }
