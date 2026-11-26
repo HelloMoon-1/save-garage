@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "再完成任意 {0} 个即可：可选任务有几百个，每个价值 {3}，所以 {1} 个即可达到 {2}。",
 "No candidates left": "没有剩余候选",
 "Reaches {0} of {1}, from {2} candidates.": "从 {2} 个候选中达到 {1} 中的 {0}。",
-"This line is complete.": "此项已完成。"
+"This line is complete.": "此项已完成。",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "最多 ${0}。在剧情当前阶段，银行的资金箱能容纳 ${1}。超出的部分，Save Garage 会添加每叠最多 ${2} 的资金叠，放在银行的 ${3} 资金箱下，和银行存满时游戏的做法一样。每叠占用一个物品栏位，并始终保留 {4} 个空位。资金叠尚未在 PS5 上测试。",
+"The bank’s money boxes hold ${0} at this point in the story.": "在剧情当前阶段，银行的资金箱能容纳 ${0}。",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "超出的部分，Save Garage 会添加每叠最多 ${0} 的资金叠，放在银行的 ${1} 资金箱下，和银行存满时游戏的做法一样。",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "每叠占用一个物品栏位，并始终保留 {0} 个空位。",
+"Stacks aren’t tested on a PS5 yet.": "资金叠尚未在 PS5 上测试。",
+"was {0}": "原为 {0}",
+"was yes": "原为 是",
+"was no": "原为 否",
+"Cash, Lucia": "现金，Lucia",
+"Cash, Jason": "现金，Jason",
+", Cash": "，现金"
 }

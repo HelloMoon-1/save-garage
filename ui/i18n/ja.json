@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "あと任意の{0}件で十分です。オプションタスクは数百件あり、各タスクが{3}分なので{1}件で{2}になります。",
 "No candidates left": "候補がありません",
 "Reaches {0} of {1}, from {2} candidates.": "{2}件の候補から{1}中{0}に到達します。",
-"This line is complete.": "この項目は達成済みです。"
+"This line is complete.": "この項目は達成済みです。",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "最大${0}。ストーリーの現時点で、銀行のマネーボックスに入るのは${1}です。それを超える分は、Save Garageが最大${2}の束を銀行の${3}ボックスの下に追加します（銀行がいっぱいになったときのゲームと同じ方法です）。束はそれぞれインベントリ枠を使い、常に{4}枠を空けておきます。束はまだPS5で検証していません。",
+"The bank’s money boxes hold ${0} at this point in the story.": "ストーリーの現時点で、銀行のマネーボックスに入るのは${0}です。",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "それを超える分は、Save Garageが最大${0}の束を銀行の${1}ボックスの下に追加します（銀行がいっぱいになったときのゲームと同じ方法です）。",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "束はそれぞれインベントリ枠を使い、常に{0}枠を空けておきます。",
+"Stacks aren’t tested on a PS5 yet.": "束はまだPS5で検証していません。",
+"was {0}": "変更前：{0}",
+"was yes": "変更前：はい",
+"was no": "変更前：いいえ",
+"Cash, Lucia": "現金、Lucia",
+"Cash, Jason": "現金、Jason",
+", Cash": "、現金"
 }

@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "Bastano altre {0} qualsiasi: ci sono alcune centinaia di attività facoltative, e {1} danno il {2} pieno, perché ognuna vale {3}.",
 "No candidates left": "Nessun candidato rimasto",
 "Reaches {0} of {1}, from {2} candidates.": "Arriva a {0} su {1}, tra {2} candidati.",
-"This line is complete.": "Questa riga è completa."
+"This line is complete.": "Questa riga è completa.",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "Fino a ${0}. Gli scomparti di denaro della banca contengono ${1} a questo punto della storia. Oltre questa cifra, Save Garage aggiunge pile fino a ${2} sotto lo scomparto da ${3} della banca, come fa il gioco quando la banca si riempie. Ogni pila occupa uno spazio dell’inventario e {4} spazi restano sempre liberi. Le pile non sono ancora state testate su PS5.",
+"The bank’s money boxes hold ${0} at this point in the story.": "Gli scomparti di denaro della banca contengono ${0} a questo punto della storia.",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "Oltre questa cifra, Save Garage aggiunge pile fino a ${0} sotto lo scomparto da ${1} della banca, come fa il gioco quando la banca si riempie.",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "Ogni pila occupa uno spazio dell’inventario e {0} spazi restano sempre liberi.",
+"Stacks aren’t tested on a PS5 yet.": "Le pile non sono ancora state testate su PS5.",
+"was {0}": "prima: {0}",
+"was yes": "prima: sì",
+"was no": "prima: no",
+"Cash, Lucia": "Contanti, Lucia",
+"Cash, Jason": "Contanti, Jason",
+", Cash": ", Contanti"
 }

@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "Elke {0} extra zijn genoeg: er zijn een paar honderd optionele taken, en {1} geven de volle {2}, omdat elke taak {3} waard is.",
 "No candidates left": "Geen kandidaten meer",
 "Reaches {0} of {1}, from {2} candidates.": "Bereikt {0} van {1}, uit {2} kandidaten.",
-"This line is complete.": "Deze regel is compleet."
+"This line is complete.": "Deze regel is compleet.",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "Tot ${0}. De geldvakken van de bank kunnen op dit punt in het verhaal ${1} bevatten. Daarboven voegt Save Garage stapels van maximaal ${2} toe onder het ${3}-vak van de bank, zoals de game doet als de bank vol raakt. Elke stapel neemt een plek in de inventaris in, en er blijven altijd {4} plekken vrij. Stapels zijn nog niet op een PS5 getest.",
+"The bank’s money boxes hold ${0} at this point in the story.": "De geldvakken van de bank kunnen op dit punt in het verhaal ${0} bevatten.",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "Daarboven voegt Save Garage stapels van maximaal ${0} toe onder het ${1}-vak van de bank, zoals de game doet als de bank vol raakt.",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "Elke stapel neemt een plek in de inventaris in, en er blijven altijd {0} plekken vrij.",
+"Stacks aren’t tested on a PS5 yet.": "Stapels zijn nog niet op een PS5 getest.",
+"was {0}": "was {0}",
+"was yes": "was ja",
+"was no": "was nee",
+"Cash, Lucia": "Contant geld, Lucia",
+"Cash, Jason": "Contant geld, Jason",
+", Cash": ", Contant geld"
 }

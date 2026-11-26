@@ -20,7 +20,8 @@ How money is stored (each part checked on a real PS5, November 2026):
   0x26457c8e (15,000), 0x33894998 (85,000), 0x00fc0216 and 0xdb44180c. The game fills them in that order when money
   comes in and empties them in that order when money goes out. Only money in these boxes counts as BuckMe funds:
   the balance the game spends from (and writes to stat 262) leaves out any other box under checking, while the BuckMe
-  app still shows it. So checking cannot go past the capacity of its own boxes. The large 400,000 / 500,000 / 1,000,000
+  app still shows it. So checking cannot go past the capacity of its own boxes, with one exception: the 85,000 box takes
+  any number of 85,000 stacks (money rows under it), and the game counts every one (see STACK_BOX). The large 400,000 / 500,000 / 1,000,000
   boxes belong to Family Savings, and earlier versions that put them under checking made money that shows but cannot
   be spent (GitHub issue #3). Editing the bank now empties such boxes and puts the money in checking's own boxes.
 
@@ -56,6 +57,15 @@ BIG_BOXES = ((0xa61b8949, joaat('slotid_currency_cash_400000'), 400000),
 CHECKING_BOXES = ((0x26457c8e, 0x006854cf, 15000),
                   (0x33894998, 0x81cc2559, 85000),
                   (0x00fc0216, 0x9e5f7b71, 123844))
+# Checking's 85,000 box takes any number of stacks: every money row under it holds up to 85,000 and the game counts them
+# all, in the balance and in the limit. The game adds such stacks itself once the bank goes past its other boxes, and
+# GarlicSaves' GTA VI editor fills a bank this way (reported tested in game); Save Garage's stacks are not yet tested on
+# a PS5. Every new row needs an Items entry, and an inventory's Items array holds at most 4,095, so ITEM_RESERVE entries
+# are always left free for items the game adds later. BANK_CEILING keeps the signed 32-bit ledger and stats far from
+# overflowing. Rows emptied by a lower balance stay in place (at 0) and are filled again first.
+STACK_BOX, STACK_SLOT, STACK_MAX = 0x33894998, 0x81cc2559, 85000
+ITEM_LIMIT, ITEM_RESERVE = 4095, 300
+BANK_CEILING = 999999999
 # Family Savings' boxes. Under checking (where only earlier versions of this editor put them) the game does not spend from them.
 SAVINGS_BOXES = {0xcfefdcf1, 0xb84a2da6} | {box for box, _, _ in BIG_BOXES}
 ACCOUNTS = {
@@ -171,6 +181,7 @@ def _inventory(sec_txt, nth):
     f = inv.get(K_MAIN) or {}
     v = {'guid': _data(f.get(K_GUID)), 'parent': _data(f.get(K_PARENT)), 'item': _data(f.get(K_ITEM)), 'slot': _data(f.get(K_SLOT)),
          'qty': _data(f.get(K_QTY)), 'parents': _data(inv.get(K_PARENTS))}
+    v['items_n'] = len(_data(inv.get(K_ITEMS)))
     v['used'] = set(v['guid']) | set(v['parents'])
     for k in K_SUBLISTS:
         v['used'] |= set(_data((inv.get(k) or {}).get(K_GUID)))
@@ -187,8 +198,10 @@ def _children(v, row):
 
 
 def _account(v, kind):
-    """Money boxes under an account: [{box, box_row, money_row or None, qty, cap or None, foreign}], or None without the account.
-    foreign: a Family Savings box under checking (the game does not spend from it)."""
+    """Money boxes under an account: [{box, box_row, money_row or None, rows, qty, first, cap or None, foreign}], or None
+    without the account. rows: every money row of the box (the 85,000 box can have many stacks), money_row the first;
+    qty: their total; first: the first row's amount. foreign: a Family Savings box under checking (the game does not
+    spend from it)."""
     root_item, table = ACCOUNTS[kind]
     if root_item not in v['item']:
         return None
@@ -197,8 +210,10 @@ def _account(v, kind):
     for r in _children(v, v['item'].index(root_item)):
         if v['slot'][r] != BOX_SLOT:
             continue
-        m = next((c for c in _children(v, r) if v['item'][c] == MONEY_CAT), None)
-        out.append({'box': v['item'][r], 'box_row': r, 'money_row': m, 'qty': v['qty'][m] if m is not None else 0, 'cap': caps.get(v['item'][r]),
+        rows = [c for c in _children(v, r) if v['item'][c] == MONEY_CAT]
+        m = rows[0] if rows else None
+        out.append({'box': v['item'][r], 'box_row': r, 'money_row': m, 'rows': rows, 'qty': sum(v['qty'][c] for c in rows),
+                    'first': v['qty'][m] if m is not None else 0, 'cap': caps.get(v['item'][r]),
                     'foreign': kind == 'bank' and v['item'][r] in SAVINGS_BOXES})
     return out
 
@@ -207,17 +222,38 @@ def _checking_caps(boxes):
     """{box: capacity} for checking's own boxes that the save has: the known capacity, or what the box already holds if more."""
     caps = {}
     for box, _, cap in CHECKING_BOXES:
-        held = [x['qty'] for x in boxes if x['box'] == box]
+        held = [x['first'] for x in boxes if x['box'] == box]
         if held:
             caps[box] = max([cap] + held)
     return caps
 
 
-def _limit(kind, boxes):
-    """The most an account can hold. Checking: the capacity of the own boxes the save has (it gets no new boxes).
-    Savings: every box it can have, since missing ones are added."""
+def _box_limit(boxes):
+    """Checking without new stacks: its own boxes' first rows, the stacks it already has, and any other box as it is."""
+    stack = next((x for x in boxes if x['box'] == STACK_BOX), None)
+    return (sum(_checking_caps(boxes).values()) + sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
+            + (STACK_MAX * len(stack['rows'][1:]) if stack else 0))
+
+
+def _new_stacks(boxes, items_n):
+    """How many new 85,000 stacks fit: Items entries left above the reserve, less the rows the own boxes still need.
+    None when the save has no 85,000 box (the game adds it later in the story; Save Garage never adds one)."""
+    if not any(x['box'] == STACK_BOX for x in boxes):
+        return None
+    need = sum(1 for box in _checking_caps(boxes) for x in boxes if x['box'] == box and x['money_row'] is None)
+    return max(0, ITEM_LIMIT - ITEM_RESERVE - items_n - need)
+
+
+def _limit(kind, boxes, items_n=0):
+    """The most an account can hold. Checking: the capacity of the own boxes the save has (it gets no new boxes), plus
+    85,000 for every stack that still fits under its 85,000 box, at most BANK_CEILING. Savings: every box it can have,
+    since missing ones are added."""
     if kind == 'bank':
-        return sum(_checking_caps(boxes).values()) + sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
+        lim = _box_limit(boxes)
+        n = _new_stacks(boxes, items_n)
+        if n:
+            lim = max(min(lim + STACK_MAX * n, BANK_CEILING), lim)
+        return lim
     return sum(cap for _, _, cap in ACCOUNTS[kind][1]) + sum(x['qty'] for x in boxes if x['cap'] is None)
 
 
@@ -236,12 +272,14 @@ def scan(b):
             rows = [x['money_row'] for x in boxes or [] if x['money_row'] is not None]
             if not rows:
                 continue
-            seen |= set(rows)
+            seen |= {r for x in boxes for r in x['rows']}
             item = {'inv': n, 'idx': rows[0], 'type': v['slot'][rows[0]], 'kind': kind, 'value': sum(x['qty'] for x in boxes),
-                    'max': _limit(kind, boxes)}
+                    'max': _limit(kind, boxes, v['items_n'])}
             if kind == 'bank':      # value is what the BuckMe app shows; spendable is what the game can spend; stuck is the rest
                 item['spendable'] = sum(x['qty'] for x in boxes if not x['foreign'])
                 item['stuck'] = item['value'] - item['spendable']
+                item['boxMax'] = _box_limit(boxes)        # above this, the balance goes into new 85,000 stacks
+                item['stacks'] = sum(len(x['rows'][1:]) for x in boxes if x['box'] == STACK_BOX)
             items.append(item)
         for k, q in enumerate(v['qty']):
             if v['item'][k] == MONEY_CAT and k not in seen:
@@ -309,9 +347,10 @@ def _set_account(txt, nth, kind, target):
     left = target - sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
     if left < 0:
         raise SaveError('out_of_range')
-    for x in boxes:
-        if x['foreign'] and x['money_row'] is not None and x['qty']:
-            txt = _set(txt, _qty_span(txt, nth), x['money_row'], x['qty'], 0)
+    v = _inventory(txt, nth)
+    zero = {r: (v['qty'][r], 0) for x in boxes if x['foreign'] for r in x['rows'] if v['qty'][r]}
+    if zero:
+        txt = _set_many(txt, _qty_span(txt, nth), zero)
     own = _checking_caps(boxes) if kind == 'bank' else None
     for box, slot, cap in table:
         if own is not None:
@@ -322,8 +361,8 @@ def _set_account(txt, nth, kind, target):
         v = _inventory(txt, nth)
         cur = next((x for x in _account(v, kind) if x['box'] == box), None)
         if cur and cur['money_row'] is not None:
-            if cur['qty'] != amount:
-                txt = _set(txt, _qty_span(txt, nth), cur['money_row'], cur['qty'], amount)
+            if cur['first'] != amount:
+                txt = _set(txt, _qty_span(txt, nth), cur['money_row'], cur['first'], amount)
             continue
         if not amount:
             continue
@@ -334,9 +373,62 @@ def _set_account(txt, nth, kind, target):
             txt, _, box_guid = _add_row(txt, nth, _inventory(txt, nth), root_idx, box, BOX_SLOT, 1)
         txt, box_idx = _parent_index(txt, nth, box_guid)
         txt, _, _ = _add_row(txt, nth, _inventory(txt, nth), box_idx, MONEY_CAT, slot, amount)
+    if kind == 'bank':
+        txt, left = _fill_stacks(txt, nth, left)
     if left:
         raise SaveError('out_of_range')
     return txt
+
+
+def _set_many(txt, span, changes):
+    """Several values of one comma list at once: changes {idx: (old, new)}, each old value checked."""
+    it = txt[span[0]:span[1]].split(b',')
+    for idx, (old, new) in changes.items():
+        if it[idx] != str(old).encode():
+            raise SaveError('verify_failed')
+        it[idx] = str(new).encode()
+    return txt[:span[0]] + b','.join(it) + txt[span[1]:]
+
+
+def _add_rows(txt, nth, v, parent_idx, item, slot, amounts):
+    """Add one main-list row per amount, all under the same parent and each registered in Items."""
+    row0, guids, g = len(v['guid']), [], max(v['used']) + 1
+    for _ in amounts:
+        while g in v['used']:
+            g += 1
+        if g >= 2 ** 63:
+            raise SaveError('out_of_range')
+        v['used'].add(g); guids.append(g)
+    n = len(amounts)
+    for key, vals in ((K_GUID, [b'%d' % x for x in guids]), (K_PARENT, [b'%d' % parent_idx] * n), (K_ITEM, [b'%d' % item] * n),
+                      (K_SLOT, [b'%d' % slot] * n), (K_QTY, [b'%d' % q for q in amounts]), (K_FLAG, [b'false'] * n),
+                      (K_ITEMS, [b'%d' % (((row0 + k) << 4) | 1) for k in range(n)])):
+        txt = _append(txt, nth, key, b','.join(vals))
+    return txt
+
+
+def _fill_stacks(txt, nth, left):
+    """Put what is left into checking's extra 85,000 stacks: the rows under the 85,000 box after its first, in order
+    (emptied when nothing is left), then new rows under the box. Returns (text, what still did not fit)."""
+    v = _inventory(txt, nth)
+    stack = next((x for x in _account(v, 'bank') or [] if x['box'] == STACK_BOX), None)
+    if stack is None:
+        return txt, left
+    changes = {}
+    for r in stack['rows'][1:]:
+        amount = min(STACK_MAX, left); left -= amount
+        if v['qty'][r] != amount:
+            changes[r] = (v['qty'][r], amount)
+    if changes:
+        txt = _set_many(txt, _qty_span(txt, nth), changes)
+    n = -(-left // STACK_MAX)
+    if n <= 0:
+        return txt, left
+    if _inventory(txt, nth)['items_n'] + n > ITEM_LIMIT - ITEM_RESERVE:
+        return txt, left
+    txt, box_idx = _parent_index(txt, nth, v['guid'][stack['box_row']])
+    amounts = [STACK_MAX] * (n - 1) + [left - STACK_MAX * (n - 1)]
+    return _add_rows(txt, nth, _inventory(txt, nth), box_idx, MONEY_CAT, STACK_SLOT, amounts), 0
 
 
 def patch(b, changes):
