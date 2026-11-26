@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "아무거나 {0}개만 더 하면 돼요. 선택 과제는 수백 개이고, 과제 하나가 {3}라서 {1}개면 {2}가 돼요.",
 "No candidates left": "남은 후보 없음",
 "Reaches {0} of {1}, from {2} candidates.": "후보 {2}개로 {1} 중 {0}에 도달해요.",
-"This line is complete.": "이 항목은 완료됐어요."
+"This line is complete.": "이 항목은 완료됐어요.",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "최대 ${0}. 스토리의 현재 시점에서 은행 돈 상자에는 ${1}까지 들어가요. 그 이상은 은행이 가득 찼을 때 게임이 하는 것처럼 Save Garage가 최대 ${2}짜리 묶음을 은행의 ${3} 상자 아래에 추가해요. 묶음마다 인벤토리 칸을 하나씩 쓰고, 항상 {4}칸은 비워 둬요. 묶음은 아직 PS5에서 테스트하지 않았어요.",
+"The bank’s money boxes hold ${0} at this point in the story.": "스토리의 현재 시점에서 은행 돈 상자에는 ${0}까지 들어가요.",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "그 이상은 은행이 가득 찼을 때 게임이 하는 것처럼 Save Garage가 최대 ${0}짜리 묶음을 은행의 ${1} 상자 아래에 추가해요.",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "묶음마다 인벤토리 칸을 하나씩 쓰고, 항상 {0}칸은 비워 둬요.",
+"Stacks aren’t tested on a PS5 yet.": "묶음은 아직 PS5에서 테스트하지 않았어요.",
+"was {0}": "이전 값: {0}",
+"was yes": "이전 값: 예",
+"was no": "이전 값: 아니요",
+"Cash, Lucia": "현금, Lucia",
+"Cash, Jason": "현금, Jason",
+", Cash": ", 현금"
 }

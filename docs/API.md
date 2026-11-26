@@ -27,7 +27,7 @@ The whole app state, polled about once a second by the UI.
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "log": []},
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
-  "version": "1.25.0",
+  "version": "1.26.0",
   "canQuit": false                                    // true in the desktop builds
 }
 ```
@@ -35,8 +35,10 @@ The whole app state, polled about once a second by the UI.
 ## GET /api/slot?file=…
 
 Editor data for one save: featured stats with the exact rows to edit, ammo and the weapons each character carries.
-For the bank, `max` is what the bank's own money boxes hold, `spendable` is the money the game can spend, and `stuck` is money an
-older version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it).
+For the bank, `boxMax` is what the bank's own money boxes hold, and `max` adds a $85,000 stack for every inventory slot left
+above the 300 kept free (at most $999,999,999; equal to `boxMax` when the save has no $85,000 box yet). `stacks` counts
+the extra stacks the bank already has, `spendable` is the money the game can spend, and `stuck` is money an older version
+left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it).
 For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes.
 Each weapon is
 `{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:

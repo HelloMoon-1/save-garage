@@ -17,7 +17,7 @@ your browser, and the PS5 takes it back the same way.
 
 | | What | Status |
 |---|---|---|
-| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank goes up to what its own money boxes hold at your point in the story, because shops only spend from those. Cash goes up to $20,000. | Tested on PS5 |
+| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank fills its own money boxes, then adds $85,000 stacks under its $85,000 box, as the game does when the bank fills up: up to about $230 million, depending on free inventory slots. Cash goes up to $20,000. | Tested on PS5 (the $85,000 stacks not yet) |
 | **Ammo** | Every ammo type each character is carrying, named the way the game names it, with one click to refill to a full load (for example 300 assault rifle rounds) or to set the maximum of 9,999. Also lists the weapons each character carries. | Tested on PS5 up to a full load; a save with more loads fine |
 | **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. | Tested on PS5, except times, distances and the story and styles percentages |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Tested on PS5 |
@@ -35,7 +35,7 @@ your original save, and the original is backed up on your computer before anythi
 
 ## Before you start
 
-- A PS5 with GTA VI (PPSA01547 or PPSA38500). Tested on system software 14.23.
+- A PS5 with GTA VI (PPSA01547, PPSA38500 or PPSA29660). Tested on system software 14.23.
 - A Windows 10 or 11 PC, a Mac, or a Linux computer on the **same home network** as the PS5.
 - An internet connection: decrypting and re-encrypting the save runs on the [GarlicSaves](https://garlicsaves.com) service.
 
@@ -85,13 +85,22 @@ Extract the package to a writable folder. Source runs keep saves in `data`.
   vehicles, missions, save keys) with the evidence for each, plus 1.1 million GTA VI hashes from the community's name
   lists, as searchable text tables.
 
+## Related
+
+- [GTA 6 hash database](https://github.com/NotHGM/gta6-hash-database): every name Save Garage has decoded (stats, items,
+  vehicles, missions, save keys) with the evidence for each, plus 1.1 million GTA VI hashes from the community's name
+  lists, as searchable text tables.
+
 ## Good to know
 
 - **Money is capped by the game.** Each account holds money in boxes of a fixed size. Family Savings gets the larger
   boxes the game itself uses for savings goals. The bank stays within its own boxes, because shops only spend money
   from those: versions before 1.24.0 put extra money in Family Savings boxes under the bank, which BuckMe showed but
   shops couldn't spend (issue #3). Editing the bank again, or **Make it spendable** on the Money tab, moves it back.
-  Cash stays at the $20,000 wallet.
+  Past its boxes, the bank takes any number of $85,000 stacks under its $85,000 box, which the game counts in full.
+  Each stack takes one inventory slot, and Save Garage always leaves 300 free, so the limit depends on the save
+  (about $230 million in a late save, and at most $999,999,999). An early save, before the story gives the bank its
+  $85,000 box, stays at what its boxes hold. The stacks aren't tested on a PS5 yet. Cash stays at the $20,000 wallet.
 - **A balance of 0 can't be edited.** The game doesn't store it. Get a little money in the game, save and download again.
 - **Only ammo you carry is listed.** Pick some up in the game first to add a new type.
 - **Turn off PS Plus auto-sync for GTA VI** while you test an edited save, so it can't replace your cloud backup.

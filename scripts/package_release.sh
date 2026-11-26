@@ -20,6 +20,8 @@ APP_FILES=(engine vendor ui LICENSE CREDITS.md README.md README.zh-CN.md require
 copy_app() {   # copy the app source into $1, without caches
   mkdir -p "$1"
   for f in "${APP_FILES[@]}"; do cp -R "$ROOT/$f" "$1/"; done
+  mkdir -p "$1/docs"
+  cp -R "$ROOT/docs/releases" "$1/docs/"
   find "$1" -name __pycache__ -prune -exec rm -rf {} +
 }
 
@@ -113,6 +115,8 @@ zip_dir "$STAGE/mac" SaveGarage "$OUT/SaveGarage-$VERSION-macos.zip"
 # ---------------------------------------------------------------- Linux (PyInstaller)
 ./scripts/build_linux.sh >/dev/null
 cp LICENSE CREDITS.md README.md README.zh-CN.md build_out/dist/SaveGarage/
+mkdir -p build_out/dist/SaveGarage/docs
+cp -R docs/releases build_out/dist/SaveGarage/docs/
 cat > build_out/dist/SaveGarage/README.txt <<'TXT'
 Save Garage for Linux
 

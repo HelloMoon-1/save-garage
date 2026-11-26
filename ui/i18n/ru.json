@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "Хватит ещё {0} любых: необязательных заданий несколько сотен, а {1} дают полные {2}, потому что каждое стоит {3}.",
 "No candidates left": "Кандидатов не осталось",
 "Reaches {0} of {1}, from {2} candidates.": "Достигает {0} из {1} (кандидатов: {2}).",
-"This line is complete.": "Эта строка выполнена."
+"This line is complete.": "Эта строка выполнена.",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "До ${0}. Ячейки банка вмещают ${1} на этом этапе сюжета. Сверх этого Save Garage добавляет пачки до ${2} в ячейку банка на ${3}, как это делает сама игра, когда банк заполняется. Каждая пачка занимает место в инвентаре, и {4} мест всегда остаются свободными. Пачки ещё не проверены на PS5.",
+"The bank’s money boxes hold ${0} at this point in the story.": "Ячейки банка вмещают ${0} на этом этапе сюжета.",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "Сверх этого Save Garage добавляет пачки до ${0} в ячейку банка на ${1}, как это делает сама игра, когда банк заполняется.",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "Каждая пачка занимает место в инвентаре, и {0} мест всегда остаются свободными.",
+"Stacks aren’t tested on a PS5 yet.": "Пачки ещё не проверены на PS5.",
+"was {0}": "было {0}",
+"was yes": "было: да",
+"was no": "было: нет",
+"Cash, Lucia": "Наличные, Lucia",
+"Cash, Jason": "Наличные, Jason",
+", Cash": ", Наличные"
 }

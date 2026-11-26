@@ -23,7 +23,7 @@ else:
 DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.25.0-zh.2'
+VERSION = '1.21.6'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -31,7 +31,7 @@ PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAV
 BIND = os.environ.get('SAVEGARAGE_HOST', '127.0.0.1')
 ALLOW_NETS = [ipaddress.ip_network(n.strip(), strict=False) for n in os.environ.get('SAVEGARAGE_ALLOW', '127.0.0.0/8').split(',') if n.strip()]
 OK_HOSTS = ['127.0.0.1', 'localhost'] + ([BIND] if BIND not in ('', '0.0.0.0', '127.0.0.1', 'localhost') else [])
-GTA_TITLES = ['PPSA01547', 'PPSA38500']          # GTA VI title IDs for each region
+GTA_TITLES = ['PPSA01547', 'PPSA38500', 'PPSA29660']   # GTA VI title IDs (regions); PPSA29660: GarlicSaves treats it as GTA VI too
 NOWIN = 0x08000000 if os.name == 'nt' else 0
 PY = sys.executable
 LAST_SEEN = {'t': time.time()}

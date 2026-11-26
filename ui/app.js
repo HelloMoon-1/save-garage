@@ -436,6 +436,8 @@
     const name = x => ({bank: 'Bank account', savings: 'Family Savings', cash: 'Cash, ' + (x.inv === 0 ? 'Lucia' : 'Jason')})[x.kind];
     const help = x => ({bank: x.stuck > 0
                           ? `BuckMe shows $${nf.format(x.value)}, but $${nf.format(x.stuck)} of it sits in Family Savings boxes that an older version of Save Garage put under the bank, and the game can’t spend it. Moving it puts as much as fits, up to $${nf.format(x.max)}, in the bank’s own money boxes.`
+                          : x.max > x.boxMax
+                          ? `Up to $${nf.format(x.max)}. The bank’s money boxes hold $${nf.format(x.boxMax)} at this point in the story. Above that, Save Garage adds stacks of up to $${nf.format(85000)} under the bank’s $${nf.format(85000)} box, as the game does when the bank fills up. Each stack takes an inventory slot, and ${nf.format(300)} slots are always left free. Stacks aren’t tested on a PS5 yet.`
                           : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops only spend money from these boxes, so the editor doesn’t go past them. The limit grows as the story goes on.`,
                         savings: `Up to $${nf.format(x.max)}.`, cash: `Up to $${nf.format(x.max)}, the size of the wallet.`})[x.kind];
     return `

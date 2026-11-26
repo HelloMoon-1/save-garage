@@ -90,6 +90,9 @@ jobs:
 
           GPL-3.0 许可证和贡献者署名随发行包提供。
           NOTES
+          if [[ -f "docs/releases/$RELEASE_TAG.md" ]]; then
+            cp "docs/releases/$RELEASE_TAG.md" "$RUNNER_TEMP/release-notes.md"
+          fi
           gh release create "$RELEASE_TAG" build_out/release/* \
-            --target "$GITHUB_SHA" --title "Save Garage $RELEASE_TAG" \
+            --latest --target "$GITHUB_SHA" --title "Save Garage $RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

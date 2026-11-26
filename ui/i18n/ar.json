@@ -1080,5 +1080,16 @@
 "Any {0} more will do: there are a few hundred optional tasks, and {1} give the full {2}, because each one is worth {3}.": "يكفي أي {0} إضافية: هناك بضع مئات من المهام الاختيارية، و{1} تمنح {2} كاملة لأن كل مهمة تساوي {3}.",
 "No candidates left": "لم يتبقَّ مرشحون",
 "Reaches {0} of {1}, from {2} candidates.": "يصل إلى {0} من {1}، من بين {2} مرشحًا.",
-"This line is complete.": "اكتمل هذا البند."
+"This line is complete.": "اكتمل هذا البند.",
+"Up to ${0}. The bank’s money boxes hold ${1} at this point in the story. Above that, Save Garage adds stacks of up to ${2} under the bank’s ${3} box, as the game does when the bank fills up. Each stack takes an inventory slot, and {4} slots are always left free. Stacks aren’t tested on a PS5 yet.": "حتى ${0}. تتسع صناديق المال الخاصة بالبنك لـ ${1} في هذه المرحلة من القصة. وفوق ذلك، يضيف Save Garage رزمًا تصل إلى ${2} تحت صندوق البنك البالغ ${3}، كما تفعل اللعبة عندما يمتلئ البنك. تشغل كل رزمة خانة في المخزون، وتبقى {4} خانة فارغة دائمًا. لم تُختبَر الرزم على PS5 بعد.",
+"The bank’s money boxes hold ${0} at this point in the story.": "تتسع صناديق المال الخاصة بالبنك لـ ${0} في هذه المرحلة من القصة.",
+"Above that, Save Garage adds stacks of up to ${0} under the bank’s ${1} box, as the game does when the bank fills up.": "وفوق ذلك، يضيف Save Garage رزمًا تصل إلى ${0} تحت صندوق البنك البالغ ${1}، كما تفعل اللعبة عندما يمتلئ البنك.",
+"Each stack takes an inventory slot, and {0} slots are always left free.": "تشغل كل رزمة خانة في المخزون، وتبقى {0} خانة فارغة دائمًا.",
+"Stacks aren’t tested on a PS5 yet.": "لم تُختبَر الرزم على PS5 بعد.",
+"was {0}": "كان {0}",
+"was yes": "كان نعم",
+"was no": "كان لا",
+"Cash, Lucia": "النقد، Lucia",
+"Cash, Jason": "النقد، Jason",
+", Cash": "، النقد"
 }
