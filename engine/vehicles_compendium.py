@@ -48,20 +48,25 @@ THE PAGE COUNTERS (settled; 4 more in round 16)
 WHICH MODELS ARE OFFERED (the key and membership risks)
   Only models on the 12 pages with a single confirmed counter, minus Emergency and Military (police variants are listed
   but not counted), and only with a key graded:
-    * confirmed: the key was seen in a game-written compendium list (148 offered);
-    * likely: joaat(model) is the only C0898 key carrying the model's display name (70 offered). That rule holds for
-      135 of 135 seen vehicles it applies to, and none of the ten gameName vehicles falls under it.
-  Held back (NOT_OFFERED): 8 models whose key is weak (no name key for the model, or several keys carry the same name)
+    * confirmed: the key was seen in a game-written compendium list (148 offered), or the game's own vehicle data
+      gives the model's gameName (VEHICLE_DATA, 69 offered). DurtyFree's GTA VI vehicles.json (build 1.0.2.1) names
+      the gameName of 190 of the 231 page members and never contradicts a key: 117 of them were seen in saves, 64 had
+      been graded likely, 5 were held back as weak and 4 are edition vehicles. For all 190 the gameName is the model
+      name;
+    * likely: joaat(model) is the only C0898 key carrying the model's display name (6 offered). That rule holds for
+      135 of 135 seen vehicles it applies to and for the 64 the vehicle data confirms, and none of the ten gameName
+      vehicles falls under it.
+  Held back (NOT_OFFERED): 3 models whose key is weak (no name key for the model, or several keys carry the same name)
   and the 5 Ultimate Edition / pack vehicles, which a standard copy of the game does not have. They stay page members,
   so a page still reads as consistent when the game lists them.
   Every offered model has a <model>_base_spec stats row. 'min' takes the pages in the order of PAGES (the eight car and
   utility pages first, as before, then Sedans, Bikes, Watercraft, Aircraft) and models in alphabetical order. With the
-  save at 163 it adds the same 37 models from the car pages as before; an early save (playthrough B, 4 base models)
-  reaches 200 using the new pages.
+  save at 163 it adds 37 models from the car and utility pages (2 with a likely key); an early save (playthrough B,
+  4 base models) reaches 200 using the new pages (5 with a likely key).
 
-RISK: medium. The page mapping rests on exact series matches; the category list is third-party; 70 of the offered keys
-are inferred from the game text (likely), not seen; nothing has been loaded on a PS5. The game shows the added models
-as discovered but never driven (no stats beyond the counters).
+RISK: medium. The page mapping rests on exact series matches; the category list is third-party; 6 of the offered keys
+are inferred from the game text alone (likely) and 69 come from the game's vehicle data, not from a save; nothing has
+been loaded on a PS5. The game shows the added models as discovered but never driven (no stats beyond the counters).
 """
 import challenges
 import checklist
@@ -127,18 +132,21 @@ PAGES = (
 # page members that are never added, with the reason
 NOT_OFFERED = dict(
     [(m, 'key weak: no name key for the model, or several game-text keys carry its display name')
-     for m in ('216cstreamer', 'calder', 'crusher', 'double', 'forklift', 'swift', 'telehandler', 'vigero3')] +
+     for m in ('216cstreamer', 'calder', 'swift')] +
     [(m, 'Ultimate Edition vehicle') for m in ('deviant', 'riataclassic', 'transgressor', 'wymankitcar')] +
     [('stanier55', 'pack vehicle (Vintage Vice City)')])
-# offered models whose key is inferred from the game text, not seen in a save (the rest are confirmed)
-LIKELY = frozenset((
-    'aleutian', 'aphid', 'arcturus', 'azure', 'blazer4', 'bobcatxl', 'buccaneer', 'caddy2', 'carbonrs', 'chino', 'cliffhanger',
-    'cometretro', 'coquette2', 'crake', 'cretacean', 'declasse500', 'devanity', 'dibnah', 'dominator7', 'drafter', 'duster',
-    'emerus', 'esskey', 'fcr', 'flatdeck', 'fortune', 'fr36', 'gauntlet5', 'golfcarthotrod', 'gresleyxt', 'growler', 'hermes',
-    'journey', 'kamacho', 'lectro', 'mallard', 'marquis', 'mesa', 'montagnepu', 'moocher', 'nimbus', 'penumbraff', 'pmp700',
-    'pontoon', 'primo', 'reclaimerclassic', 'ripley', 'sandkingxt', 'sedna', 'shamal', 'shuttle', 'skivvy', 'slamvan', 'spritz',
-    'sungrazer', 'taco', 'tao', 'torlan', 'tribike', 'trotter', 'tulip2', 'verus', 'volatus', 'walton', 'windsor2', 'woodland',
-    'yosemite', 'youga2', 'yougaxl', 'zombieb'))
+# offered models whose key is inferred from the game text alone (the rest are confirmed)
+LIKELY = frozenset(('aleutian', 'azure', 'esskey', 'shamal', 'taco', 'woodland'))
+# confirmed by the game's own vehicle data rather than a save list: DurtyFree's GTA VI vehicles.json (build 1.0.2.1)
+# gives these models' gameName, and it is the model name, so the key is joaat(model)
+VEHICLE_DATA = frozenset((
+    'aphid', 'arcturus', 'blazer4', 'bobcatxl', 'buccaneer', 'caddy2', 'carbonrs', 'chino', 'cliffhanger', 'cometretro',
+    'coquette2', 'crake', 'cretacean', 'crusher', 'declasse500', 'devanity', 'dibnah', 'dominator7', 'double', 'drafter',
+    'duster', 'emerus', 'fcr', 'flatdeck', 'forklift', 'fortune', 'fr36', 'gauntlet5', 'golfcarthotrod', 'gresleyxt',
+    'growler', 'hermes', 'journey', 'kamacho', 'lectro', 'mallard', 'marquis', 'mesa', 'montagnepu', 'moocher', 'nimbus',
+    'penumbraff', 'pmp700', 'pontoon', 'primo', 'reclaimerclassic', 'ripley', 'sandkingxt', 'sedna', 'shuttle', 'skivvy',
+    'slamvan', 'spritz', 'sungrazer', 'tao', 'telehandler', 'torlan', 'tribike', 'trotter', 'tulip2', 'verus', 'vigero3',
+    'volatus', 'walton', 'windsor2', 'yosemite', 'youga2', 'yougaxl', 'zombieb'))
 # the other page counters identified by series (not used for adding; documented and tested)
 OTHER_PAGES = {'Emergency': (0x32f90aa2,), 'Military': (0x0085e736,), 'Trucks': (0xadeae663, 0xea384fd4),
                'Transport Vehicles': (0x8b30431d, 0x704b9a5f), 'Industrial': (0xbd646822, 0x8bd2aa53),
