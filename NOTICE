@@ -1,0 +1,37 @@
+Save Garage
+Copyright (C) 2026 NotHGM
+https://github.com/NotHGM/save-garage
+
+Save Garage is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License version 3 (see LICENSE), together with the additional terms below. It comes with no warranty.
+
+Save Garage includes work by others under the same licence: gta6-save-editor by CoreyLyu76, which Save Garage started
+from (the local service, the money editor and the GarlicSaves client), and GarlicTransfer by earthonion (the PS5 Data
+Transfer code in vendor/poc and the GarlicSaves sign-in flow). See CREDITS.md. Their copyright stays with them.
+
+
+ADDITIONAL TERMS (GNU General Public License version 3, section 7)
+
+These terms apply to the material NotHGM added to Save Garage, as permitted by section 7 of the licence, starting with
+the version that first carries this file. Anyone who conveys that material, changed or unchanged, must keep these
+terms with it.
+
+1. Author attribution (section 7(b)). Keep this NOTICE file, and keep the line
+   "Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)"
+   in the README or equivalent documentation, and in the legal notices the app shows (the page footer), of every copy
+   and every modified version.
+
+2. Marking modified versions (section 7(c)). A modified version must say clearly, in its README and in the app, that it
+   is a modified version of Save Garage and not the official one, and must not suggest that NotHGM makes, checks or
+   supports it.
+
+3. Name and logo (section 7(e)). This licence grants no rights under trademark law to the name "Save Garage" or to the
+   Save Garage logo and icons used as marks. A modified version you distribute must use a different name and logo.
+   Unchanged copies of an official release may keep them.
+
+
+OFFICIAL RELEASES
+
+Official Save Garage releases are published only at https://github.com/NotHGM/save-garage/releases. Each one is signed
+with Save Garage's release key, and Save Garage checks that signature before it installs an update (see "Updates" in
+the README). Builds from anywhere else are not made or checked by NotHGM.

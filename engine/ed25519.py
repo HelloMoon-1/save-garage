@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Ed25519 signatures (RFC 8032), in pure Python so the update check works in every build: the Windows embeddable
 Python and the macOS system Python have no third-party packages to lean on.
 

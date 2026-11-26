@@ -1,3 +1,5 @@
+# Save Garage - Copyright (C) 2026 CoreyLyu76 (gta6-save-editor) and NotHGM - GNU GPL v3; NotHGM's parts also carry
+# the additional terms in NOTICE. See LICENSE.
 """Save Garage local service. The web UI only talks to the /api endpoints here; see docs/API.md."""
 import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math, secrets
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler

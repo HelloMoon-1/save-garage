@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """What the game itself calls stats, read from its stats screens and matched to save rows by value.
 
 GAME_LABELS maps (base hash, qualifier hash, owner hash) to the on-screen label. QUALIFIER_LABELS maps qualifier

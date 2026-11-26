@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Save Garage's updater. It finds a newer release on GitHub, makes sure it is one the maintainer signed, and stages it
 in the data folder; engine/bootstrap.py installs it the next time Save Garage starts. README.md, "Updates", says the
 same for users.

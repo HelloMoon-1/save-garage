@@ -1,3 +1,4 @@
+// Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 'use strict';
 // Save Garage translations. The page is written in English; this swaps the text people read for the chosen language,
 // as it appears (the page re-renders often), sentence by sentence where a whole text has no translation. Game names

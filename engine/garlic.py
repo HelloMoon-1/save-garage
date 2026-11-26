@@ -1,3 +1,5 @@
+# Save Garage - Copyright (C) 2026 CoreyLyu76 (gta6-save-editor) and NotHGM - GNU GPL v3; NotHGM's parts also carry
+# the additional terms in NOTICE. See LICENSE.
 """GarlicSaves client: decrypt, encrypt and transfer-key derivation, and the sign-in that gets this installation its
 worker key. Uses curl because Cloudflare blocks Python's own HTTP fingerprint."""
 import json, subprocess, time, urllib.request, urllib.parse, shutil, os, re, socket, threading, unicodedata, zipfile

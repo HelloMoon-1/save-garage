@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Find and replace single values in the save's JSON text without re-serialising it.
 
 The game is particular about its JSON formatting (floats as %.6f, key order, spacing), so edits replace the exact bytes

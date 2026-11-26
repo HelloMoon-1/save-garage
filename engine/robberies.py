@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Robbery lines of the 100% checklist: BANK JOBS / PAYDAY LOAN JOBS / SMASH 'N' GRABS / STICK UPS FULLY COMPLETED,
 VAULTS HIT, and the Robberies page's CONVENIENCE STORES: LOCATIONS FULLY HIT (Save Garage feature module).
 

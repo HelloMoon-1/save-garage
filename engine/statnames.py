@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Known names for GTA VI stat keys.
 
 The save stores stat names as joaat hashes of lower-case names. These names were recovered by hashing candidate words

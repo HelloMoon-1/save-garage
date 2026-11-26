@@ -1,3 +1,5 @@
+# Save Garage - Copyright (C) 2026 CoreyLyu76 (gta6-save-editor) and NotHGM - GNU GPL v3; NotHGM's parts also carry
+# the additional terms in NOTICE. See LICENSE.
 """Read and edit money in decrypted GTA VI JSAV saves.
 
 How money is stored (each part checked on a real PS5, November 2026):

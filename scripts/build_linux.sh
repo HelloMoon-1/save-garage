@@ -11,7 +11,7 @@ PY="${PYTHON:-python3}"
   --distpath build_out/dist --workpath build_out/work --specpath build_out \
   --paths "$ROOT/engine" \
   --add-data "$ROOT/vendor:vendor" --add-data "$ROOT/ui:ui" --add-data "$ROOT/engine/workers:engine/workers" \
-  --add-data "$ROOT/LICENSE:." --add-data "$ROOT/CREDITS.md:." --add-data "$ROOT/README.md:." \
+  --add-data "$ROOT/LICENSE:." --add-data "$ROOT/NOTICE:." --add-data "$ROOT/CREDITS.md:." --add-data "$ROOT/README.md:." \
   --hidden-import app --hidden-import money --hidden-import garlic --hidden-import savedit --hidden-import statnames \
   --hidden-import bootstrap --hidden-import updater --hidden-import ed25519 --hidden-import tarfile --hidden-import secrets \
   --hidden-import sqlite3 --hidden-import ipaddress --hidden-import select --hidden-import uuid --hidden-import hashlib \

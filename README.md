@@ -5,6 +5,9 @@
   &nbsp;&nbsp;|&nbsp;&nbsp; Windows, macOS and Linux &nbsp;&nbsp;|&nbsp;&nbsp; Free and open source (GPL-3.0)
 </p>
 
+> **Official releases come only from this repository's [Releases](../../releases) page,** and every one is signed with
+> Save Garage's release key. Copies and builds published anywhere else are not made or checked by NotHGM.
+
 Save Garage edits your **GTA VI story-mode save on PS5**: money, ammo and stats. It needs no jailbreak and installs
 nothing on the console. Your PS5 sends the save to your computer through its own Data Transfer feature, you edit it in
 your browser, and the PS5 takes it back the same way.
@@ -288,7 +291,13 @@ signs `SHA256SUMS.txt` with the release key and checks the signature the way the
 
 ## Credits and license
 
-Save Garage is free software under the [GNU GPL v3](LICENSE). It started from
+Save Garage, Copyright (C) 2026 NotHGM. It is free software under the [GNU GPL v3](LICENSE), with the additional terms in
+[NOTICE](NOTICE) that section 7 of the licence allows. In short, for the parts written by NotHGM: a copy or modified
+version must keep the credit "Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)", a modified
+version must say clearly that it is modified and not the official Save Garage, and a modified version you distribute
+must use its own name and logo.
+
+Save Garage started from
 [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor) by CoreyLyu76 and includes PS5 Data Transfer code
 and the GarlicSaves sign-in flow from [GarlicTransfer](https://github.com/earthonion/GarlicTransfer) by earthonion, both
 GPL-3.0. Details in

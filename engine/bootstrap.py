@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Installs an update engine/updater.py staged. engine/main.py calls run() first thing on a normal start, before any of
 the app's own modules are imported, so no file is replaced under running code.
 

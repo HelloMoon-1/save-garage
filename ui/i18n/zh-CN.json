@@ -1445,5 +1445,7 @@
 "Save Garage decrypts and encrypts saves through GarlicSaves, which now asks each app that uses it to sign in with your own GarlicSaves account. You do this once on this computer.": "Save Garage 通过 GarlicSaves 解密和加密存档，而 GarlicSaves 现在要求每个使用它的应用用你自己的 GarlicSaves 账号登录。在这台电脑上只需操作一次。",
 "GarlicSaves gives Save Garage on this computer a key of its own. Save Garage keeps it in its data folder, readable only by you, and sends it only to GarlicSaves. It never appears on this page.": "GarlicSaves 会为这台电脑上的 Save Garage 发放一个专属密钥。Save Garage 将它保存在只有你能读取的数据文件夹中，并且只发送给 GarlicSaves。它绝不会显示在此页面上。",
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSaves 拒绝了此登录。它可能已被停用，也可能已过期。请重新登录以继续。",
-"Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "要退出 GarlicSaves 登录吗？Save Garage 会忘记它在这台电脑上的密钥，之后你需要重新登录才能配对、下载、保存修改或传回存档。"
+"Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "要退出 GarlicSaves 登录吗？Save Garage 会忘记它在这台电脑上的密钥，之后你需要重新登录才能配对、下载、保存修改或传回存档。",
+"Free software under the GNU GPL v3, with no warranty.": "GNU GPL v3 自由软件，不提供任何担保。",
+"Source and official releases": "源代码和官方版本"
 }

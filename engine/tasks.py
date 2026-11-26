@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Optional tasks: the 100% checklist line 'OPTIONAL TASKS COMPLETED x / 100' (Save Garage feature module, READ-ONLY).
 
 There is deliberately no apply(): completing optional tasks by editing the save is not offered (see WHY NOT EDITABLE).

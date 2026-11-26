@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """The 100% checklist and the overall '100% COMPLETION' figure (Save Garage feature module).
 
 WHAT IT READS

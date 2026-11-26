@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Fenced-goods lines of the 100% checklist: NARCOTICS FENCED $x / $100,000, JEWELRY FENCED $x / $100,000,
 MARKED BILLS FENCED $x / $250,000 and VEHICLES FENCED $x / $200,000 (Save Garage feature module).
 

@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """BASE MODEL VEHICLES x / 200 on the 100% checklist: add vehicle models to the compendium (Save Garage feature module).
 
 WHAT THE LINE READS

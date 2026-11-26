@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Discover every location of a map category (Save Garage feature module).
 
 WHAT IT CHANGES (section 940e954d Discovery only)

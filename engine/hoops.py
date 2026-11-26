@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Basketball hoops found and scored (Save Garage feature module). Checklist line 'BASKETBALL HOOPS x / 90'.
 
 WHAT IT CHANGES

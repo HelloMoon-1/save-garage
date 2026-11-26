@@ -1,3 +1,5 @@
+# Save Garage - Copyright (C) 2026 CoreyLyu76 (gta6-save-editor) and NotHGM - GNU GPL v3; NotHGM's parts also carry
+# the additional terms in NOTICE. See LICENSE.
 """Entry point. Starts the local service; with --mod it runs a module in the same interpreter or executable (a packaged build has no separate python)."""
 import ipaddress, os, sys, runpy
 

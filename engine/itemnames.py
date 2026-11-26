@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Known names for GTA VI inventory item and slot IDs (joaat hashes of lower-case names), recovered the same way as
 the stat names; only names graded confirmed or likely are listed. Weapons are weaponspec_<group>_<name>_<variant>."""
 

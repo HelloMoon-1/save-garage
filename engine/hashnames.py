@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """What a number in the save stands for, when it is the ID of something the app already has a name for.
 
 Many values in the save are joaat hashes used as IDs: inventory items and slots, stat names, locations, vehicles,

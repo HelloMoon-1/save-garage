@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Activity lines of the 100% checklist (Save Garage feature module): races, race challenges, shooting ranges, video
 games, pool, mini golf, drone time trials and Bret's target decks. Hoops are in hoops.py, vehicles in
 vehicles_compendium.py.

@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Compendium: mark animals, weapons and vehicles as discovered (Save Garage feature module).
 
 SECTION dbf71c51 = DiscoverableMemoryData[7], one entry per DiscoverableType 0..6:

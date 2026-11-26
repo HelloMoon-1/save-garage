@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Browse every section of the save and change single numbers or true/false values in place.
 
 This is the expert view behind the curated tabs. Values are replaced byte for byte (see jsonedit), the old value must

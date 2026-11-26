@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Time of day, health and armour.
 
 Time of day lives in three places that the game always keeps equal: the clock in SimpleVariables, a copy of the clock

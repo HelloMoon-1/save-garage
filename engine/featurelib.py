@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Shared helpers for the Save Garage story-save feature modules (compendium, discovery, challenges, hoops, gyms).
 
 Nothing here re-serialises JSON. Every change is a splice into the section's original text, so all other bytes stay

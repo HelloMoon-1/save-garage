@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Meditation spots: the 100% checklist line 'MEDITATION SPOTS COMPLETED x / 15' (Save Garage feature module).
 
 WHAT IT CHANGES

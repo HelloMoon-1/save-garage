@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Complete challenges (Save Garage feature module).
 
 THE 212 SAVED CHALLENGES (section 3000010d Challenges: codeVersion + savedChallengeSets[11])

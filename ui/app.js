@@ -1,3 +1,4 @@
+// Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 'use strict';
 // Save Garage: redesigned UI for the local save editor service (same /api as the original UI, plus /api/slot and /api/stats).
 (() => {

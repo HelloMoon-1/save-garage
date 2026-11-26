@@ -1445,5 +1445,7 @@
 "Save Garage decrypts and encrypts saves through GarlicSaves, which now asks each app that uses it to sign in with your own GarlicSaves account. You do this once on this computer.": "Save Garage는 GarlicSaves를 통해 세이브를 복호화하고 암호화하는데, 이제 GarlicSaves는 자신을 쓰는 앱마다 본인의 GarlicSaves 계정으로 로그인하도록 요구해요. 이 컴퓨터에서 한 번만 하면 돼요.",
 "GarlicSaves gives Save Garage on this computer a key of its own. Save Garage keeps it in its data folder, readable only by you, and sends it only to GarlicSaves. It never appears on this page.": "GarlicSaves는 이 컴퓨터의 Save Garage에 전용 키를 발급해요. Save Garage는 그 키를 본인만 읽을 수 있는 데이터 폴더에 보관하고 GarlicSaves에만 보내요. 이 페이지에는 절대 표시되지 않아요.",
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSaves가 이 로그인을 거부했어요. 로그인이 꺼졌거나 만료되었을 수 있어요. 계속하려면 다시 로그인하세요.",
-"Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "GarlicSaves에서 로그아웃할까요? Save Garage가 이 컴퓨터에서 키를 잊기 때문에, 페어링, 다운로드, 수정 사항 저장, 세이브 보내기를 하려면 다시 로그인해야 해요."
+"Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "GarlicSaves에서 로그아웃할까요? Save Garage가 이 컴퓨터에서 키를 잊기 때문에, 페어링, 다운로드, 수정 사항 저장, 세이브 보내기를 하려면 다시 로그인해야 해요.",
+"Free software under the GNU GPL v3, with no warranty.": "GNU GPL v3 자유 소프트웨어이며 어떠한 보증도 없어요.",
+"Source and official releases": "소스 코드와 공식 릴리스"
 }

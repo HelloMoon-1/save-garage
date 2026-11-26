@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Collectibles of the 100% checklist, second pass: the two keyed tables of section e4fcc5fa (Save Garage feature module).
 
 Same interface as collectibles.py (read(b) -> dict, apply(b, choice) -> (bytes, log)); research_notes/

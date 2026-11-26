@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Signs Save Garage releases, so the app only installs updates the maintainer published (see "Updates" in README.md).
 
   sign_release.py keygen                 make the release key, once: ~/.config/savegarage-release/ed25519.key (mode 600)
