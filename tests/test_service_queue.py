@@ -126,3 +126,41 @@ class SaveJobWaitTests(unittest.TestCase):
             with self.assertRaisesRegex(garlic.GarlicError, 'worker failed'):
                 self.client._wait('original')
         self.assertEqual(poll.call_count, 2)
+
+    def test_running_batch_survives_curl_28_and_a_bad_gateway(self):
+        responses = [(200, {}, b'{"status":"running"}'), garlic.TemporaryServiceError('curl: (28)'),
+                     (502, {}, b'gateway error'), (200, {}, b'{"status":"running"}'),
+                     (200, {}, b'{"status":"done"}')]
+        updates = []
+        with patch.object(self.client, '_curl', side_effect=responses) as read:
+            self.assertEqual(self.client._wait('original', on_status=updates.append)['status'], 'done')
+        self.assertEqual(updates, ['running', 'reconnecting', 'running', 'done'])
+        self.assertTrue(all(c.args[0] == ['http://localhost/api/v1/jobs/original'] for c in read.call_args_list))
+
+    def test_curl_timeout_is_retryable_but_key_refusal_is_terminal(self):
+        with patch.object(garlic.subprocess, 'run', return_value=SimpleNamespace(returncode=28, stderr=b'timeout')):
+            with self.assertRaises(garlic.TemporaryServiceError):
+                self.client._curl([])
+        with patch.object(self.client, '_curl', return_value=(401, {}, b'{"error":"invalid"}')) as read:
+            with self.assertRaises(garlic.KeyDisabled):
+                self.client._wait('original')
+            read.assert_called_once()
+
+    def test_result_download_discards_partial_file_before_publishing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'result.zip'
+            calls = []
+            def fetch(args):
+                self.assertFalse(out.exists())
+                calls.append(args)
+                partial = Path(args[-1])
+                if len(calls) == 1:
+                    partial.write_bytes(b'partial file')
+                    raise garlic.TemporaryServiceError('connection reset')
+                partial.write_bytes(b'complete')
+                return 200, {}, b''
+            with patch.object(self.client, '_curl', side_effect=fetch):
+                self.client._result('original', str(out))
+            self.assertEqual(out.read_bytes(), b'complete')
+            self.assertEqual(calls[0], calls[1])

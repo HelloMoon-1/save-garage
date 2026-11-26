@@ -1,4 +1,6 @@
 {
+"Continue decrypting the downloaded files": "ダウンロード済みのセーブデータの復号を再開",
+"Reconnecting to the same job": "同じジョブに再接続中",
 "Save time": "保存日時",
 "Save time unavailable": "保存日時を取得できません",
 "Queue position": "待機順位",

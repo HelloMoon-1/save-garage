@@ -240,7 +240,7 @@
     const view = viewFor(st);
     const job = st.job || {};
     const s = slotOf(S.slot);
-    const key = [view, st.console?.host, st.paired, st.hasSession, S.sig, st.readyToUpload,
+    const key = [view, st.console?.host, st.paired, st.hasSession, S.sig, st.readyToUpload, st.resumeDownload, running(),
       view === 'edit' ? [S.slot, S.tab, S.detail[S.slot] ? 1 : 0, S.stats[S.slot] ? 1 : 0, s?.modified, JSON.stringify(s?.applied || null)].join(',') : '',
       view === 'connect' ? [S.searching, JSON.stringify(S.consoles)].join(',') : '',
       view === 'send' ? [job.kind === 'upload' && job.stage === 'uploaded', (st.slots || []).map(x => x.modified).join('')].join(',') : ''].join('|');
@@ -314,7 +314,8 @@
           <li><strong>Click Download save.</strong></li>
           <li><strong>When this page asks, press the PS5 power button once and let go at the beep.</strong></li>
         </ol>
-        <div class="row"><button class="btn primary" data-act="download" ${running() ? 'disabled' : ''}>Download save</button></div>
+        <div class="row">${S.state.resumeDownload && !running() ? '<button class="btn primary" data-act="resume-download">Continue decrypting the downloaded files</button>' : ''}
+          <button class="btn ${S.state.resumeDownload ? '' : 'primary'}" data-act="download" ${running() ? 'disabled' : ''}>Download save</button></div>
         ${jobBox('download')}
       </div>`;
   }
@@ -1476,7 +1477,7 @@
   // ------------------------------------------------------------ job box
   const queueStatus = {
     pending: 'Waiting on this computer', submitting: 'Submitting', queued: 'Queued at GarlicSaves',
-    running: 'Processing', receiving: 'Fetching result', done: 'Completed', failed: 'Failed',
+    running: 'Processing', reconnecting: 'Reconnecting to the same job', receiving: 'Fetching result', done: 'Completed', failed: 'Failed',
     skipped: 'Not submitted', interrupted: 'Interrupted', rate_limited: 'Rate limited',
     key_disabled: 'Key refused', bad_request: 'Request rejected'
   };
@@ -1707,6 +1708,7 @@
     if (a === 'pick') { act('/api/console', {host: b.dataset.host}, st => { S.manualView = null; onState(st); }); return; }
     if (a === 'pair') { act('/api/pair'); return; }
     if (a === 'download') { act('/api/download'); return; }
+    if (a === 'resume-download') { act('/api/resume-download'); return; }
     if (a === 'choose-account') { act('/api/choose-account', {owner: b.dataset.owner}); return; }
     if (a === 'cancel') { act('/api/cancel'); return; }
     if (a === 'upload') { act('/api/upload'); return; }

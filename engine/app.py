@@ -320,13 +320,17 @@ def service_slot(name):
         row['status'] = 'submitting'
 
     def status(remote):
-        if remote not in G.STATUSES:
+        if remote not in (*G.STATUSES, 'reconnecting'):
             return
         state = 'receiving' if remote == 'done' else remote
         with LOCK:
             if row['status'] == state:
                 return
-            row.update(status=state, queuedAt=time.monotonic() if state == 'queued' else None)
+            if state == 'queued' and row.get('queuedAt') is None:
+                row['queuedAt'] = time.monotonic()
+            elif state not in ('queued', 'reconnecting'):
+                row['queuedAt'] = None
+            row['status'] = state
             log('%s %s: %s' % (row['operation'], name, remote))
 
     try:
@@ -380,6 +384,14 @@ def decrypt_slots(sess, images):
             end += 1
             size += added
         batch = images[start:end]
+        receipt = sess / ('decrypt-' + batch[0].name + '.json')
+        job_id = None
+        if receipt.is_file():
+            record = json.loads(receipt.read_text('utf-8'))
+            if record.get('slots') == [p.name for p in batch] and record.get('server') == G.server:
+                candidate = record.get('job')
+                if isinstance(candidate, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', candidate):
+                    job_id = candidate
         with ExitStack() as stack:
             reports = [stack.enter_context(service_slot(p.name)) for p in batch]
 
@@ -388,10 +400,19 @@ def decrypt_slots(sess, images):
                     update(status)
 
             def remember(jid):
+                record = {'job': jid, 'server': G.server, 'slots': [p.name for p in batch]}
+                tmp = receipt.with_suffix('.tmp')
+                tmp.write_text(json.dumps(record), 'utf-8')
+                os.replace(tmp, receipt)
                 for path in batch:
                     remember_service_job(path.name, jid)
 
-            G.decrypt_batch(batch, sess / 'dec', report, remember)
+            try:
+                G.decrypt_batch(batch, sess / 'dec', report, remember, job_id=job_id)
+            except garlic.SaveJobEnded:
+                receipt.unlink(missing_ok=True)
+                raise
+        receipt.unlink(missing_ok=True)
         slots.extend(read_slot(p.name, sess / 'dec' / p.name) for p in batch)
         start = end
     return slots
@@ -591,13 +612,15 @@ def summarize(plog):
 RESTORE_HOURS = float(os.environ.get('SAVEGARAGE_RESTORE_HOURS', 6))
 
 
-def restore_session():
+def restore_session(resume=False):
     """After a restart, pick up the latest download so the power button doesn't have to be pressed again. Reads local files only.
     Skips downloads already sent back or older than RESTORE_HOURS: the player may have saved new progress since."""
     # Search both locations after upgrading. Prefer the portable copy on a timestamp tie.
     roots = dict.fromkeys([session_dir(), console_dir() / 'sessions'])
     sessions = (p for root in roots for p in root.glob('*')
                 if re.fullmatch(r'[0-9]{8}-[0-9]{6}', p.name) and p.is_dir())
+    if resume:
+        sessions = (p for p in sessions if p.name == STATE.get('resumeDownload'))
     sess = max(sessions, key=lambda p: p.name, default=None)
     if sess is None:
         return
@@ -614,13 +637,33 @@ def restore_session():
         names = {'%08x' % u: n or l or o for u, n, l, o in db.execute('SELECT user_id, user_name, login_id, online_id FROM user_info_tbl')}
     finally:
         db.close()
-    for entry_id, path in rows:                 # same as job_download: the first GTA save entry
+    candidates = []
+    for entry_id, path in rows:
         parts = path.strip('/').split('/')
         if len(parts) > 2 and parts[-1] in GTA_TITLES and (lib / 'Saves' / parts[2] / parts[-1]).is_dir():
-            owner, title = parts[2], parts[-1]
-            break
-    else:
+            candidates.append((entry_id, parts[2], parts[-1]))
+    selected = sess / 'download-entry.txt'
+    if selected.is_file():
+        picked = selected.read_text('utf-8').strip()
+        candidates = [c for c in candidates if str(c[0]) == picked]
+    if not candidates:
         return
+    entry_id, owner, title = candidates[0]
+    images = sorted((lib / 'Saves' / owner / title).glob('sdimg_*'))
+    missing = [p for p in images if SLOT_RE.fullmatch(p.name) and not (sess / 'dec' / p.name).is_dir()]
+    if missing:
+        originals = sess / 'orig'
+        if len(candidates) != 1 or not all((originals / p.name).is_file()
+                and (originals / p.name).stat().st_size == p.stat().st_size > 0 for p in images):
+            return
+        with LOCK:
+            STATE['resumeDownload'] = sess.name
+        if not resume:
+            return
+        with LOCK:
+            SERVICE_SLOTS.update((p.name, {'operation': 'decrypt', 'status': 'pending'}) for p in missing)
+        stage('decrypting')
+        decrypt_slots(sess, [originals / p.name for p in missing])
     slots = []
     for f in sorted((lib / 'Saves' / owner / title).glob('sdimg_*')):
         top = sess / 'dec' / f.name
@@ -638,7 +681,7 @@ def restore_session():
     if not slots:
         return
     with LOCK:
-        STATE.update(session=str(sess), user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
+        STATE.update(session=str(sess), resumeDownload=None, user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
                      slots=slots, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
@@ -749,6 +792,8 @@ def job_download():
     sess = session_dir() / time.strftime('%Y%m%d-%H%M%S')
     lib = sess / 'lib'
     lib.mkdir(parents=True)
+    with LOCK:
+        STATE['resumeDownload'] = None
     keys = relay()
     opts = {'oracleHost': '127.0.0.1', 'oraclePort': keys.port, 'clientHost': c['host'], 'output': str(lib), 'interface': '',
             'hostId': c['hostId'], 'systemVersion': c['firmware'], 'hardware': 0, 'approvalPrefixPath': str(prefix_path()),
@@ -799,8 +844,10 @@ def job_download():
     (sess / 'orig').mkdir()
     for f in imgs:
         shutil.copyfile(f, sess / 'orig' / f.name)
+    (sess / 'download-entry.txt').write_text(str(e['id']), 'utf-8')
     images = [f for f in imgs if SLOT_RE.fullmatch(f.name)]
     with LOCK:
+        STATE['resumeDownload'] = sess.name
         SERVICE_SLOTS.update((f.name, {'operation': 'decrypt', 'status': 'pending'}) for f in images)
     stage('decrypting')
     slots = decrypt_slots(sess, images)
@@ -808,7 +855,7 @@ def job_download():
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
+        STATE.update(session=str(sess), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
     stage('ready')
 
 
@@ -821,6 +868,16 @@ def choose_account(owner):
             raise Fail('bad_request')
         CHOICE['owner'] = str(owner)
     CHOICE['event'].set()
+
+
+def resume_download():
+    with LOCK:
+        if not STATE.get('resumeDownload'):
+            raise Fail('no_session')
+    restore_session(resume=True)
+    if STATE.get('resumeDownload'):
+        raise Fail('no_session')
+    stage('ready')
 
 
 def job_patch(slot_file, edits):
@@ -1076,12 +1133,14 @@ class H(BaseHTTPRequestHandler):
                 cons = discover()
                 return self._send(200, {'consoles': cons})
             if path == '/api/console':
+                if JOB['status'] == 'running':
+                    raise Fail('busy')
                 c = probe_host(body['host'])
                 if not c:
                     raise Fail('console_not_found')
                 with LOCK:
                     STATE['console'] = {'host': c['host'], 'name': c['name'], 'hostId': c['hostId'], 'firmware': c['firmware']}
-                    STATE.update(session=None, slots=[], readyToUpload=False, user=None, entryId=None)
+                    STATE.update(session=None, resumeDownload=None, slots=[], readyToUpload=False, user=None, entryId=None)
                     refresh_paired()
                     try:
                         restore_session()
@@ -1109,6 +1168,8 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {'job': start_job('pair', job_pair)})
             if path == '/api/download':
                 return self._send(200, {'job': start_job('download', job_download)})
+            if path == '/api/resume-download':
+                return self._send(200, {'job': start_job('download', resume_download)})
             if path == '/api/choose-account':
                 choose_account(body.get('owner'))
                 return self._send(200, {'ok': True})

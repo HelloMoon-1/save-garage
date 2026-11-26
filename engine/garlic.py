@@ -15,6 +15,14 @@ class GarlicError(Exception):
     pass
 
 
+class TemporaryServiceError(GarlicError):
+    """A connection or gateway failure for which an idempotent read can be repeated."""
+
+
+class SaveJobEnded(GarlicError):
+    """The service no longer has a usable result for this job."""
+
+
 class GarlicRefused(GarlicError):
     """GarlicSaves answered and turned the request down; `reason` says why. Its text holds the HTTP status and the wait
     only, never the server's own words, which can quote what was sent."""
@@ -226,9 +234,13 @@ class Garlic:
         if self.proxy:
             cmd += ['-x', self.proxy]
         cmd += ['-H', 'X-Worker-Key: ' + self.key, *args]
-        r = subprocess.run(cmd, capture_output=True, timeout=timeout, creationflags=NOWIN)
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=timeout, creationflags=NOWIN)
+        except subprocess.TimeoutExpired:
+            raise TemporaryServiceError('connection timed out') from None
         if r.returncode != 0:
-            raise GarlicError('network: ' + r.stderr.decode('utf-8', 'replace').strip()[:200])
+            error = TemporaryServiceError if r.returncode in (5, 6, 7, 16, 18, 28, 35, 52, 55, 56, 92) else GarlicError
+            raise error('network: ' + r.stderr.decode('utf-8', 'replace').strip()[:200])
         out, _, code = r.stdout.rpartition(b'\n')
         headers, m = {}, self.HEAD.match(out)
         while m:                                # the last response's headers count
@@ -260,6 +272,11 @@ class Garlic:
     def _json(self, args, **kw):
         status, headers, body = self._curl(args, **kw)
         self._refusal(status, headers, body)
+        if status in (408, 425) or 500 <= status < 600:
+            raise TemporaryServiceError('service returned HTTP %d' % status)
+        if not 200 <= status < 300:
+            error = SaveJobEnded if status in (404, 410) else GarlicError
+            raise error('service returned HTTP %d' % status)
         try:
             return json.loads(body)
         except ValueError:                      # only the status and type: a page from a proxy can quote this computer's address
@@ -275,12 +292,29 @@ class Garlic:
         except Exception:
             return False
 
+    def _read_existing(self, read, on_retry=None):
+        for delay in (2, 4, 8, 16, None):
+            try:
+                return read()
+            except TemporaryServiceError:
+                if delay is None:
+                    raise
+                if on_retry:
+                    on_retry('reconnecting')
+                time.sleep(delay)
+
     def _wait(self, job_id, timeout=600, on_status=None):
         """Poll an existing save job. Time spent in the service queue has no deadline."""
         deadline = time.monotonic() + timeout
         last = None
         while deadline is None or time.monotonic() < deadline:
-            j = self._json([self.server + '/api/v1/jobs/' + job_id], timeout=60)
+            url = self.server + '/api/v1/jobs/' + job_id
+            def reconnect(state):
+                nonlocal last
+                if on_status and last != state:
+                    on_status(state)
+                last = state
+            j = self._read_existing(lambda: self._json([url], timeout=60), reconnect)
             status = j.get('status')
             if status != last and on_status:
                 on_status(status)
@@ -288,7 +322,7 @@ class Garlic:
             if status == 'done':
                 return j
             if status == 'failed':
-                raise GarlicError(j.get('error') or 'job failed')
+                raise SaveJobEnded(j.get('error') or 'job failed')
             if status == 'queued':
                 deadline = None
             elif deadline is None:
@@ -322,7 +356,14 @@ class Garlic:
         raise last
 
     def _result(self, job_id, path):
-        """Download a finished job's result to path. An HTTP error raises (a refusal as its GarlicRefused) and leaves no file."""
+        """Retry a result GET, publishing only a complete download."""
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=Path(path).parent) as tmp:
+            partial = str(Path(tmp) / 'result')
+            self._read_existing(lambda: self._fetch_result(job_id, partial))
+            os.replace(partial, path)
+
+    def _fetch_result(self, job_id, path):
         status, headers, _ = self._curl([self.server + '/api/v1/jobs/%s/result' % job_id, '-o', path])
         if 200 <= status < 300:
             return
@@ -334,6 +375,10 @@ class Garlic:
         except OSError:
             pass
         self._refusal(status, headers, body)
+        if status in (408, 425) or 500 <= status < 600:
+            raise TemporaryServiceError('result: HTTP %d' % status)
+        if status in (404, 410):
+            raise SaveJobEnded('result: HTTP %d' % status)
         raise GarlicError('result: HTTP %d' % status)
 
     def decrypt(self, image_path, out_dir, on_status=None, on_job=None):
@@ -355,11 +400,11 @@ class Garlic:
         os.remove(z)
         return os.path.join(out_dir, top)
 
-    def decrypt_batch(self, images, out_dir, on_status, on_job):
+    def decrypt_batch(self, images, out_dir, on_status, on_job, job_id=None):
         """Submit distinct PS5 images together and validate every returned slot before publishing."""
         import tempfile
         fields = {'operation': 'decrypt', 'include_sce_sys': 'true', 'platform': 'ps5'}
-        jid = self._submit(fields, images[0], images[0].name, on_status, images[1:])
+        jid = job_id or self._submit(fields, images[0], images[0].name, on_status, images[1:])
         on_job(jid)
         self._wait(jid, on_status=on_status)
         out_dir.mkdir(exist_ok=True, parents=True)

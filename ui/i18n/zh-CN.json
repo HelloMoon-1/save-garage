@@ -1,4 +1,6 @@
 {
+"Continue decrypting the downloaded files": "继续解密已下载的存档",
+"Reconnecting to the same job": "连接中断，正在重连原任务",
 "Save time unavailable": "未读取到存档时间",
 "Queue position": "服务器排位",
 "Queued across GarlicSaves": "全站排队任务数",

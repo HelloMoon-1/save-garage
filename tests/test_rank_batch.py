@@ -8,6 +8,7 @@ from unittest.mock import patch
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'engine'))
+import app
 import garlic
 import service_rank
 
@@ -43,6 +44,26 @@ class ServerRanks(unittest.TestCase):
 
 
 class BatchDecrypt(unittest.TestCase):
+    def test_interrupted_batch_remembers_the_service_job_for_resume(self):
+        with tempfile.TemporaryDirectory() as folder:
+            sess = Path(folder)
+            image = sess / 'sdimg_SAVEDATASARC0001'
+            image.write_bytes(b'snapshot')
+            observed = []
+            def batch(paths, dest, on_status, on_job, job_id=None):
+                observed.append(job_id)
+                on_job(job_id or 'saved-job')
+                if len(observed) == 1:
+                    raise garlic.TemporaryServiceError('disconnected')
+            rows = {image.name: {'operation': 'decrypt', 'status': 'pending'}}
+            with patch.dict(app.SERVICE_SLOTS, rows, clear=True), patch.dict(app.JOB, log=[]), \
+                    patch.object(app.G, 'decrypt_batch', side_effect=batch), patch.object(app, 'read_slot', return_value='slot'):
+                with self.assertRaises(garlic.TemporaryServiceError):
+                    app.decrypt_slots(sess, [image])
+                self.assertEqual(app.decrypt_slots(sess, [image]), ['slot'])
+            self.assertEqual(observed, [None, 'saved-job'])
+            self.assertFalse(list(sess.glob('decrypt-*.json')))
+
     def test_one_request_validates_all_slots_before_publishing_any(self):
         client = garlic.Garlic(server='http://localhost', key='test', proxy='')
         names = ['sdimg_SAVEDATASARC0001', 'sdimg_sce_sdmemory']
