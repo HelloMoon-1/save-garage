@@ -130,7 +130,7 @@ def apply(b, edit):
                     t = je.put(t, base + [ARMOUR], je.fmt_float(mx))
         secs[i] = t
         log.append({'what': 'world', 'label': 'Armour', 'from': before, 'to': after})
-    wanted = {k: v for k, v in edit.items() if k.partition('_')[0] in OWNERS}
+    wanted = {k: v for k, v in edit.items() if '_' in k and k.partition('_')[0] in OWNERS}
     if wanted:
         ci, si = money._sec(ents, CHARACTER), money._sec(ents, fl.STATS)
         stats = fl.Stats(secs[si])

@@ -1,5 +1,5 @@
 """Save Garage local service. The web UI only talks to the /api endpoints here; see docs/API.md."""
-import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress
+import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
@@ -23,7 +23,7 @@ else:
 DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.21.6'
+VERSION = '1.29.1'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -32,6 +32,8 @@ BIND = os.environ.get('SAVEGARAGE_HOST', '127.0.0.1')
 ALLOW_NETS = [ipaddress.ip_network(n.strip(), strict=False) for n in os.environ.get('SAVEGARAGE_ALLOW', '127.0.0.0/8').split(',') if n.strip()]
 OK_HOSTS = ['127.0.0.1', 'localhost'] + ([BIND] if BIND not in ('', '0.0.0.0', '127.0.0.1', 'localhost') else [])
 GTA_TITLES = ['PPSA01547', 'PPSA38500', 'PPSA29660']   # GTA VI title IDs (regions); PPSA29660: GarlicSaves treats it as GTA VI too
+# the World tab's edits: world.py (time, health, armour), player.py (each character and the relationship), fog.py (the map)
+WORLD_KEYS = ('time', 'health', 'armour', 'lucia', 'jason', 'relationship', 'fog')
 NOWIN = 0x08000000 if os.name == 'nt' else 0
 PY = sys.executable
 LAST_SEEN = {'t': time.time()}
@@ -52,8 +54,10 @@ G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
          'slots': [], 'readyToUpload': False, 'network': None}
-JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None, 'log': []}
+JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None,
+       'wait': None, 'log': []}
 CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
+CANCEL = threading.Event()                                  # set by /api/cancel, so a job waiting between tries stops
 PROC = {'p': None}
 RELAY = {'r': None}
 
@@ -66,7 +70,7 @@ def log(msg):
 
 def relay():
     if RELAY['r'] is None:
-        RELAY['r'] = garlic.OracleRelay(G, log)
+        RELAY['r'] = garlic.OracleRelay(G, log, wait=KEY_WAIT)
     return RELAY['r']
 
 
@@ -115,11 +119,22 @@ class Fail(Exception):
         super().__init__(code); self.code, self.detail = code, detail
 
 
+# A decrypt or encrypt job GarlicSaves turned down (garlic.GarlicRefused) ends with these codes; an invalid request is 'internal'.
+GARLIC_REFUSED = {'rate_limited': 'garlic_rate_limited', 'key_disabled': 'garlic_key_disabled'}
+
+
 def start_job(kind, fn):
     with LOCK:
         if JOB['status'] == 'running':
             raise Fail('busy')
-        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None, log=[])
+        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None,
+                   wait=None, log=[])
+        CANCEL.clear()
+
+    def failed(code, detail):
+        log('FAIL %s %s' % (code, detail))
+        with LOCK:
+            JOB.update(status='error', error={'code': code, 'detail': str(detail)[:300]}, needPower=False, accounts=None, wait=None)
 
     def run():
         try:
@@ -127,9 +142,9 @@ def start_job(kind, fn):
             with LOCK:
                 JOB.update(status='done', needPower=False, accounts=None)
         except Fail as e:
-            log('FAIL %s %s' % (e.code, e.detail))
-            with LOCK:
-                JOB.update(status='error', error={'code': e.code, 'detail': str(e.detail)[:300]}, needPower=False, accounts=None)
+            failed(e.code, e.detail)
+        except garlic.GarlicRefused as e:       # its text is the HTTP status and the wait, never GarlicSaves' words
+            failed(GARLIC_REFUSED.get(e.reason, 'internal'), e)
         except Exception as e:
             log(traceback.format_exc()[-600:])
             with LOCK:
@@ -352,16 +367,19 @@ def completion_readers(b):
             ('activities', lambda: activities.read(b)), ('checklist', lambda: checklist.read(b)), ('tasks', lambda: tasks.read(b)),
             ('gangs', lambda: gangs.read(b)), ('robberies', lambda: robberies.read(b)), ('fencing', lambda: fencing.read(b)),
             ('activities2', lambda: activities2.read(b)), ('hoops', lambda: hoops.read(b)), ('vehicles', lambda: vehicles_compendium.read(b)),
-            ('collectibles', lambda: collectibles.read(b))]
+            ('collectibles', lambda: collectibles.read(b)), ('cheats', lambda: challenges.read_cheats(b))]
 
 
 def completion_preview(slot, body):
-    """The game's 100% checklist as it would be after these stat and Completion edits. Nothing is written."""
+    """The game's 100% checklist as it would be after these stat, gun and Completion edits (the guns add weapons to the
+    compendium, which the checklist counts). Nothing is written."""
     import checklist
     c = body.get('completion') or {}
-    if not isinstance(c, dict) or not isinstance(body.get('stats') or [], list):
-        raise ValueError('completion must be an object and stats a list')
-    edits = {'stats': body.get('stats') or [], 'completion': {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}}
+    if not isinstance(c, dict) or not isinstance(body.get('stats') or [], list) or not isinstance(body.get('guns') or {}, dict):
+        raise ValueError('completion and guns must be objects and stats a list')
+    edits = {'stats': body.get('stats') or [], 'completion': {k: c[k] for k in savedit.COMPLETION_KEYS if c.get(k)}}
+    if body.get('guns'):
+        edits['guns'] = body['guns']
     b = slot_bytes(slot)
     try:
         nb, _ = savedit.apply(b, edits)
@@ -372,6 +390,11 @@ def completion_preview(slot, body):
                 savedit.apply(b, {'completion': {k: v}})
             except Exception:
                 failed.append(k)
+        if edits.get('guns'):
+            try:
+                savedit.apply(b, {'guns': edits['guns']})
+            except Exception:
+                failed.append('guns')
         if edits['stats']:
             try:
                 savedit.apply(b, {'stats': edits['stats']})
@@ -404,6 +427,17 @@ def slot_weapons(slot):
     return cached(('weapons', slot['file']), lambda: savedit.weapons(savedit.section(slot_bytes(slot), money.SEC_INV)))
 
 
+def slot_guns(slot):
+    """The guns each character can be given (guns.py), or None with the reason when the save can't show them."""
+    def build():
+        import guns
+        try:
+            return guns.read(slot_bytes(slot)), None
+        except Exception as e:                  # a save this can't read leaves the rest of the Ammo tab working
+            return None, repr(e)[:200]
+    return cached(('guns', slot['file']), build)
+
+
 def slot_detail(slot):
     def range_scores():
         import activities2, featurelib
@@ -413,8 +447,10 @@ def slot_detail(slot):
                  'played': stats.value('timescompleted', tier, course), 'unlocked': stats.value('unlocked', tier, course)}
                 for venue, course, tier in activities2._courses()]
 
-    return {'file': slot['file'], 'rangeScores': cached(('rangeScores', slot['file']), range_scores), 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
-            'applied': slot.get('applied'), 'modified': slot['modified']}
+    guns, err = slot_guns(slot)
+    return {'file': slot['file'], 'rangeScores': cached(('rangeScores', slot['file']), range_scores),
+            'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
+            'guns': guns, 'errors': {'guns': err} if err else {}, 'applied': slot.get('applied'), 'modified': slot['modified']}
 
 
 def slot_stats(slot):
@@ -449,7 +485,7 @@ def summarize(plog):
         elif w == 'ammo':
             out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
-        elif w in ('world', 'raw', 'completion'):
+        elif w in ('world', 'raw', 'completion', 'guns'):
             label = str(x.get('label') or _completion_label(x))
             same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
             if same and w == 'completion':
@@ -522,6 +558,103 @@ def restore_session():
     log('restored session ' + sess.name)
 
 
+# The transfer code waits 30 s for each set of keys from the relay (derive_with_oracle in vendor/poc/dt_ppr_client.py),
+# so a derivation that hasn't answered by then has failed it. How long the PS5 itself waits in that handshake isn't
+# known, so these waits stay as they are.
+KEY_WAIT = 30
+KEY_RETRY_WAIT = 5                      # seconds before the one automatic second try when the key service was too slow
+# ... and when GarlicSaves rate limited a key request: until its Retry-After is over (60 s when it gave none), at most 75 s
+KEY_LIMIT_WAIT, KEY_LIMIT_MAX = garlic.RATE_WINDOW, 75
+# A key request GarlicSaves refused ends the download with the code for its reason. A refused invalid request has none:
+# the transfer code's own error gives the code then.
+KEY_REFUSED = {'key_disabled': 'key_disabled', 'rate_limited': 'key_rate_limited'}
+
+
+def download_try(opts):
+    """Run the download worker once. Returns what it reported, with the last stage it reached."""
+    p = spawn(['dl_worker', json.dumps(opts)])
+    r = {'entries': [], 'users': [], 'nosave': False, 'err': None, 'files': 0, 'chosen': None, 'stage': None}
+
+    def at(s, **kw):
+        r['stage'] = s; stage(s, **kw)
+    at('connecting')
+    for line in p.stdout:
+        line = line.rstrip()
+        if line.startswith('[file] saved'):
+            r['files'] += 1
+            with LOCK:
+                JOB['progress'] = {'files': r['files']}
+            log('saved file %d' % r['files']); continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            if line and not line.startswith(('[ddp]', 'host-', 'device-', 'system-', '[file]')):   # [file] paths hold the PS5 user ID
+                log(line)
+            continue
+        t = ev.get('type')
+        if t == 'powerRequired':
+            at('need_power', needPower=True)
+        elif t == 'status' and ev.get('step') == 3:
+            at('reading_list', needPower=False)
+        elif t == 'status' and ev.get('step') == 4:
+            at('downloading', needPower=False)
+        elif t == 'entries':
+            r['entries'], r['users'] = ev['entries'], ev.get('users') or []
+        elif t == 'accounts':                   # several PS5 accounts have a save: ask which one, then tell the worker
+            CHOICE['owner'] = None; CHOICE['event'].clear()
+            at('choose_account', accounts=ev.get('accounts') or [])
+            while not CHOICE['event'].wait(0.5):
+                if p.poll() is not None:        # cancelled or the worker died
+                    break
+            if p.poll() is not None or not CHOICE['owner']:
+                raise Fail('download_failed', 'cancelled while choosing the account')
+            p.stdin.write(json.dumps({'owner': CHOICE['owner']}) + '\n'); p.stdin.flush()
+            at('downloading', accounts=None)
+        elif t == 'owner':
+            r['chosen'] = ev.get('owner')
+        elif t == 'nosave':
+            r['nosave'] = True
+        elif t == 'error':
+            r['err'] = ev.get('message')
+        elif t == 'log':
+            msg = ev.get('message') or ''
+            log('Encrypted channel: open' if msg.startswith('Encrypted channel:') else msg)    # not the PS5's address: details get shared in bug reports
+    p.wait()
+    return r
+
+
+def download_error(err, reached, late, refused=None):
+    """The error code for a failed download try. A key request GarlicSaves refused decides it (refused: that derivation's
+    reason, see KEY_REFUSED): the transfer code can't go on without those keys. Otherwise a timeout while the power prompt
+    is up is the power button's; any other timeout is the key service's when a derivation of this try gave the transfer
+    code no keys in time (late), else the PS5's, which didn't answer."""
+    if refused in KEY_REFUSED:
+        return KEY_REFUSED[refused]
+    m = err.lower()
+    if 'timed out' not in m and 'timeout' not in m:
+        return 'console_rejected' if 'rejected' in m else 'download_failed'
+    if reached == 'need_power':
+        return 'power_timeout'
+    return 'key_timeout' if late else 'console_timeout'
+
+
+def pause(seconds):
+    """Wait before the automatic second try, with the seconds left in job.wait for the page. True when Cancel ended it."""
+    end = time.monotonic() + seconds
+    try:
+        while True:
+            left = end - time.monotonic()
+            if left <= 0:
+                return False
+            with LOCK:
+                JOB['wait'] = math.ceil(left)
+            if CANCEL.wait(min(1.0, left)):
+                return True
+    finally:
+        with LOCK:
+            JOB['wait'] = None
+
+
 def job_download():
     c = STATE['console']
     if not STATE['paired']:
@@ -531,57 +664,46 @@ def job_download():
     sess = session_dir() / time.strftime('%Y%m%d-%H%M%S')
     lib = sess / 'lib'
     lib.mkdir(parents=True)
-    opts = {'oracleHost': '127.0.0.1', 'oraclePort': relay().port, 'clientHost': c['host'], 'output': str(lib), 'interface': '',
+    keys = relay()
+    opts = {'oracleHost': '127.0.0.1', 'oraclePort': keys.port, 'clientHost': c['host'], 'output': str(lib), 'interface': '',
             'hostId': c['hostId'], 'systemVersion': c['firmware'], 'hardware': 0, 'approvalPrefixPath': str(prefix_path()),
             'waitForSelection': True, 'titles': GTA_TITLES}
-    p = spawn(['dl_worker', json.dumps(opts)])
-    stage('connecting')
-    entries, users, nosave, err, files, chosen = [], [], False, None, 0, None
-    for line in p.stdout:
-        line = line.rstrip()
-        if line.startswith('[file] saved'):
-            files += 1
-            with LOCK:
-                JOB['progress'] = {'files': files}
-            log('saved file %d' % files); continue
-        try:
-            ev = json.loads(line)
-        except ValueError:
-            if line and not line.startswith(('[ddp]', 'host-', 'device-', 'system-')):
+    for first in (True, False):
+        t0 = time.monotonic()
+        r = download_try(opts)
+        if not r['err']:
+            break
+        tried = keys.derivations.since(t0)
+        late = [d for d in tried if d.late(KEY_WAIT)]
+        for d in late:                          # the worker stopped waiting for these: say so in the details
+            line = d.report_unanswered()
+            if line:
                 log(line)
-            continue
-        t = ev.get('type')
-        if t == 'powerRequired':
-            stage('need_power', needPower=True)
-        elif t == 'status' and ev.get('step') == 3:
-            stage('reading_list', needPower=False)
-        elif t == 'status' and ev.get('step') == 4:
-            stage('downloading', needPower=False)
-        elif t == 'entries':
-            entries, users = ev['entries'], ev.get('users') or []
-        elif t == 'accounts':                   # several PS5 accounts have a save: ask which one, then tell the worker
-            CHOICE['owner'] = None; CHOICE['event'].clear()
-            stage('choose_account', accounts=ev.get('accounts') or [])
-            while not CHOICE['event'].wait(0.5):
-                if p.poll() is not None:        # cancelled or the worker died
-                    break
-            if p.poll() is not None or not CHOICE['owner']:
-                raise Fail('download_failed', 'cancelled while choosing the account')
-            p.stdin.write(json.dumps({'owner': CHOICE['owner']}) + '\n'); p.stdin.flush()
-            stage('downloading', accounts=None)
-        elif t == 'owner':
-            chosen = ev.get('owner')
-        elif t == 'nosave':
-            nosave = True
-        elif t == 'error':
-            err = ev.get('message')
-        elif t == 'log':
-            log(ev.get('message'))
-    p.wait()
-    if err:
-        m = err.lower()
-        raise Fail('power_timeout' if 'timed out' in m or 'timeout' in m else 'console_rejected' if 'rejected' in m else 'download_failed', err)
-    if nosave or not entries:
+        refused = why = None; detail = r['err']
+        for d in tried:                         # a key request GarlicSaves refused: the detail says why, not the closed connection it led to
+            w = d.reason()
+            if w in KEY_REFUSED:
+                refused, why, detail = d, w, d.summary()
+                break
+        code = download_error(r['err'], r['stage'], late, why)
+        # before the power prompt with nothing downloaded yet, one more try: 5 s later when the key service was too slow,
+        # once the rate limit is over when GarlicSaves limited the requests
+        again = first and r['stage'] == 'connecting' and not (r['files'] or r['entries'])
+        if again and code == 'key_timeout':
+            log('The key service was slow, trying again')
+            stage('key_retry')
+            wait = KEY_RETRY_WAIT
+        elif again and code == 'key_rate_limited':
+            left = refused.limit_left(KEY_LIMIT_WAIT)
+            wait = min(KEY_LIMIT_WAIT if left is None else left, KEY_LIMIT_MAX)
+            log('GarlicSaves is limiting requests, trying again in %d s' % math.ceil(wait))
+            stage('key_rate_wait')
+        else:
+            raise Fail(code, detail)
+        if pause(wait):
+            raise Fail(code, detail)
+    entries, users, chosen = r['entries'], r['users'], r['chosen']
+    if r['nosave'] or not entries:
         raise Fail('no_gta_save')
     e = next((x for x in entries if chosen and x['owner'].lower() == chosen.lower()), entries[0]); owner = e['owner']
     uname = next((u['name'] for u in users if u['id'].lower() == owner.lower()), 'user')
@@ -617,7 +739,7 @@ def choose_account(owner):
 
 
 def job_patch(slot_file, edits):
-    """edits = {'money': [...], 'ammo': [...], 'stats': [...]}, always applied to the original slot."""
+    """edits: what savedit.apply takes (money, ammo, stats, guns, completion, world, raw), always applied to the original slot."""
     sess = Path(STATE['session'])
     slot = slot_by_file(slot_file)
     if not slot:
@@ -797,15 +919,23 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, savebrowse.node(b, int(q['section'][0], 16), p, int((q.get('offset') or ['0'])[0]), 200))
             except Exception as e:
                 return self._send(400, {'error': 'bad_request', 'detail': repr(e)[:300]})
-        if path == '/api/world':                        # time of day, health and armour
+        if path == '/api/world':                        # time of day, health and armour, the characters and the map
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import world
-                return self._send(200, world.read(slot_bytes(slot)))
+                import world, player, fog
+                b = slot_bytes(slot)
+                out = world.read(b)
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
+            out['errors'] = {}
+            for key, mod in (('player', player), ('fog', fog)):   # each on its own: one that can't be read leaves the rest working
+                try:
+                    out[key] = mod.read(b)
+                except Exception as e:
+                    out[key], out['errors'][key] = None, repr(e)[:200]
+            return self._send(200, out)
         if path == '/api/completion':                   # the Completion tab: stunts and their counters
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
@@ -875,7 +1005,7 @@ class H(BaseHTTPRequestHandler):
                     STATE['network'] = {'ok': ok, 'proxy': bool(G.proxy)}
                 return self._send(200, STATE['network'])
             if path == '/api/cancel':
-                kill_proc()
+                CANCEL.set(); kill_proc()
                 return self._send(200, {'ok': True})
             if path == '/api/quit':
                 if JOB['status'] == 'running' and JOB['stage'] in ('console_connected', 'transferring'):
@@ -905,7 +1035,7 @@ class H(BaseHTTPRequestHandler):
                 if not slot:
                     raise Fail('no_slot')
                 return self._send(200, completion_preview(slot, body))
-            if path == '/api/patch':                   # money, ammo and stats in one request
+            if path == '/api/patch':                   # every edit for one save in one request
                 slot = body['slot']
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
                 if not all(isinstance(v, list) for v in edits.values()):
@@ -914,7 +1044,11 @@ class H(BaseHTTPRequestHandler):
                     c = body['completion']
                     if not isinstance(c, dict):
                         raise ValueError('completion must be an object')
-                    edits['completion'] = {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}
+                    edits['completion'] = {k: c[k] for k in savedit.COMPLETION_KEYS if c.get(k)}
+                if body.get('guns'):
+                    if not isinstance(body['guns'], dict):
+                        raise ValueError('guns must be an object')
+                    edits['guns'] = body['guns']
                 if body.get('raw'):
                     if not isinstance(body['raw'], list):
                         raise ValueError('raw must be a list')
@@ -923,9 +1057,10 @@ class H(BaseHTTPRequestHandler):
                     if not isinstance(body['world'], dict):
                         raise ValueError('world must be an object')
                     import world
-                    keys = ['time', 'health', 'armour'] + [n + '_' + q for n in world.OWNERS for q in world.CAPACITY]
-                    keys.extend(k for k in body['world'] if k.startswith('research_'))
-                    edits['world'] = {k: body['world'][k] for k in keys if body['world'].get(k) is not None}
+                    allowed = set(WORLD_KEYS)
+                    allowed.update(f'{owner}_{field}' for owner in world.OWNERS for field in world.CAPACITY)
+                    edits['world'] = {key: value for key, value in body['world'].items()
+                                      if value is not None and (key in allowed or key.startswith('research_'))}
                 return self._send(200, {'job': start_job('patch', lambda: job_patch(slot, edits))})
             if path == '/api/restore':
                 return self._send(200, {'job': start_job('restore', job_restore)})

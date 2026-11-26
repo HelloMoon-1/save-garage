@@ -26,16 +26,26 @@
   const TYPE_MAX = {int32: 2147483647, u32: 4294967295, int64: 9007199254740991, int16: 32767, u8: 127, float: 1e12};
   const STAGE = {
     pair_waiting_console: 'Waiting for the PS5', pair_reading: 'Reading the pairing request', paired: 'Paired',
-    connecting: 'Connecting to your PS5', need_power: 'Press the PS5 power button', reading_list: 'Reading the save list',
+    connecting: 'Connecting to your PS5', key_retry: 'The key service was slow, trying again', need_power: 'Press the PS5 power button', reading_list: 'Reading the save list',
+    key_rate_wait: 'GarlicSaves is getting too many requests right now, so it is briefly limiting them.',
     choose_account: 'Choose the PS5 account', downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
     patching: 'Applying your edits', encrypting: 'Encrypting the edited save', importing: 'Getting the save ready to send',
     ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
+  // GarlicSaves limits the jobs it takes from the one key every copy of Save Garage shares: in a download's key requests
+  // (key_rate_limited) or in decrypting and encrypting a save (garlic_rate_limited)
+  const RATE_LIMITED = 'GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.';
   const ERR = {
     range_score_order: 'Best score must be at least the latest score.',
     garlic_unreachable: 'The decryption service (garlicsaves.com) can’t be reached. Check your internet connection, then try again.',
     not_paired: 'This PS5 isn’t paired yet. Pair it first.',
-    power_timeout: 'The power-button wait timed out, or the key service was too slow. Go back to the PS5 home screen and try again.',
+    power_timeout: 'The power-button wait timed out. Go back to the PS5 home screen and try again.',
+    key_timeout: 'GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.',
+    key_rate_limited: RATE_LIMITED,
+    key_disabled: 'GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.',
+    garlic_rate_limited: RATE_LIMITED,
+    garlic_key_disabled: 'GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.',
+    console_timeout: 'The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.',
     console_rejected: 'The PS5 refused the request. Sign in with the account you paired with, or pair again.',
     no_gta_save: 'No GTA VI save was found on the PS5. Save once in the game, then try again.',
     no_story_slot: 'No story save was found. Save once in story mode, then try again.',
@@ -47,6 +57,18 @@
     save_bad_value: 'One of the new values isn’t valid for its field.',
     save_out_of_range: 'One of the new values is outside the allowed range.',
     save_bad_time: 'The time of day needs an hour from 0 to 23 and a minute from 0 to 59.',
+    save_fog_version: 'This save’s map data has a version Save Garage doesn’t know yet, so the map is left alone.',
+    save_fog_entry: 'An entry in this save’s map data doesn’t look the way Save Garage expects, so the map is left alone.',
+    save_fog_repeat: 'This save’s map data lists a region twice, so the map is left alone.',
+    save_attributes_layout: 'This character’s attributes don’t have the 37 values Save Garage expects, so they are left alone.',
+    save_relationship_locked: 'The game has locked the relationship at this point in the story, so it can’t be changed.',
+    save_relationship_disabled: 'The game has switched the relationship off at this point in the story, so it can’t be changed.',
+    save_no_vest: 'This character wears no armour and has no vest in the wardrobe to put on.',
+    save_guns_layout: 'This character’s inventory doesn’t look the way Save Garage expects, so no guns are added.',
+    save_inventory_damaged: 'This character’s inventory already breaks a rule the game keeps, such as an item listed twice, so guns are left alone to keep it safe.',
+    save_item_limit: 'There isn’t room in the inventory for these guns, because Save Garage always leaves 300 slots free.',
+    save_not_offered: 'That gun can’t be added to this character. Reload the page and try again.',
+    save_cheats_layout: 'This save’s cheat trackers don’t look the way Save Garage expects, so they are left alone.',
     save_read_only: 'That part of the save is read-only.',
     save_not_editable: 'Only numbers and true/false values can be changed.',
     save_bad_request: 'The edit didn’t match this save. Reload the page and try again.',
@@ -257,10 +279,10 @@
 
   const CAPS = [
     ['Money', 'Bank account and Family Savings, up to what the game can hold.', 'tested'],
-    ['Ammo', 'Refill or set the ammo for every weapon Lucia and Jason carry.', 'tested'],
+    ['Ammo', 'Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.', 'tested'],
     ['Stats', 'Fitness, overpowers and buffs, time played, distances, earnings, wanted levels and trophy counters, with the game’s own labels.', 'tested'],
-    ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5.', 'caution'],
-    ['World', 'Time of day, health and armour.', 'caution'],
+    ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.', 'caution'],
+    ['World', 'Time of day, health, armour and the map, plus Lucia’s and Jason’s skills, special meter, criminal profile and relationship.', 'caution'],
     ['All stats and Save data', 'Every one of the save’s values, with names or descriptions for almost all of them. For experts.', 'danger']];
 
   const fw = f => /^[0-9a-f]{8}$/i.test(f || '') ? `${Number(f.slice(0, 2))}.${f.slice(2, 4)}` : (f || 'unknown');
@@ -309,7 +331,7 @@
   // the figure after the edits picked so far, once the app has worked it out
   function afterOf(s) {
     const P = S.preview[s.file], d = S.drafts[s.file];
-    if (!P?.data?.ok || P.busy || !d || (!Object.keys(d.completion || {}).length && !Object.keys(d.stats || {}).length)) return null;
+    if (!P?.data?.ok || P.busy || !d || (!Object.keys(d.completion || {}).length && !Object.keys(d.stats || {}).length && !gunCount(d.guns))) return null;
     return P.data.overall.computed;
   }
 
@@ -364,15 +386,17 @@
   }
 
   const riskTag = r => ({tested: '<span class="risk tested">Tested on PS5</span>', caution: '<span class="risk caution">Not tested yet</span>',
-                         danger: '<span class="risk danger">Can break your save</span>'})[r] || '';
+                         danger: '<span class="risk danger">Can break your save</span>', untested: '<span class="risk caution">Not tested on a PS5 yet</span>',
+                         experimental: '<span class="risk caution">Experimental, not tested on a PS5 yet</span>'})[r] || '';
 
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
-    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}};
+    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}};
     const a = s.applied || {};
-    if (a.world) d.world = {...a.world};
+    if (a.world) d.world = JSON.parse(JSON.stringify(a.world));
     if (a.completion) d.completion = JSON.parse(JSON.stringify(a.completion));
+    if (a.guns) d.guns = JSON.parse(JSON.stringify(a.guns));
     for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
     for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
     for (const c of a.ammo || []) d.ammo[`${c.inv}:${c.idx}`] = c;
@@ -381,15 +405,21 @@
   }
 
   const rawKey = (sec, path) => sec + ':' + JSON.stringify(path);
-  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}});
+  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}});
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
-                           raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles'].filter(k => c && c[k]).length;
-  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
-                         + Object.keys(d.raw || {}).length + compCount(d.completion);
-  const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
+                           raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {})), guns: JSON.parse(JSON.stringify(d.guns || {}))});
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'cheats'].filter(k => c && c[k]).length;
+  // World edits: each key is one change, except a character's object ({meter, skills, profile, vest}), where each counts
+  const worldCount = w => Object.entries(w || {}).reduce((n, [k, v]) => n + (k === 'lucia' || k === 'jason' ? Object.keys(v || {}).length : 1), 0);
+  // guns to add: {lucia: [weapon ids], jason: [...]}, each gun one change
+  const gunCount = g => Object.values(g || {}).reduce((n, v) => n + (v || []).length, 0);
+  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + worldCount(d.world)
+                         + Object.keys(d.raw || {}).length + compCount(d.completion) + gunCount(d.guns);
+  const stable = v => v && typeof v === 'object' && !Array.isArray(v) ? `{${Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',')}}` : JSON.stringify(v);
+  const worldKey = w => stable(w || {});
+  const gunsKey = g => stable(Object.fromEntries(Object.entries(g || {}).filter(([, v]) => (v || []).length).map(([k, v]) => [k, [...v].sort()])));
   const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world)
-    + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort()) + worldKey(e?.completion);
+    + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort()) + worldKey(e?.completion) + gunsKey(e?.guns);
   const dirty = s => norm(draftList(draftOf(s.file))) !== norm(s.applied);
 
   // a numeric input cell. kind: money|ammo|stat; init = value shown in the field
@@ -472,7 +502,60 @@
     };
     return `<div class="section-head"><h2>Ammo</h2>${riskTag('tested')}
         <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Amounts up to a full load have been tested on a PS5 and the game keeps them. Larger amounts haven’t been tried yet: the game may cut them back to a full load when it loads the save.</p></div>
-      ${d.ammo.length ? block(0, 'Lucia') + block(1, 'Jason') : '<div class="empty">Neither character is carrying ammo in this save.</div>'}`;
+      ${d.ammo.length ? block(0, 'Lucia') + block(1, 'Jason') : '<div class="empty">Neither character is carrying ammo in this save.</div>'}
+      ${gunsSection(s, d)}`;
+  }
+
+  // ---- guns: add the guns a character doesn't have yet, built as the game builds a gun you buy (guns.py)
+  const gunItem = (who, g, on) => `<li class="${on ? 'on' : ''}"><label><input type="checkbox" data-gun="${who}" data-id="${esc(g.id)}" ${on ? 'checked' : ''}>
+    <span>${esc(g.label)}${g.kind ? ` <span class="kind">${esc(g.kind)}</span>` : ''}${g.ammo ? ` <span class="kind">×${nf.format(g.ammo)}</span>` : ''}</span></label></li>`;
+  const gunSum = (c, picked) => {
+    const slots = c.offered.filter(g => picked.has(g.id)).reduce((a, g) => a + g.rows, 0);
+    return picked.size ? `${picked.size} picked, using ${nf.format(slots)} of the ${nf.format(c.itemsFree)} free inventory slots.` : 'None picked yet.';
+  };
+  function gunsSection(s, d) {
+    const G = d.guns, picks = draftOf(s.file).guns || {};
+    const known = (G?.characters || []).flatMap(c => [...c.offered, ...c.owned]);
+    const amount = kind => known.find(g => g.name === `weaponspec_thrown_${kind}_default`)?.ammo;
+    const amounts = [amount('grenade'), amount('bomb')].filter(x => x != null);
+    const head = `<div class="group guns"><div class="section-head"><h2>Guns</h2>${riskTag('experimental')}
+        <p>Adds guns a character doesn’t have yet, each with the kit and default parts the game gives a gun you buy. Only guns whose parts Save Garage has seen the game write are offered, and nothing a character already has is changed. Each gun takes a few inventory slots, and ${nf.format(G?.itemReserve ?? 300)} are always left free.</p>
+        <p>Guns come without ammo: buy some in the game, or pick some up, and refill it here next time.${amounts.length === 2 ? ` Grenades and sticky bombs come with ${nf.format(amounts[0])} and ${nf.format(amounts[1])}, as many as the game gave when they were bought.` : ''} A gun the compendium doesn’t list yet is added to it too, as the game does, which can raise STANDARD ISSUE WEAPONS and the 100% figure.</p></div>`;
+    if (!G) return head + '<div class="callout">This part of the save can’t be read yet.</div></div>';
+    const rows = G.characters.map(c => {
+      const picked = new Set(picks[c.key] || []);
+      let help, ctl = '';
+      if (c.problem) help = esc(ERR['save_' + c.problem] || ERR.save_layout_changed);
+      else if (!c.offered.length) help = c.owned.length ? `Already has all ${nf.format(c.owned.length)} guns Save Garage can add.` : 'No guns can be added to this character.';
+      else {
+        help = `${c.offered.length === 1 ? '1 gun can be added.' : `${nf.format(c.offered.length)} guns can be added.`} <span data-gun-sum="${c.key}">${gunSum(c, picked)}</span>`;
+        ctl = `<ul class="weapons guns">${c.offered.map(g => gunItem(c.key, g, picked.has(g.id))).join('')}</ul>
+          <div class="row"><button class="btn small" data-act="guns-all" data-who="${c.key}" ${picked.size === c.offered.length ? 'disabled' : ''}>Pick all</button>
+            <button class="btn small" data-act="guns-none" data-who="${c.key}" ${picked.size ? '' : 'disabled'}>Clear</button></div>`;
+      }
+      if (c.left?.length) help += ` ${c.left.length === 1 ? '1 is' : `${nf.format(c.left.length)} are`} left alone: the character has its ammo without the weapon, which no save has shown.`;
+      return `<div class="field gunfield"><div class="name">${esc(c.name)}<span class="help">${help}</span></div><div class="inputs">${ctl}</div></div>`;
+    }).join('');
+    const offered = new Set(known.map(g => g.id));       // a gun one character can't be given but the other can isn't listed
+    const no = [...new Map(Object.values(G.notOffered || {}).flat().filter(g => !offered.has(g.id)).map(g => [g.id, g])).values()];
+    const left = no.length ? `<p class="note">Can’t be added yet, because no game save shows their default parts:</p>
+      <ul class="weapons">${no.map(g => `<li>${esc(g.label)}${g.kind ? ` <span class="kind">${esc(g.kind)}</span>` : ''}</li>`).join('')}</ul>` : '';
+    return head + `<div class="fields">${rows}</div>${left}</div>`;
+  }
+
+  function onGun(el) {
+    const s = slotOf(S.slot);
+    if (!s) return;
+    const d = draftOf(s.file), who = el.dataset.gun, cur = new Set(d.guns[who] || []);
+    if (el.checked) cur.add(el.dataset.id); else cur.delete(el.dataset.id);
+    if (cur.size) d.guns[who] = [...cur]; else delete d.guns[who];
+    el.closest('li')?.classList.toggle('on', el.checked);
+    const c = S.detail[s.file]?.guns?.characters?.find(x => x.key === who), sum = $(`[data-gun-sum="${who}"]`);
+    if (c && sum) sum.textContent = gunSum(c, cur);
+    const all = $(`[data-act="guns-all"][data-who="${who}"]`), none = $(`[data-act="guns-none"][data-who="${who}"]`);
+    if (all && c) all.disabled = cur.size === c.offered.length;
+    if (none) none.disabled = !cur.size;
+    renderPending(); renderCounts();
   }
 
   // ---- featured stats
@@ -720,12 +803,12 @@
   function schedulePreview(file) {
     const P = S.preview[file] || (S.preview[file] = {});
     const d = draftOf(file);
-    const body = {file, stats: Object.values(d.stats), completion: d.completion};
+    const body = {file, stats: Object.values(d.stats), completion: d.completion, guns: d.guns || {}};
     const sig = JSON.stringify(body);
     if (sig === P.want) return;
     P.want = sig;
     clearTimeout(P.t);
-    if (!Object.keys(d.completion || {}).length && !Object.keys(d.stats).length) { P.data = null; P.sig = sig; P.busy = false; return; }
+    if (!Object.keys(d.completion || {}).length && !Object.keys(d.stats).length && !gunCount(d.guns)) { P.data = null; P.sig = sig; P.busy = false; return; }
     P.busy = true;
     P.t = setTimeout(async () => {
       let data;
@@ -826,7 +909,33 @@
       <details class="more-opts" data-keep="compMore" ${S.keep.compMore ? 'open' : ''}><summary>Every option, part by part</summary>
         <p class="note">The same edits in finer steps, plus extras the checklist doesn’t count: map discoveries, gym memberships, convenience-store robberies, single challenge categories, and the experiments.</p>
         ${stuntGroups(s)}${compParts(s)}</details>
+      <details class="more-opts" data-keep="compCheats" ${S.keep.compCheats ? 'open' : ''}><summary>Cheats</summary>${cheatParts(s)}</details>
       <details class="more-opts" data-keep="compLeft" ${S.keep.compLeft ? 'open' : ''}><summary>What’s left to play in the game</summary>${leftToPlay(s) || '<p class="note">Not available for this save.</p>'}</details>`;
+  }
+
+  // ---- cheats: complete chosen cheat unlock trackers (challenges.py, set d6d53427)
+  const cheatText = c => `${c.name ? `<span class="cheat-name" data-no-i18n>${esc(c.name)}</span>` : ''}<span class="${c.name ? 'effect' : 'cheat-name'}">${esc(c.effect)}</span>
+    <span class="help"><b>To unlock:</b> ${esc(c.unlock)}</span>`;
+  function cheatParts(s) {
+    const C = S.comp[s.file].cheats, d = draftOf(s.file).completion;
+    const warn = '<div class="callout danger"><span class="risk danger"></span><div><b>Using a cheat in the game turns off trophies and saving for the rest of that session.</b> The game warns about this when you use one. Unlocking a cheat here doesn’t use it.</div></div>';
+    if (!C) return warn + '<p class="note">This part of the save can’t be read yet.</p>';
+    if (C.problem) return warn + `<div class="callout">${esc(ERR['save_' + C.problem] || ERR.save_layout_changed)}</div>`;
+    const picked = new Set(d.cheats?.trackers || []);
+    const open = C.entries.filter(e => e.done < e.of && !e.ids.every(i => picked.has(i)));
+    const head = `<div class="section-head"><h3>Cheat unlocks</h3><div class="head-actions">${riskTag('experimental')}${open.length > 1 ? '<button class="btn small" data-act="cheat-add" data-key="all">Pick every cheat</button>' : ''}</div>
+        <p>The game unlocks a cheat when you meet its condition, and keeps a tracker for each one in the save. ${nf.format(C.done)} of ${nf.format(C.of)} are complete in this save. Completing one here marks it the way the game does when the condition is met; whether the cheat then shows in the game’s Progress menu hasn’t been tested on a PS5 yet. No other progress, trophy or counter changes, and the 100% figure stays the same.</p>
+        <p>Each challenge category has two cheats, one for 5 of its challenges and one for all of them. The save doesn’t show which of the two trackers is which, so they are completed together.</p></div>`;
+    const ctl = e => e.done >= e.of ? '<span class="done-mark">Unlocked</span>'
+      : e.ids.every(i => picked.has(i)) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="cheat-undo" data-key="${esc(e.key)}">Undo</button>`
+      : `<button class="btn small" data-act="cheat-add" data-key="${esc(e.key)}">Unlock</button>`;
+    const rows = C.entries.map(e => {
+      if (e.kind === 'single') return `<div class="field cheat"><div class="name">${cheatText(e.cheats[0])}</div><div class="inputs">${ctl(e)}</div></div>`;
+      const note = e.kind === 'pair' ? '' : `<span class="help">Save Garage hasn’t seen these ${nf.format(e.of)} trackers hold any progress in a save, so it can’t tell which cheat each one is. They can only be completed together${e.done ? `, and ${nf.format(e.done)} of them are complete already` : ''}.</span>`;
+      return `<div class="field cheat ${e.kind}"><div class="name">${note}<ul class="cheats">${e.cheats.map(c => `<li>${cheatText(c)}</li>`).join('')}</ul></div>
+        <div class="inputs">${ctl(e)}</div></div>`;
+    }).join('');
+    return `${warn}<div class="group">${head}<div class="fields">${rows}</div></div>`;
   }
 
   function compParts(s) {
@@ -974,7 +1083,76 @@
         <div class="field"><div class="name">Armour<span class="help">Now ${nf2.format(w.armour)} of ${nf2.format(w.armourMax)}, for both characters’ armour together.</span></div>
           <div class="inputs">${d.armour === 'full' ? '<span class="note">Will be filled. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="armour">Undo</button>'
             : `<button class="btn small" data-act="world-fill" data-what="armour" ${w.armour >= w.armourMax ? 'disabled' : ''}>${w.armour >= w.armourMax ? 'Already full' : 'Fill armour'}</button>`}</div></div>
-      </div><h2>Long-term capacities</h2><p>Editor target: 100 points. Only capacities with matching saved values are listed.</p>${growth}`;
+      </div><h2>Long-term capacities</h2><p>Editor target: 100 points. Only capacities with matching saved values are listed.</p>${growth}
+      ${mapGroup(s)}${characterGroups(s)}`;
+  }
+
+  // a World field with its own risk label; help is plain text
+  const worldField = (name, risk, help, ctl) => `<div class="field"><div class="name">${name} ${riskTag(risk)}<span class="help">${esc(help)}</span></div>
+    <div class="inputs">${ctl}</div></div>`;
+  // a number cell of the World tab: what = skills | profile | relationship, who = lucia | jason (none for the relationship)
+  function worldCell(o) {
+    const {what, who, label, min, max, step, value, init, was, changed, extra = ''} = o, id = `w-${what}-${who || 'both'}`;
+    return `<div class="cell narrow ${changed ? 'changed' : ''}"><label for="${id}">${esc(label)}</label><span class="with-unit"><input id="${id}" type="number" min="${min}" max="${max}" step="${step}"
+      value="${esc(value)}" data-world="${what}" ${who ? `data-who="${who}"` : ''} data-init="${esc(init)}" data-was="${esc(was)}">${extra}</span>
+      <span class="was">${changed ? 'was ' + esc(was) : ''}</span></div>`;
+  }
+
+  // the map's fog of war: every region Save Garage knows (fog.py)
+  function mapGroup(s) {
+    const F = S.world[s.file].fog, d = draftOf(s.file).world;
+    let help = 'This part of the save can’t be read yet.', ctl = '';
+    if (F?.problem) help = ERR['save_' + F.problem] || ERR.save_layout_changed;
+    else if (F) {
+      help = `Clears the fog of war from the regions Save Garage knows so far, about ${nf.format(F.known)} of the map’s ${nf.format(F.mapTotal)}; the others stay covered until you explore them. This save has ${nf.format(F.regions)} uncovered, and ${nf.format(F.missing)} of the known ones are still covered.`;
+      ctl = d.fog ? '<span class="note">Will be revealed. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="fog">Undo</button>'
+        : `<button class="btn small" data-act="world-fill" data-what="fog" ${F.missing ? '' : 'disabled'}>${F.missing ? 'Reveal the map' : 'All known regions revealed'}</button>`;
+    }
+    return `<div class="group"><div class="section-head"><h3>Map</h3></div><div class="fields">${worldField('Reveal the map', 'untested', help, ctl)}</div></div>`;
+  }
+
+  // Lucia and Jason: special meter, skills, criminal profile and a vest each, then their relationship (player.py)
+  function characterGroups(s) {
+    const P = S.world[s.file].player, d = draftOf(s.file).world;
+    if (!P) return '<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="callout">This part of the save can’t be read yet.</div></div>';
+    return P.characters.map(c => characterGroup(P, c, d[c.key] || {})).join('') + relationshipGroup(P, d);
+  }
+
+  function characterGroup(P, c, dc) {
+    const pending = (what, text) => `<span class="note">${text} Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="${what}" data-who="${c.key}">Undo</button>`;
+    let rows = '';
+    if (c.attributesProblem || !c.skills) rows += worldField('Special meter and skills', 'experimental', ERR['save_' + c.attributesProblem] || ERR.save_layout_changed, '');
+    else {
+      const full = c.meter >= P.meterFull, lo = Math.min(...c.skills), hi = Math.max(...c.skills), now = lo === hi ? String(lo) : `${lo} to ${hi}`;
+      rows += worldField('Special meter', 'untested', `Now ${c.meter}. Attribute slot ${P.meterSlot}, which other editors call the special ability meter; the game’s own name for it isn’t known. Filling it sets ${P.meterFull}, a value the game writes there itself.`,
+        dc.meter ? pending('meter', 'Will be filled.') : `<button class="btn small" data-act="world-fill" data-what="meter" data-who="${c.key}" ${full ? 'disabled' : ''}>${full ? 'Already full' : `Fill to ${P.meterFull}`}</button>`);
+      rows += worldField('Skills', 'experimental', `Now ${now}. Attribute slots ${P.skillSlots.slice(0, -1).join(', ')} and ${P.skillSlots.at(-1)}, which other editors call skills. Each is raised to the value you pick and never lowered. In the game’s own saves none is above ${P.skillChoices[0]}; GarlicSaves writes ${P.skillChoices[1]} and says it was tested in the game.`,
+        worldCell({what: 'skills', who: c.key, label: 'Raise to', min: P.skillMin, max: P.skillMax, step: 1, value: dc.skills ?? lo, init: lo, was: now, changed: dc.skills != null,
+          extra: P.skillChoices.map(v => `<button class="btn small" data-act="world-fill" data-what="skills" data-who="${c.key}" data-to="${v}">${v}</button>`).join('')}));
+    }
+    if (c.profile != null) {
+      const was = nf2.format(c.profile);
+      rows += worldField('Criminal profile', 'experimental', `Now ${was}. The game calls it the criminal profile: a temperament score behind the Professional, Hardened, Violent, Psycho and Irredeemable profiles in the Jason & Lucia menu. Which score gives which profile isn’t known yet. Lucia starts a new game at ${nf.format(P.profileNewGame)}; saves written by the game hold ${nf.format(P.profileMin)} to ${nf2.format(P.profileMax)}.`,
+        worldCell({what: 'profile', who: c.key, label: 'Score', min: P.profileMin, max: P.profileMax, step: 'any', value: dc.profile ?? Number(c.profile.toFixed(2)), init: Number(c.profile.toFixed(2)), was, changed: dc.profile != null}));
+    }
+    const V = c.vest || {};
+    const vhelp = {can_add: `Wears no armour, and a vest is in the wardrobe. Adding it puts it on the way the game records a worn vest: armour ${nf.format(P.vestArmour)} of ${nf.format(P.vestArmour)}.`,
+      worn: `Wears armour now, ${nf2.format(V.armour)} of ${nf2.format(V.max)}.` + (V.armour < V.max ? ' Fill armour above tops it up.' : ''), no_vest: ERR.save_no_vest}[V.state]
+      || 'The armour in this save doesn’t look the way Save Garage expects, so it is left alone.';
+    rows += worldField('Vest', 'experimental', vhelp, V.state !== 'can_add' ? '' : dc.vest ? pending('vest', 'Will be added.')
+      : `<button class="btn small" data-act="world-fill" data-what="vest" data-who="${c.key}">Add a vest</button>`);
+    return `<div class="group"><div class="section-head"><h3>${esc(c.name)}</h3></div><div class="fields">${rows}</div></div>`;
+  }
+
+  function relationshipGroup(P, d) {
+    const R = P.relationship || {};
+    let help, ctl = '';
+    if (R.problem) help = (R.value != null ? `Now ${R.value}. ` : '') + (ERR['save_' + R.problem] || ERR.save_layout_changed);
+    else {
+      help = `Now ${R.value}. At this point in the story the game keeps it from ${R.lowerCap} to ${R.cap}, so that is the range here. The relationship level the game shows is stored on its own and isn’t changed.`;
+      ctl = worldCell({what: 'relationship', label: 'Score', min: R.lowerCap, max: R.cap, step: 1, value: d.relationship ?? R.value, init: R.value, was: String(R.value), changed: d.relationship != null});
+    }
+    return `<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="fields">${worldField('Relationship', 'experimental', help, ctl)}</div></div>`;
   }
 
   function onWorld(el) {
@@ -998,6 +1176,19 @@
       const ok = el.value !== '' && v >= 1 && v <= w.healthMax;
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
       if (!ok || v === w.health) delete d.health; else d.health = v;
+    } else if ((what === 'skills' || what === 'profile' || what === 'relationship') && w.player) {
+      const who = el.dataset.who, c = w.player.characters.find(x => x.key === who);
+      const ok = el.value.trim() !== '' && Number.isFinite(v) && (what === 'profile' || Number.isInteger(v)) && v >= Number(el.min) && v <= Number(el.max);
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      // skills are only ever raised, so a value at or below the lowest one changes nothing; the profile is a float32 in the save
+      const same = what === 'skills' ? v <= Math.min(...c.skills) : what === 'profile' ? Math.fround(v) === Math.fround(c.profile) : v === w.player.relationship.value;
+      if (what === 'relationship') { if (!ok || same) delete d.relationship; else d.relationship = v; }
+      else {
+        const ch = d[who] || {};
+        if (!ok || same) delete ch[what]; else ch[what] = v;
+        if (Object.keys(ch).length) d[who] = ch; else delete d[who];
+      }
+      mark(el.closest('.cell'), ok && !same, el);
     }
     renderPending(); renderCounts();
   }
@@ -1131,7 +1322,7 @@
       const ok = el.value.trim() !== '' && Number.isFinite(nv) && (el.dataset.kind !== 'int' || Number.isInteger(nv))
         && (el.min === '' || nv >= Number(el.min)) && (el.max === '' || nv <= Number(el.max));
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
-      if (!ok) { delete d[k]; renderPending(); renderCounts(); if (el.max !== '') toast(`Health can be 1 to ${el.max}.`); return; }
+      if (!ok) { delete d[k]; renderPending(); renderCounts(); if (el.max !== '') toast(`This value can be ${el.min} to ${el.max}.`); return; }
     }
     const orig = el.dataset.orig;
     const same = el.type === 'checkbox' ? String(nv) === orig : Number(orig) === nv;
@@ -1206,10 +1397,10 @@
 
   function renderCounts() {
     const d = draftOf(S.slot);
-    const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length, stats: 0, all: 0};
+    const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length + gunCount(d.guns), stats: 0, all: 0};
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
     const stunt = S.stuntKeys[S.slot] || new Set();
-    n.completion = compCount(d.completion); n.world = Object.keys(d.world || {}).length; n.data = Object.keys(d.raw || {}).length;
+    n.completion = compCount(d.completion); n.world = worldCount(d.world); n.data = Object.keys(d.raw || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     const known = S.known[S.slot]?.rows || [];
     n.known = Object.keys(d.world || {}).filter(k=>k.startsWith('research_')).length
@@ -1288,6 +1479,7 @@
           const pct = p && p.total ? Math.round(100 * p.files / p.total) : null;
           html = `<div class="job"><div class="stage">${esc(stage)}</div>
             ${p ? `<div class="detail">${p.total ? `File ${p.files} of ${p.total}` : `${p.files} files so far`}</div>` : ''}
+            ${job.stage === 'key_rate_wait' && job.wait != null ? `<div class="detail">Trying again in ${esc(job.wait)} s</div>` : ''}
             <div class="bar ${pct != null ? 'fixed' : ''}"><span ${pct != null ? `style="width:${pct}%"` : ''}></span></div>
             ${job.needPower ? `<div class="power"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 12a16 16 0 1 0 18 0"/><line x1="24" y1="5" x2="24" y2="22"/></svg>
               <div><strong>Press the PS5 power button once</strong>Let go when it beeps. The PS5 restarts into transfer mode. You have about 5 minutes.</div></div>` : ''}
@@ -1295,7 +1487,7 @@
               <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
-            ${['waiting_console', 'pair_waiting_console', 'connecting', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
+            ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'key_rate_wait', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${logBlock(job)}</div>`;
         } else if (job.status === 'error') {
           const code = job.error?.code || 'internal';
@@ -1328,12 +1520,22 @@
     const isDirty = dirty(s);
     const busy = running();
     if (!n && !s.modified) { pendingEl.hidden = true; return; }
-    const w = d.world || {}, now = S.world[s.file];
+    const w = d.world || {}, now = S.world[s.file], P = now?.player, F = now?.fog;
+    const who = k => P?.characters?.find(x => x.key === k);
     const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
       w.health != null && {label: 'Health', value: now ? now.health : '', newValue: w.health},
       w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'},
       ...Object.entries(w).filter(([k]) => /^(jason|lucia)_/.test(k)).map(([k,v]) => ({
-        label: k.split('_')[0] + ' / ' + T(now?.capacities?.[k]?.label || k), value: now?.capacities?.[k]?.value ?? '', newValue: v}))].filter(Boolean);
+        label: k.split('_')[0] + ' / ' + T(now?.capacities?.[k]?.label || k), value: now?.capacities?.[k]?.value ?? '', newValue: v})),
+      w.fog && {label: 'Map regions uncovered', value: F ? F.regions : '', newValue: F ? F.regions + F.missing : 'all known'},
+      ...['lucia', 'jason'].flatMap(k => {
+        const e = w[k], c = who(k), name = c?.name || (k === 'lucia' ? 'Lucia' : 'Jason');
+        return !e ? [] : [e.meter && {label: `Special meter (${name})`, value: c?.meter ?? '', newValue: P?.meterFull ?? 100},
+          e.skills != null && {label: `Skills (${name})`, value: c?.skills ? Math.min(...c.skills) : '', newValue: e.skills},
+          e.profile != null && {label: `Criminal profile (${name})`, value: c?.profile ?? '', newValue: e.profile},
+          e.vest && {label: `Vest (${name})`, value: c?.vest?.armour ?? '', newValue: P?.vestArmour ?? 150}];
+      }),
+      w.relationship != null && {label: 'Relationship', value: P?.relationship?.value ?? '', newValue: w.relationship}].filter(Boolean);
     for (const [key,v] of Object.entries(w).filter(([key])=>key.startsWith('research_'))) {
       const row=S.known[s.file]?.rows?.find(x=>x.key===key);
       worldList.push({label:row?T(row.label):key, value:row?.value??'',newValue:v});
@@ -1349,8 +1551,11 @@
       cp.activities2 && {label: 'Activities: ' + cp.activities2.lines.join(', '), value: '', newValue: 'completed'},
       cp.hoops && {label: 'Basketball hoops: all', value: '', newValue: 'scored'},
       cp.vehicles && {label: 'Vehicle compendium: up to 200 base models', value: '', newValue: 'discovered'},
-      cp.collectibles && {label: 'Collectibles: ' + cp.collectibles.categories.join(', '), value: '', newValue: 'found'}].filter(Boolean);
-    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
+      cp.collectibles && {label: 'Collectibles: ' + cp.collectibles.categories.join(', '), value: '', newValue: 'found'},
+      cp.cheats && {label: 'Cheat trackers', value: '', newValue: `${cp.cheats.trackers.length} completed`}].filter(Boolean);
+    const gunList = Object.entries(d.guns || {}).filter(([, v]) => (v || []).length)
+      .map(([k, v]) => ({label: `Guns added (${k === 'lucia' ? 'Lucia' : 'Jason'})`, value: '', newValue: v.length}));
+    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...gunList, ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && s.modified && !isDirty
       ? `<div class="sum">Edits waiting to be sent<small><span data-no-i18n>${esc(missionName(s))}.</span> They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
@@ -1533,6 +1738,23 @@
       S.mainKey = ''; renderMain(); renderPending(); renderCounts();
       return;
     }
+    if (a === 'cheat-add' || a === 'cheat-undo') {        // the cheat trackers to complete, by entry (a pair or the unmatched group is one entry)
+      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file]?.cheats;
+      if (!C?.entries) return;
+      const cur = new Set(d.cheats?.trackers || []), key = b.dataset.key;
+      const entries = key === 'all' ? C.entries.filter(e => e.done < e.of) : C.entries.filter(e => e.key === key);
+      for (const e of entries) for (const i of e.ids) { if (a === 'cheat-add') cur.add(i); else cur.delete(i); }
+      if (cur.size) d.cheats = {trackers: [...cur]}; else delete d.cheats;
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
+    if (a === 'guns-all' || a === 'guns-none') {
+      const s = slotOf(S.slot), d = draftOf(s.file), who = b.dataset.who;
+      const c = S.detail[s.file]?.guns?.characters?.find(x => x.key === who);
+      if (a === 'guns-all' && c?.offered?.length) d.guns[who] = c.offered.map(g => g.id); else delete d.guns[who];
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
+      return;
+    }
     if (a === 'sd-home') { S.sd[S.slot].cur = null; S.sd[S.slot].node = null; S.mainKey = ''; renderMain(); return; }
     if (a === 'sd-open') { sdOpen(S.slot, b.dataset.section, JSON.parse(b.dataset.path), b.dataset.label, false); return; }
     if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
@@ -1560,8 +1782,15 @@
       S.mainKey='';renderMain();renderPending();renderCounts();return;
     }
     if (a === 'world-fill' || a === 'world-undo') {
-      const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world;
-      if (b.dataset.what === 'health') d.health = w.healthMax;
+      const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world, what = b.dataset.what, who = b.dataset.who;
+      if (who) {                                  // one character's special meter, skills or vest
+        const ch = d[who] || {}, c = w.player.characters.find(x => x.key === who);
+        if (a === 'world-undo') delete ch[what];
+        else if (what === 'skills') { const to = Number(b.dataset.to); if (to > Math.min(...c.skills)) ch.skills = to; else delete ch.skills; }
+        else ch[what] = what === 'meter' ? 'full' : true;
+        if (Object.keys(ch).length) d[who] = ch; else delete d[who];
+      } else if (what === 'fog') { if (a === 'world-fill') d.fog = 'known'; else delete d.fog; }
+      else if (what === 'health') d.health = w.healthMax;
       else if (a === 'world-fill') d.armour = 'full';
       else delete d.armour;
       S.mainKey = ''; renderMain(); renderPending(); renderCounts();
@@ -1602,7 +1831,7 @@
     if (a === 'save') {
       const s = slotOf(S.slot);
       const d = draftList(draftOf(s.file));
-      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length && !compCount(d.completion);
+      const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length && !compCount(d.completion) && !gunCount(d.guns);
       if (none && !s.modified) return;
       if (none) {
         if (confirm(T('You removed every edit for this save. Put its original back instead?'))) act('/api/restore', {}, () => { S.drafts = {}; });
@@ -1649,6 +1878,7 @@
 
   document.addEventListener('change', e => {
     const el = e.target;
+    if (el.dataset.gun && el.type === 'checkbox') onGun(el);
     if (el.dataset.edit && el.type === 'checkbox') onEdit(el);
     if (el.dataset.raw && el.type === 'checkbox') onRaw(el);
     if (el.dataset.find === 'varies' || el.dataset.find === 'named' || el.dataset.find === 'game') {

@@ -51,15 +51,16 @@ jobs:
           import re
           from pathlib import Path
 
-          key = os.environ['RELEASE_WORKER_KEY']
-          if not re.fullmatch(r'[0-9a-fA-F]{64}', key):
-              raise SystemExit('Missing or invalid release worker key')
           path = Path('engine/garlic.py')
           source = path.read_text(encoding='utf-8')
-          marker = "DEFAULT_KEY = ''\n"
-          if source.count(marker) != 1:
-              raise SystemExit('Release key placeholder not found')
-          path.write_text(source.replace(marker, 'DEFAULT_KEY = ' + repr(key) + '\n'), encoding='utf-8')
+          pattern = r"^DEFAULT_KEY = '([0-9a-fA-F]{64})'$"
+          bundled = re.findall(pattern, source, flags=re.M)
+          if len(bundled) != 1:
+              raise SystemExit('Expected one valid distribution worker key')
+          key = os.environ.get('RELEASE_WORKER_KEY') or bundled[0]
+          if not re.fullmatch(r'[0-9a-fA-F]{64}', key):
+              raise SystemExit('Invalid release worker key')
+          path.write_text(re.sub(pattern, 'DEFAULT_KEY = ' + repr(key), source, flags=re.M), encoding='utf-8')
           PY
 
       - name: Build Windows, macOS and Linux packages
