@@ -1447,5 +1447,16 @@
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSaves 拒绝了此登录。它可能已被停用，也可能已过期。请重新登录以继续。",
 "Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "要退出 GarlicSaves 登录吗？Save Garage 会忘记它在这台电脑上的密钥，之后你需要重新登录才能配对、下载、保存修改或传回存档。",
 "Free software under the GNU GPL v3, with no warranty.": "GNU GPL v3 自由软件，不提供任何担保。",
-"Source and official releases": "源代码和官方版本"
+"Source and official releases": "源代码和官方版本",
+"Shops can spend all of it.": "这些钱都可以在商店里花。",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend.": "银行里的 ${1} 中，有 ${0} 位于额外的资金叠里，游戏可能不让你花。",
+"Setting the bank to ${0} or less keeps everything spendable.": "把银行余额设为 ${0} 或更少，所有钱都能花。",
+"Allow more than ${0} (experimental)": "允许超过 ${0}（实验性）",
+"May not be spendable": "可能无法花用",
+"Amounts above ${0} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them.": "超过 ${0} 的部分会放进额外的资金叠，游戏可能不让你花：有玩家用这些钱无法完成电话付款。",
+"Use it only if you’re fine with that.": "只有在你能接受这一点时才使用。",
+"The bank will be set to ${0}, all in its own money boxes, when you save edits.": "保存修改时，银行余额会设为 ${0}，全部放在银行自己的资金箱里。",
+"Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "最多 ${0}：即剧情当前阶段银行自己的资金箱能容纳的金额。这些钱都可以在商店里花。上限会随剧情推进而提高。",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "银行里的 ${1} 中，有 ${0} 位于额外的资金叠里，游戏可能不让你花。把银行余额设为 ${2} 或更少，所有钱都能花。",
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "最多 ${0}。超过 ${1} 的部分会放进额外的资金叠，游戏可能不让你花：有玩家用这些钱无法完成电话付款。只有在你能接受这一点时才使用。"
 }

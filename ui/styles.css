@@ -193,7 +193,11 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .field { display: grid; grid-template-columns: minmax(200px, 1.25fr) 2fr; gap: 10px 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
 .field .name { font-weight: 600; }
 .field .help { display: block; color: var(--text-2); font-size: 13px; font-weight: 400; margin-top: 2px; }
+.field .help.warn { color: #ffd395; }
 .field .inputs { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+/* the bank's experimental extra stacks, under its amount */
+.stacks-opt { flex-basis: 100%; max-width: 62ch; }
+.stacks-opt .row { gap: 4px 14px; }
 .cell { display: grid; gap: 4px; }
 .cell label, .cell .lbl { font-size: 12px; color: var(--text-3); }
 .cell .with-unit { display: flex; gap: 8px; align-items: center; }

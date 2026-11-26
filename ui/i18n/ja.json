@@ -1447,5 +1447,16 @@
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSavesがこのサインインを拒否しました。サインインが無効にされたか、期限が切れた可能性があります。続けるには、もう一度サインインしてください。",
 "Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "GarlicSavesからサインアウトしますか？Save Garageはこのコンピューターのキーを削除するため、ペアリング、ダウンロード、編集の保存、セーブデータの送り返しには、もう一度サインインが必要になります。",
 "Free software under the GNU GPL v3, with no warranty.": "GNU GPL v3 のフリーソフトウェアです。保証はありません。",
-"Source and official releases": "ソースコードと公式リリース"
+"Source and official releases": "ソースコードと公式リリース",
+"Shops can spend all of it.": "その全額をショップで使えます。",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend.": "銀行の${1}のうち${0}は追加の束に入っていて、ゲーム内で使えない可能性があります。",
+"Setting the bank to ${0} or less keeps everything spendable.": "銀行の残高を${0}以下にすれば、全額を使える状態に保てます。",
+"Allow more than ${0} (experimental)": "${0}を超える額を許可する（実験的）",
+"May not be spendable": "使えない可能性あり",
+"Amounts above ${0} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them.": "${0}を超える分は追加の束に入り、ゲーム内で使えない可能性があります。あるプレイヤーは、この束のお金で電話での支払いができませんでした。",
+"Use it only if you’re fine with that.": "それで問題ない場合にだけ使ってください。",
+"The bank will be set to ${0}, all in its own money boxes, when you save edits.": "編集を保存すると、銀行の残高は${0}になり、全額が銀行専用のマネーボックスに入ります。",
+"Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "最大${0}：ストーリーの現時点で、銀行専用のマネーボックスに入る額です。その全額をショップで使えます。上限はストーリーの進行とともに増えます。",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "銀行の${1}のうち${0}は追加の束に入っていて、ゲーム内で使えない可能性があります。銀行の残高を${2}以下にすれば、全額を使える状態に保てます。",
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "最大${0}。${1}を超える分は追加の束に入り、ゲーム内で使えない可能性があります。あるプレイヤーは、この束のお金で電話での支払いができませんでした。それで問題ない場合にだけ使ってください。"
 }

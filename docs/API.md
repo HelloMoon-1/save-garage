@@ -18,7 +18,8 @@ The whole app state, polled about once a second by the UI.
   "slots": [{
     "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
     "subtitle": "Mission name",
-    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "spendable": 85000, "stuck": 0}],
+    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 231933844, "spendable": 85000,
+               "stuck": 0, "boxMax": 223844, "stacks": 0}],
     "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 9999}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
@@ -43,10 +44,15 @@ The whole app state, polled about once a second by the UI.
 ## GET /api/slot?file=…
 
 Editor data for one save: featured stats with the exact rows to edit, ammo and the weapons each character carries.
-For the bank, `boxMax` is what the bank's own money boxes hold, and `max` adds a $85,000 stack for every inventory slot left
-above the 300 kept free (at most $999,999,999; equal to `boxMax` when the save has no $85,000 box yet). `stacks` counts
-the extra stacks the bank already has, `spendable` is the money the game can spend, and `stuck` is money an older version
-left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it).
+For the bank, `max` is what the bank's own money boxes hold at this point in the story, which shops spend from; an edit
+goes no higher unless it asks for the extra stacks (`stacks`, under `/api/patch` below). `maxStacks` is the limit with
+them: a $85,000 stack under the bank's $85,000 box for every inventory slot left above the 300 kept free, at most
+$999,999,999, and equal to `max` when the save has no $85,000 box yet. The stacks are experimental and may not be
+spendable (issue #8). `stacks` counts the extra stacks the bank already has, and `boxMax`, kept for compatibility, is
+where new stacks would start: `max` plus $85,000 for each of them (equal to `max` without any). `stuck` is money an older
+version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it), and
+`spendable` is the rest of `value`, extra stacks included. Without `stuck` money, a `value` above `max` is money in extra
+stacks, as versions 1.26.0 to 1.30.0 wrote it.
 For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes.
 Each weapon is
 `{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:
@@ -139,9 +145,13 @@ slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmo
 | `/api/signout` | none | Forgets the GarlicSaves sign-in on this computer: its entry in `config.json` and its key. Refused with `busy` while a task runs. Answers `state.garlic` |
 
 Each edit names the value it replaces (`value`) and the new one (`newValue`); an edit whose `value` no longer matches
-the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail": "…"}`. `/api/pair`, `/api/download`,
-`/api/patch` and `/api/upload` go through GarlicSaves and are refused with `not_signed_in` until Save Garage is signed
-in.
+the save is refused. A money edit is `{"inv": 0, "idx": 384, "value": 85000, "newValue": 223844}`, and a value above the
+item's `max` is written as `max`. A bank edit with `"stacks": true` goes up to `maxStacks` instead, putting what is past
+the bank's own boxes in extra $85,000 stacks (experimental: the game may not let you spend them); `stacks` must be `true`
+or `false` (HTTP 400 otherwise). A lower bank balance is always written and empties the stacks it no longer needs, so an
+edit without `stacks` brings a bank that is in stacks back within its own boxes. Errors come back as HTTP 409
+`{"error": "<code>", "detail": "…"}`. `/api/pair`, `/api/download`, `/api/patch` and `/api/upload` go through
+GarlicSaves and are refused with `not_signed_in` until Save Garage is signed in.
 
 ### Download errors
 

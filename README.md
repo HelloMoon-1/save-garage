@@ -12,13 +12,13 @@ Save Garage edits your **GTA VI story-mode save on PS5**: money, ammo and stats.
 nothing on the console. Your PS5 sends the save to your computer through its own Data Transfer feature, you edit it in
 your browser, and the PS5 takes it back the same way.
 
-<p align="center"><img src="assets/screens/editor-money.png" alt="The Money tab: raising the bank to $25,000,000 with the new $85,000 stacks" width="88%"></p>
+<p align="center"><img src="assets/screens/editor-money.png" alt="The Money tab: the bank up to what its own money boxes hold, with larger amounts as an experimental option" width="88%"></p>
 
 ## What you can change
 
 | | What | Status |
 |---|---|---|
-| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank fills its own money boxes, then adds $85,000 stacks under its $85,000 box, as the game does when the bank fills up: up to about $230 million, depending on free inventory slots. Cash goes up to $20,000. | Tested on PS5 (the $85,000 stacks not yet) |
+| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank goes up to what its own money boxes hold at your point in the story, because shops spend from those. An experimental option goes past them with $85,000 stacks, up to about $230 million, but the game may not let you spend that money. Cash goes up to $20,000. | Tested on PS5; the $85,000 stacks are experimental, and a player couldn't spend them (issue #8) |
 | **Ammo** | Every ammo type each character is carrying, named the way the game names it, with one click to refill to a full load (for example 300 assault rifle rounds) or to set the maximum of 9,999. Also lists the weapons each character carries, and adds guns a character doesn't have yet: 15 for Lucia plus the grenade and sticky bomb, and 16 for Jason, each with the kit and default parts the game gives a gun you buy. | Ammo tested on PS5 up to a full load, and a save with more loads fine; adding guns is experimental and not tested on a PS5 yet |
 | **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. | Tested on PS5, except times, distances and the story and styles percentages |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Tested on PS5 |
@@ -195,10 +195,14 @@ backups or GarlicSaves sign-in.
   boxes the game itself uses for savings goals. The bank stays within its own boxes, because shops only spend money
   from those: versions before 1.24.0 put extra money in Family Savings boxes under the bank, which BuckMe showed but
   shops couldn't spend (issue #3). Editing the bank again, or **Make it spendable** on the Money tab, moves it back.
-  Past its boxes, the bank takes any number of $85,000 stacks under its $85,000 box, which the game counts in full.
-  Each stack takes one inventory slot, and Save Garage always leaves 300 free, so the limit depends on the save
-  (about $230 million in a late save, and at most $999,999,999). An early save, before the story gives the bank its
-  $85,000 box, stays at what its boxes hold. The stacks aren't tested on a PS5 yet. Cash stays at the $20,000 wallet.
+  Past its boxes, the bank can also take $85,000 stacks under its $85,000 box, which BuckMe shows in the balance.
+  Versions 1.26.0 to 1.30.0 put anything past the boxes in such stacks, but they may not be spendable: a player on
+  1.30.0 with about $2,000,000 in the bank couldn't make a $150,000 phone payment (issue #8). Since 1.30.1 the stacks
+  are an experimental option on the Money tab, off by default, until a PS5 shows the game spends them. Each stack takes
+  one inventory slot, and Save Garage always leaves 300 free, so their limit depends on the save (about $230 million in
+  a late save, and at most $999,999,999). An early save, before the story gives the bank its $85,000 box, has no
+  stacks. A bank already past its boxes shows how much of it is in stacks, and **Make it spendable** sets it to what
+  its boxes hold, emptying the stacks. Cash stays at the $20,000 wallet.
 - **A balance of 0 can't be edited.** The game doesn't store it. Get a little money in the game, save and download again.
 - **Only ammo you carry is listed.** Pick some up in the game first to add a new type.
 - **Adding guns is experimental.** A gun is built row for row the way the game wrote guns that were bought in a save:

@@ -1447,5 +1447,16 @@
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSaves가 이 로그인을 거부했어요. 로그인이 꺼졌거나 만료되었을 수 있어요. 계속하려면 다시 로그인하세요.",
 "Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "GarlicSaves에서 로그아웃할까요? Save Garage가 이 컴퓨터에서 키를 잊기 때문에, 페어링, 다운로드, 수정 사항 저장, 세이브 보내기를 하려면 다시 로그인해야 해요.",
 "Free software under the GNU GPL v3, with no warranty.": "GNU GPL v3 자유 소프트웨어이며 어떠한 보증도 없어요.",
-"Source and official releases": "소스 코드와 공식 릴리스"
+"Source and official releases": "소스 코드와 공식 릴리스",
+"Shops can spend all of it.": "이 돈은 모두 상점에서 쓸 수 있어요.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend.": "은행에 있는 ${1} 중 ${0}만큼은 추가 묶음에 들어 있어서 게임에서 쓰지 못할 수도 있어요.",
+"Setting the bank to ${0} or less keeps everything spendable.": "은행 금액을 ${0} 이하로 설정하면 모든 돈을 쓸 수 있어요.",
+"Allow more than ${0} (experimental)": "${0} 초과 허용(실험적)",
+"May not be spendable": "쓰지 못할 수도 있음",
+"Amounts above ${0} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them.": "${0} 초과 금액은 추가 묶음에 들어가서 게임에서 쓰지 못할 수도 있어요. 한 플레이어는 이 돈으로 전화 결제를 하지 못했어요.",
+"Use it only if you’re fine with that.": "괜찮은 경우에만 사용하세요.",
+"The bank will be set to ${0}, all in its own money boxes, when you save edits.": "수정 사항을 저장하면 은행 금액을 ${0}에 맞추고, 전부 은행 자체 돈 상자에 넣어요.",
+"Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "최대 ${0}: 스토리의 현재 시점에서 은행 자체 돈 상자에 들어가는 금액이에요. 이 돈은 모두 상점에서 쓸 수 있어요. 한도는 스토리가 진행될수록 늘어나요.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "은행에 있는 ${1} 중 ${0}만큼은 추가 묶음에 들어 있어서 게임에서 쓰지 못할 수도 있어요. 은행 금액을 ${2} 이하로 설정하면 모든 돈을 쓸 수 있어요.",
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "최대 ${0}. ${1} 초과 금액은 추가 묶음에 들어가서 게임에서 쓰지 못할 수도 있어요. 한 플레이어는 이 돈으로 전화 결제를 하지 못했어요. 괜찮은 경우에만 사용하세요."
 }

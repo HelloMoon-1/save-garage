@@ -1272,6 +1272,8 @@ class H(BaseHTTPRequestHandler):
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
                 if not all(isinstance(v, list) for v in edits.values()):
                     raise ValueError('edits must be lists')
+                if any(isinstance(c, dict) and not isinstance(c.get('stacks', False), bool) for c in edits['money']):
+                    raise ValueError('stacks must be true or false')    # the bank's opt-in to its extra 85,000 stacks
                 if body.get('completion'):
                     c = body['completion']
                     if not isinstance(c, dict):

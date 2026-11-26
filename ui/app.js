@@ -559,25 +559,31 @@
 
   const riskTag = r => ({tested: '<span class="risk tested">Tested on PS5</span>', caution: '<span class="risk caution">Not tested yet</span>',
                          danger: '<span class="risk danger">Can break your save</span>', untested: '<span class="risk caution">Not tested on a PS5 yet</span>',
-                         experimental: '<span class="risk caution">Experimental, not tested on a PS5 yet</span>'})[r] || '';
+                         experimental: '<span class="risk caution">Experimental, not tested on a PS5 yet</span>',
+                         stacks: '<span class="risk caution">May not be spendable</span>'})[r] || '';
 
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
-    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}};
+    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}, stacksOn: {}};
     const a = s.applied || {};
     if (a.world) d.world = JSON.parse(JSON.stringify(a.world));
     if (a.completion) d.completion = JSON.parse(JSON.stringify(a.completion));
     if (a.guns) d.guns = JSON.parse(JSON.stringify(a.guns));
     for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
-    for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
+    for (const c of a.money || []) {
+      d.money[`${c.inv}:${c.idx}`] = c;
+      if (c.stacks) d.stacksOn[`${c.inv}:${c.idx}`] = true;       // saved with the bank's extra stacks: the box stays ticked
+    }
     for (const c of a.ammo || []) d.ammo[`${c.inv}:${c.idx}`] = c;
     for (const c of a.stats || []) d.stats[`${c.group}:${c.row}`] = c;
     S.drafts[s.file] = d;
   }
 
   const rawKey = (sec, path) => sec + ':' + JSON.stringify(path);
-  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}});
+  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}, stacksOn: {}});
+  // the bank's experimental extra stacks, ticked for this bank field ("inv:idx"); its changes then carry stacks: true
+  const stacksOn = (file, key) => !!draftOf(file).stacksOn?.[key];
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {})), guns: JSON.parse(JSON.stringify(d.guns || {}))});
   const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'cheats'].filter(k => c && c[k]).length;
@@ -633,24 +639,54 @@
   }
 
   // ---- money
+  // The bank goes up to what its own money boxes hold (max), which shops spend from. Past them it can take extra $85,000
+  // stacks (maxStacks), but only when the user ticks the experimental option: a player couldn't spend them (issue #8).
   function panelMoney(s) {
     const items = (s.items || []).filter(x => x.kind !== 'other');
     const name = x => ({bank: 'Bank account', savings: 'Family Savings', cash: 'Cash, ' + (x.inv === 0 ? 'Lucia' : 'Jason')})[x.kind];
+    // a bank already past its own boxes (versions 1.26 to 1.30 put the rest in extra stacks); stuck money has its own fix
+    const over = x => x.kind === 'bank' && !(x.stuck > 0) && x.value > x.max;
     const help = x => ({bank: x.stuck > 0
                           ? `BuckMe shows $${nf.format(x.value)}, but $${nf.format(x.stuck)} of it sits in Family Savings boxes that an older version of Save Garage put under the bank, and the game can’t spend it. Moving it puts as much as fits, up to $${nf.format(x.max)}, in the bank’s own money boxes.`
-                          : x.max > x.boxMax
-                          ? `Up to $${nf.format(x.max)}. The bank’s money boxes hold $${nf.format(x.boxMax)} at this point in the story. Above that, Save Garage adds stacks of up to $${nf.format(85000)} under the bank’s $${nf.format(85000)} box, as the game does when the bank fills up. Each stack takes an inventory slot, and ${nf.format(300)} slots are always left free. Stacks aren’t tested on a PS5 yet.`
-                          : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops only spend money from these boxes, so the editor doesn’t go past them. The limit grows as the story goes on.`,
+                          : over(x)
+                          ? `$${nf.format(x.value - x.max)} of the $${nf.format(x.value)} in the bank sits in extra stacks the game may not let you spend. Setting the bank to $${nf.format(x.max)} or less keeps everything spendable.`
+                          : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.`,
                         savings: `Up to $${nf.format(x.max)}.`, cash: `Up to $${nf.format(x.max)}, the size of the wallet.`})[x.kind];
+    const stacksOpt = (x, key, on) => `<div class="stacks-opt">
+        <div class="row"><label class="toggle small"><input type="checkbox" data-stacks="${key}" data-max="${x.max}" data-max-stacks="${x.maxStacks}" ${on ? 'checked' : ''}> Allow more than $${nf.format(x.max)} (experimental)</label>${riskTag('stacks')}</div>
+        <span class="help">Up to $${nf.format(x.maxStacks)}. Amounts above $${nf.format(x.max)} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.</span></div>`;
     return `
       <div class="group"><div class="section-head"><h2>Money</h2>${riskTag('tested')}
         <p>Balances of 0 aren’t stored in the save, so they don’t show here. Get a little money in the game, save, and download again to edit them.</p></div>
-      ${items.length ? `<div class="fields">${items.map(x => `
-        <div class="field"><div class="name">${esc(name(x))}<span class="help">${esc(help(x))}</span></div>
-          <div class="inputs">${cell({kind: 'money', key: `${x.inv}:${x.idx}`, label: 'Amount in dollars', value: x.value, display: String(x.value), unit: 'money', type: 'int', max: x.max, wide: true, money: true,
-            attrs: `data-inv="${x.inv}" data-idx="${x.idx}" data-label="${esc(name(x))}"`, extra: `<button class="btn small" data-act="fill" data-to="${x.max}">Max</button>`
-              + (x.stuck > 0 ? ` <button class="btn small primary" data-act="unstick" data-inv="${x.inv}" data-idx="${x.idx}" data-value="${x.value}" data-to="${Math.min(x.value, x.max)}">Make it spendable</button>` : '')})}</div></div>`).join('')}</div>`
+      ${items.length ? `<div class="fields">${items.map(x => {
+        const key = `${x.inv}:${x.idx}`, exp = x.kind === 'bank' && x.maxStacks > x.max, on = exp && stacksOn(s.file, key), lim = on ? x.maxStacks : x.max;
+        return `
+        <div class="field"><div class="name">${esc(name(x))}<span class="help${over(x) ? ' warn' : ''}">${esc(help(x))}</span></div>
+          <div class="inputs">${cell({kind: 'money', key, label: 'Amount in dollars', value: x.value, display: String(x.value), unit: 'money', type: 'int', max: lim, wide: true, money: true,
+            attrs: `data-inv="${x.inv}" data-idx="${x.idx}" data-label="${esc(name(x))}"`, extra: `<button class="btn small" data-act="fill" data-to="${lim}">Max</button>`
+              + (x.stuck > 0 ? ` <button class="btn small primary" data-act="unstick" data-inv="${x.inv}" data-idx="${x.idx}" data-value="${x.value}" data-to="${Math.min(x.value, x.max)}">Make it spendable</button>` : '')
+              + (over(x) ? ` <button class="btn small primary" data-act="unstack" data-to="${x.max}">Make it spendable</button>` : '')})}
+          ${exp ? stacksOpt(x, key, on) : ''}</div></div>`;
+      }).join('')}</div>`
         : '<div class="empty">This save has no money balances to edit.</div>'}</div>`;
+  }
+
+  // ticking the bank's extra stacks raises its field and Max to maxStacks, and its change asks for stacks; unticking
+  // brings an amount typed above the boxes back down to them
+  function onStacks(el) {
+    const s = slotOf(S.slot);
+    if (!s) return;
+    const d = draftOf(s.file), key = el.dataset.stacks, field = el.closest('.field');
+    d.stacksOn ??= {};
+    if (el.checked) d.stacksOn[key] = true; else delete d.stacksOn[key];
+    const input = field?.querySelector('input[data-edit="money"]'), fill = field?.querySelector('[data-act="fill"]');
+    const lim = el.checked ? el.dataset.maxStacks : el.dataset.max;
+    if (fill) fill.dataset.to = lim;
+    if (!input) return;
+    input.max = lim;
+    const v = fromDisplay(input.value, 'money', 'int');
+    if (!el.checked && input.value.trim() !== input.dataset.init && v != null && v > +el.dataset.max) input.value = el.dataset.max;
+    onEdit(input);
   }
 
   // ---- ammo
@@ -1670,7 +1706,7 @@
       const base = {value: orig, newValue, label: el.dataset.label || ''};
       d[bucket][key] = kind === 'stat'
         ? {group: el.dataset.group, row: +el.dataset.row, base: +el.dataset.base, qual: +el.dataset.qual, owner: +el.dataset.owner, ...base}
-        : {inv: +el.dataset.inv, idx: +el.dataset.idx, ...base};
+        : {inv: +el.dataset.inv, idx: +el.dataset.idx, ...base, ...(kind === 'money' && stacksOn(s.file, key) ? {stacks: true} : {})};
     }
     mark(cellEl, !same, el);
     if (kind === 'stat') updateTotal(el);
@@ -1761,6 +1797,16 @@
       d.money[`${b.dataset.inv}:${b.dataset.idx}`] = {inv: +b.dataset.inv, idx: +b.dataset.idx, value: +b.dataset.value, newValue: +b.dataset.to, label: 'Bank account (made spendable)'};
       toast('The bank money will be moved into the bank’s own boxes when you save edits.');
       renderPending(); renderCounts();
+      return;
+    }
+    if (a === 'unstack') {      // a bank past its own boxes, the rest in extra stacks: set it to what the boxes hold, stacks emptied
+      const field = b.closest('.field'), input = field?.querySelector('input[data-edit="money"]'), box = field?.querySelector('[data-stacks]');
+      if (!input) return;
+      if (box?.checked) { box.checked = false; onStacks(box); }
+      input.value = b.dataset.to; onEdit(input);
+      const c = draftOf(S.slot).money[input.dataset.key];
+      if (c) c.label = 'Bank account (made spendable)';
+      toast(`The bank will be set to $${nf.format(+b.dataset.to)}, all in its own money boxes, when you save edits.`);
       return;
     }
     if (a === 'fill') {
@@ -1934,6 +1980,7 @@
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.dataset.gun && el.type === 'checkbox') onGun(el);
+    if (el.dataset.stacks && el.type === 'checkbox') onStacks(el);
     if (el.dataset.edit && el.type === 'checkbox') onEdit(el);
     if (el.dataset.raw && el.type === 'checkbox') onRaw(el);
     if (el.dataset.find === 'varies' || el.dataset.find === 'named' || el.dataset.find === 'game') {

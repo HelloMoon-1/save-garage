@@ -1447,5 +1447,16 @@
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "رفض GarlicSaves تسجيل الدخول هذا. ربما أُوقف، أو ربما انتهت صلاحيته. سجّل الدخول مرة أخرى للمتابعة.",
 "Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "هل تريد تسجيل الخروج من GarlicSaves؟ سينسى Save Garage مفتاحه على هذا الحاسوب، وستحتاج إلى تسجيل الدخول مرة أخرى للإقران أو التنزيل أو حفظ التعديلات أو إرجاع ملفات الحفظ.",
 "Free software under the GNU GPL v3, with no warranty.": "برنامج حر بموجب رخصة GNU GPL v3، دون أي ضمان.",
-"Source and official releases": "الشيفرة المصدرية والإصدارات الرسمية"
+"Source and official releases": "الشيفرة المصدرية والإصدارات الرسمية",
+"Shops can spend all of it.": "يمكن إنفاقه كله في المتاجر.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend.": "من أصل ${1} في البنك، يوجد ${0} في رزم إضافية قد لا تسمح لك اللعبة بإنفاقها.",
+"Setting the bank to ${0} or less keeps everything spendable.": "ضبط البنك على ${0} أو أقل يُبقي كل المال قابلًا للإنفاق.",
+"Allow more than ${0} (experimental)": "السماح بأكثر من ${0} (تجريبي)",
+"May not be spendable": "قد لا يكون قابلًا للإنفاق",
+"Amounts above ${0} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them.": "تذهب المبالغ التي تتجاوز ${0} إلى رزم إضافية قد لا تسمح لك اللعبة بإنفاقها: لم يتمكن أحد اللاعبين من إجراء دفعة عبر الهاتف بها.",
+"Use it only if you’re fine with that.": "لا تستخدمه إلا إذا كان ذلك مقبولًا لديك.",
+"The bank will be set to ${0}, all in its own money boxes, when you save edits.": "سيُضبط البنك على ${0}، كله في صناديق المال الخاصة به، عندما تحفظ التعديلات.",
+"Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "حتى ${0}: ما تتسع له صناديق المال الخاصة بالبنك في هذه المرحلة من القصة. يمكن إنفاقه كله في المتاجر. يرتفع الحد مع تقدّم القصة.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "من أصل ${1} في البنك، يوجد ${0} في رزم إضافية قد لا تسمح لك اللعبة بإنفاقها. ضبط البنك على ${2} أو أقل يُبقي كل المال قابلًا للإنفاق.",
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "حتى ${0}. تذهب المبالغ التي تتجاوز ${1} إلى رزم إضافية قد لا تسمح لك اللعبة بإنفاقها: لم يتمكن أحد اللاعبين من إجراء دفعة عبر الهاتف بها. لا تستخدمه إلا إذا كان ذلك مقبولًا لديك."
 }

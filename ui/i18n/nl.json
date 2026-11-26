@@ -1447,5 +1447,16 @@
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSaves heeft deze aanmelding geweigerd. Misschien is die uitgeschakeld, of is die verlopen. Meld je opnieuw aan om verder te gaan.",
 "Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "Afmelden bij GarlicSaves? Save Garage vergeet zijn sleutel op deze computer, en je moet je opnieuw aanmelden om te koppelen, te downloaden, wijzigingen op te slaan of savegames terug te sturen.",
 "Free software under the GNU GPL v3, with no warranty.": "Vrije software onder de GNU GPL v3, zonder garantie.",
-"Source and official releases": "Broncode en officiële releases"
+"Source and official releases": "Broncode en officiële releases",
+"Shops can spend all of it.": "In winkels kun je dit allemaal uitgeven.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend.": "Van de ${1} op de bank zit ${0} in extra stapels die je in de game misschien niet kunt uitgeven.",
+"Setting the bank to ${0} or less keeps everything spendable.": "Als je de bank op ${0} of minder zet, blijft alles uitgeefbaar.",
+"Allow more than ${0} (experimental)": "Meer dan ${0} toestaan (experimenteel)",
+"May not be spendable": "Misschien niet uitgeefbaar",
+"Amounts above ${0} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them.": "Bedragen boven ${0} gaan naar extra stapels die je in de game misschien niet kunt uitgeven: een speler kon er geen betaling via de telefoon mee doen.",
+"Use it only if you’re fine with that.": "Gebruik dit alleen als je dat geen probleem vindt.",
+"The bank will be set to ${0}, all in its own money boxes, when you save edits.": "De bank wordt op ${0} gezet als je de wijzigingen opslaat, alles in de eigen geldvakken van de bank.",
+"Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "Tot ${0}: wat de eigen geldvakken van de bank op dit punt in het verhaal kunnen bevatten. In winkels kun je dit allemaal uitgeven. De limiet groeit naarmate het verhaal vordert.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "Van de ${1} op de bank zit ${0} in extra stapels die je in de game misschien niet kunt uitgeven. Als je de bank op ${2} of minder zet, blijft alles uitgeefbaar.",
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "Tot ${0}. Bedragen boven ${1} gaan naar extra stapels die je in de game misschien niet kunt uitgeven: een speler kon er geen betaling via de telefoon mee doen. Gebruik dit alleen als je dat geen probleem vindt."
 }

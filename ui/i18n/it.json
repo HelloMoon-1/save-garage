@@ -1447,5 +1447,16 @@
 "GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.": "GarlicSaves ha rifiutato questo accesso. Potrebbe essere stato disattivato o essere scaduto. Accedi di nuovo per continuare.",
 "Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.": "Uscire da GarlicSaves? Save Garage dimentica la sua chiave su questo computer, e dovrai accedere di nuovo per associare, scaricare, salvare le modifiche o reinviare i salvataggi.",
 "Free software under the GNU GPL v3, with no warranty.": "Software libero sotto la GNU GPL v3, senza garanzia.",
-"Source and official releases": "Codice sorgente e versioni ufficiali"
+"Source and official releases": "Codice sorgente e versioni ufficiali",
+"Shops can spend all of it.": "Puoi spenderlo tutto nei negozi.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend.": "Dei ${1} in banca, ${0} si trovano in pile aggiuntive che il gioco potrebbe non farti spendere.",
+"Setting the bank to ${0} or less keeps everything spendable.": "Impostando la banca a ${0} o meno, tutto resta spendibile.",
+"Allow more than ${0} (experimental)": "Consenti più di ${0} (sperimentale)",
+"May not be spendable": "Potrebbe non essere spendibile",
+"Amounts above ${0} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them.": "Gli importi oltre ${0} finiscono in pile aggiuntive che il gioco potrebbe non farti spendere: un giocatore non è riuscito a fare un pagamento col telefono con quei soldi.",
+"Use it only if you’re fine with that.": "Usalo solo se ti va bene.",
+"The bank will be set to ${0}, all in its own money boxes, when you save edits.": "La banca verrà impostata a ${0}, tutta negli scomparti di denaro propri della banca, quando salverai le modifiche.",
+"Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "Fino a ${0}: quanto possono contenere gli scomparti di denaro propri della banca a questo punto della storia. Puoi spenderlo tutto nei negozi. Il limite aumenta man mano che la storia va avanti.",
+"${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "Dei ${1} in banca, ${0} si trovano in pile aggiuntive che il gioco potrebbe non farti spendere. Impostando la banca a ${2} o meno, tutto resta spendibile.",
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "Fino a ${0}. Gli importi oltre ${1} finiscono in pile aggiuntive che il gioco potrebbe non farti spendere: un giocatore non è riuscito a fare un pagamento col telefono con quei soldi. Usalo solo se ti va bene."
 }
