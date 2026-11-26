@@ -1462,6 +1462,31 @@
   const fmtChange = v => typeof v === 'boolean' ? (v ? 'yes' : 'no') : typeof v === 'number' ? (Number.isInteger(v) ? nf.format(v) : nf2.format(v)) : String(v);
 
   // ------------------------------------------------------------ job box
+  const queueStatus = {
+    pending: 'Waiting on this computer', submitting: 'Submitting', queued: 'Queued at GarlicSaves',
+    running: 'Processing', receiving: 'Fetching result', done: 'Completed', failed: 'Failed',
+    skipped: 'Not submitted', interrupted: 'Interrupted', rate_limited: 'Rate limited',
+    key_disabled: 'Key refused', bad_request: 'Request rejected'
+  };
+  function serviceQueue(job) {
+    const rows = job.serviceQueue || [];
+    if (!rows.length) return '';
+    const ops = {key: 'Transfer key', decrypt: 'Decrypt', encrypt: 'Encrypt'};
+    const items = rows.map(r => {
+      const slot = r.slot === 'sdimg_sce_sdmemory' ? T('Autosave') : (r.slot || '').replace(/^sdimg_SAVEDATA/, '');
+      const suffix = r.operation === 'key' ? ` #${r.group}.${r.attempt}` : ' · ' + slot;
+      const sec = r.waitSeconds;
+      const wait = r.status === 'queued' && Number.isInteger(sec) && sec >= 0
+        ? ` <time>${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}</time>` : '';
+      return `<li><span>${esc(T(ops[r.operation] || 'GarlicSaves'))}${esc(suffix)}</span>
+        <span class="queue-state" data-state="${esc(r.status)}">${esc(T(queueStatus[r.status] || 'Unknown'))}${wait}</span></li>`;
+    }).join('');
+    const hint = rows.some(r => r.status === 'queued')
+      ? `<p>${esc(T('Waiting for a free worker. This page updates automatically. The timer shows how long you have waited.'))}</p>` : '';
+    return `<section class="service-queue"><strong>${esc(T('GarlicSaves queue on this computer'))}</strong>${hint}
+      <ul>${items}</ul></section>`;
+  }
+
   function renderJob() {
     const st = S.state;
     if (!st) return;
@@ -1488,16 +1513,16 @@
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
             ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'key_rate_wait', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
-            ${logBlock(job)}</div>`;
+            ${serviceQueue(job)}${logBlock(job)}</div>`;
         } else if (job.status === 'error') {
           const code = job.error?.code || 'internal';
           const detail = job.error?.detail || '';
           const perm = /PermissionError/.test(detail);
           html = `<div class="job err"><div class="stage">${esc(ERR[code] || ERR.internal)}</div>
             ${perm ? '<div class="detail">This computer isn’t allowed to use ports 1004 to 1006. On Linux, run sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1004 in a terminal, then try again.</div>' : ''}
-            ${detail && !perm ? `<div class="detail">${esc(detail)}</div>` : ''}${logBlock(job)}</div>`;
+            ${detail && !perm ? `<div class="detail">${esc(detail)}</div>` : ''}${serviceQueue(job)}${logBlock(job)}</div>`;
         } else if (job.status === 'done') {
-          html = `<div class="job ok"><div class="stage">${esc(stage)}</div></div>`;
+          html = `<div class="job ok"><div class="stage">${esc(stage)}</div>${serviceQueue(job)}</div>`;
         }
       }
       if (box.innerHTML !== html) {
@@ -1519,7 +1544,9 @@
     const n = editCount(d);
     const isDirty = dirty(s);
     const busy = running();
-    if (!n && !s.modified) { pendingEl.hidden = true; return; }
+    const job = st.job || {};
+    const showPatch = job.kind === 'patch' && (busy || job.status === 'error');
+    if (!n && !s.modified && !showPatch) { pendingEl.hidden = true; return; }
     const w = d.world || {}, now = S.world[s.file], P = now?.player, F = now?.fog;
     const who = k => P?.characters?.find(x => x.key === k);
     const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
@@ -1556,7 +1583,7 @@
     const gunList = Object.entries(d.guns || {}).filter(([, v]) => (v || []).length)
       .map(([k, v]) => ({label: `Guns added (${k === 'lucia' ? 'Lucia' : 'Jason'})`, value: '', newValue: v.length}));
     const list = [...Object.values(d.money), ...Object.values(d.ammo), ...gunList, ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
-    const html = !n && s.modified && !isDirty
+    const html = !n && !s.modified ? '' : !n && s.modified && !isDirty
       ? `<div class="sum">Edits waiting to be sent<small><span data-no-i18n>${esc(missionName(s))}.</span> They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
       : isDirty
@@ -1568,9 +1595,8 @@
          <div class="row"><button class="btn small" data-act="review">${S.reviewOpen ? 'Hide list' : 'Review'}</button>
            <button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`;
     const review = S.reviewOpen ? `<ul class="review">${list.map(c => `<li><span>${esc(c.label || 'Change')}</span><span>${esc(fmtChange(c.value))} to ${esc(fmtChange(c.newValue))}</span></li>`).join('')}</ul>` : '';
-    const job = st.job || {};
     const jobLine = job.kind === 'patch' && job.status !== 'idle' && !(job.status === 'done' && !isDirty)
-      ? `<div style="flex-basis:100%">${job.status === 'error' ? `<span class="risk danger">${esc(ERR[job.error?.code] || ERR.internal)}</span>` : `<span class="risk caution">${esc(STAGE[job.stage] || job.stage)}</span>`}</div>` : '';
+      ? `<div style="flex-basis:100%">${job.status === 'error' ? `<span class="risk danger">${esc(ERR[job.error?.code] || ERR.internal)}</span>` : `<span class="risk caution">${esc(STAGE[job.stage] || job.stage)}</span>`}${serviceQueue(job)}</div>` : '';
     const full = html + jobLine + review;
     if (pendingEl.dataset.html !== full) { pendingEl.innerHTML = full; pendingEl.dataset.html = full; }
     pendingEl.hidden = false;

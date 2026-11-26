@@ -137,6 +137,14 @@ p { margin: 0; }
 .job.err .stage::before { background: var(--stop); }
 .job.err .stage { font: 600 16px/1.45 var(--body); }
 .job .detail { color: var(--text-2); font-size: 14px; margin-top: 6px; }
+.service-queue { margin-top: 12px; border-top: 1px solid var(--hairline); padding-top: 10px; font: 14px/1.45 var(--body); }
+.service-queue p { margin: 3px 0 6px; color: var(--text-2); }
+.service-queue ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.service-queue li { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; padding: 3px 0; }
+.queue-state { color: var(--text-2); }
+.queue-state[data-state="queued"] { color: var(--edit); }
+.queue-state[data-state="done"] { color: var(--go); }
+.queue-state time { margin-inline-start: 5px; font-variant-numeric: tabular-nums; }
 .bar { height: 4px; background: var(--dusk-3); border-radius: 2px; margin-top: 12px; overflow: hidden; }
 .bar span { display: block; height: 100%; width: 35%; background: var(--edit); border-radius: 2px; animation: slide 1.5s ease-in-out infinite; }
 .bar.fixed span { animation: none; transition: width .3s ease-out; }

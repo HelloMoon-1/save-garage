@@ -6,6 +6,8 @@ bodies are JSON. Long tasks run in the background: a POST returns at once and pr
 
 ## GET /api/state
 
+`job.serviceQueue` lists this operation’s local slots and outstanding key-service requests. A slot row has `operation` (`decrypt` or `encrypt`), `slot`, `status`, and `waitSeconds`. Key requests use `operation: "key"` with local `group` and `attempt` numbers. `pending` means the slot is still on this computer. `queued` means GarlicSaves reported a queue, and `waitSeconds` measures time since that report. `running` means a worker took the job. The worker API does not publish a global queue position. A new operation starts a fresh list.
+
 The whole app state, polled about once a second by the UI.
 
 ```jsonc
@@ -25,7 +27,7 @@ The whole app state, polled about once a second by the UI.
     "applied": {"money": [], "ammo": [], "stats": []} | null
   }],
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
-          "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": []},
+          "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": [], "serviceQueue": []},
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
   "version": "1.29.1",
   "canQuit": false                                    // true in the desktop builds

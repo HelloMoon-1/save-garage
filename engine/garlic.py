@@ -65,6 +65,7 @@ class Derivation:
         self.started = time.monotonic()
         self.requests = 0
         self.statuses = {}                      # request number -> the last thing seen of it (Garlic.derive's on_status)
+        self.queued_at = {}
         self.retry_after = None                 # the wait GarlicSaves asked for when it rate limited a request, in seconds
         self.limited_at = None                  # when it did, a time.monotonic() value
         self.answered = None                    # True: answered, False: gave up, None: still waiting
@@ -78,9 +79,20 @@ class Derivation:
     def saw(self, n, status, retry_after=None):
         """What became of request n: Garlic.derive's on_status."""
         with self._lock:
+            if status == 'queued' and self.statuses.get(n) != 'queued':
+                self.queued_at[n] = time.monotonic()
             self.statuses[n] = status
             if status == 'rate_limited':
                 self.retry_after, self.limited_at = retry_after, time.monotonic()
+
+    def active_rows(self, now):
+        """Public progress for this computer's outstanding requests; no service IDs or key material."""
+        with self._lock:
+            if self.answered is not None or self.reported:
+                return []
+            return [{'operation': 'key', 'attempt': n + 1, 'status': status,
+                     'waitSeconds': max(0, int(now - self.queued_at[n])) if status == 'queued' else None}
+                    for n, status in sorted(self.statuses.items()) if status in ('queued', 'running')]
 
     # why a derivation gave no keys, from what its requests got, the first that applies: a refusal, a worker that took
     # the request and didn't finish it, a worker that failed it, requests nobody took, requests that got no answer
@@ -271,7 +283,7 @@ class Garlic:
             time.sleep(1.5)
         raise GarlicError('job timed out')
 
-    def _submit(self, fields, file_path, filename):
+    def _submit(self, fields, file_path, filename, on_status=None):
         args = ['-X', 'POST', self.server + '/api/v1/jobs']
         for k, v in fields.items():
             args += ['--form-string', '%s=%s' % (k, v)]
@@ -283,6 +295,8 @@ class Garlic:
             try:
                 j = self._json(args)
                 if j.get('job_id'):
+                    if on_status and j.get('status') in self.STATUSES:
+                        on_status(j['status'])
                     return j['job_id']
                 last = GarlicError(j.get('error') or 'no job id')
             except GarlicRefused:
@@ -309,7 +323,7 @@ class Garlic:
 
     def decrypt(self, image_path, out_dir, on_status=None):
         """Encrypted image -> extracted into out_dir; returns the top-level folder."""
-        jid = self._submit({'operation': 'decrypt', 'include_sce_sys': 'true', 'platform': 'ps5'}, image_path, os.path.basename(image_path))
+        jid = self._submit({'operation': 'decrypt', 'include_sce_sys': 'true', 'platform': 'ps5'}, image_path, os.path.basename(image_path), on_status)
         self._wait(jid, on_status=on_status)
         z = os.path.join(out_dir, os.path.basename(image_path) + '.zip')
         os.makedirs(out_dir, exist_ok=True)
@@ -325,7 +339,7 @@ class Garlic:
         return os.path.join(out_dir, top)
 
     def encrypt(self, workspace_zip, account_id_hex, out_path, on_status=None):
-        jid = self._submit({'operation': 'encrypt', 'account_id': account_id_hex, 'platform': 'ps5'}, workspace_zip, 'workspace.zip')
+        jid = self._submit({'operation': 'encrypt', 'account_id': account_id_hex, 'platform': 'ps5'}, workspace_zip, 'workspace.zip', on_status)
         self._wait(jid, on_status=on_status)
         z = out_path + '.zip'
         self._result(jid, z)
@@ -364,8 +378,9 @@ class Garlic:
                 j = self._json(['-X', 'POST', self.server + '/api/v1/jobs', '-F', 'operation=ppr_derive',
                                 '-F', 'client_value=' + client_hex, '-F', 'server_value=' + server_hex], timeout=40)
                 jid = j['job_id']; t0 = time.time()
-                last = j.get('status') if j.get('status') in self.STATUSES else 'queued'
-                tell(n, last)
+                last = j.get('status') if j.get('status') in self.STATUSES else None
+                if last is not None:
+                    tell(n, last)
                 while time.time() - t0 < timeout and not done.is_set():
                     s = self._json([self.server + '/api/v1/jobs/' + jid], timeout=30).get('status')
                     if s != last and s in self.STATUSES:

@@ -2,6 +2,7 @@
 import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
+from contextlib import contextmanager
 from urllib.parse import urlsplit, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import money, garlic, savedit
@@ -60,6 +61,8 @@ CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account pick
 CANCEL = threading.Event()                                  # set by /api/cancel, so a job waiting between tries stops
 PROC = {'p': None}
 RELAY = {'r': None}
+SERVICE_SLOTS = {}  # insertion order is the local submission order for this job
+JOB_STARTED = 0.0
 
 
 def log(msg):
@@ -124,11 +127,14 @@ GARLIC_REFUSED = {'rate_limited': 'garlic_rate_limited', 'key_disabled': 'garlic
 
 
 def start_job(kind, fn):
+    global JOB_STARTED
     with LOCK:
         if JOB['status'] == 'running':
             raise Fail('busy')
         JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None,
                    wait=None, log=[])
+        JOB_STARTED = time.monotonic()
+        SERVICE_SLOTS.clear()
         CANCEL.clear()
 
     def failed(code, detail):
@@ -305,10 +311,57 @@ def sfo_fields(path):
     return out
 
 
+@contextmanager
+def service_slot(name):
+    """Follow one slot through submit, remote queue, processing and local result retrieval."""
+    with LOCK:
+        row = SERVICE_SLOTS[name]
+        row['status'] = 'submitting'
+
+    def status(remote):
+        if remote not in G.STATUSES:
+            return
+        state = 'receiving' if remote == 'done' else remote
+        with LOCK:
+            if row['status'] == state:
+                return
+            row.update(status=state, queuedAt=time.monotonic() if state == 'queued' else None)
+            log('%s %s: %s' % (row['operation'], name, remote))
+
+    try:
+        yield status
+    except Exception as exc:
+        with LOCK:
+            if row['status'] != 'failed':
+                row['status'] = exc.reason if isinstance(exc, garlic.GarlicRefused) else 'interrupted'
+        raise
+    else:
+        with LOCK:
+            row['status'] = 'done'
+
+
+def service_queue():
+    """Snapshot for /api/state. The caller holds LOCK; elapsed times use the server clock."""
+    now = time.monotonic()
+    rows = []
+    relay_instance = RELAY['r']
+    if relay_instance and JOB['status'] == 'running' and JOB['kind'] in ('pair', 'download', 'upload'):
+        for index, request in enumerate(relay_instance.derivations.since(JOB_STARTED), 1):
+            rows.extend(dict(row, group=index) for row in request.active_rows(now))
+    for name, row in SERVICE_SLOTS.items():
+        state = row['status']
+        if state == 'pending' and JOB['status'] == 'error':
+            state = 'skipped'
+        rows.append({'operation': row['operation'], 'slot': name, 'status': state,
+                     'waitSeconds': max(0, int(now - row['queuedAt'])) if state == 'queued' else None})
+    return rows
+
+
 def load_slot(sess, name, enc_path):
     """Decrypt one save slot and read its balances."""
     dec_root = sess / 'dec'
-    top = Path(G.decrypt(str(enc_path), str(dec_root), on_status=lambda s: log('decrypt %s: %s' % (name, s))))
+    with service_slot(name) as report:
+        top = Path(G.decrypt(str(enc_path), str(dec_root), on_status=report))
     return read_slot(name, top)
 
 
@@ -714,11 +767,13 @@ def job_download():
     (sess / 'orig').mkdir()
     for f in imgs:
         shutil.copyfile(f, sess / 'orig' / f.name)
+    images = [f for f in imgs if SLOT_RE.fullmatch(f.name)]
+    with LOCK:
+        SERVICE_SLOTS.update((f.name, {'operation': 'decrypt', 'status': 'pending'}) for f in images)
     stage('decrypting')
     slots = []
-    for f in imgs:
-        if SLOT_RE.fullmatch(f.name):
-            slots.append(load_slot(sess, f.name, f))
+    for f in images:
+        slots.append(load_slot(sess, f.name, f))
     if not slots:
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
@@ -766,7 +821,10 @@ def job_patch(slot_file, edits):
                 zf.write(fp, fp.relative_to(mod.parent).as_posix())
     stage('encrypting')
     enc = sess / 'enc'; enc.mkdir(exist_ok=True)
-    out = G.encrypt(str(z), slot['account'], str(enc / slot['file']), on_status=lambda s: log('encrypt: ' + s))
+    with LOCK:
+        SERVICE_SLOTS[slot['file']] = {'operation': 'encrypt', 'status': 'pending'}
+    with service_slot(slot['file']) as report:
+        out = G.encrypt(str(z), slot['account'], str(enc / slot['file']), on_status=report)
     stage('importing')
     run_tool(['poc.dt_local_saves', 'import', str(sess / 'lib'), str(STATE['entryId']), slot['file'], out])
     (sess / 'mod' / (slot['file'] + '.edits.json')).write_text(json.dumps(edits), 'utf-8')
@@ -865,6 +923,7 @@ def public_state():
         if s['console']:
             s['console']['sameSubnet'] = same_subnet(s['console']['host'])
         s['job'] = json.loads(json.dumps(JOB)); s['job']['log'] = s['job']['log'][-40:]
+        s['job']['serviceQueue'] = service_queue()
         s['titles'] = GTA_TITLES
         s['canQuit'] = DESKTOP
         s['version'] = VERSION
