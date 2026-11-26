@@ -1,4 +1,10 @@
 {
+"Save time": "Время сохранения",
+"Save time unavailable": "Время сохранения неизвестно",
+"Queue position": "Место в очереди",
+"Queued across GarlicSaves": "Всего задач в очереди GarlicSaves",
+"Server queue figures unavailable": "Данные очереди недоступны",
+"View queue on GarlicSaves": "Посмотреть очередь на GarlicSaves",
 "Waiting on this computer": "Ожидает отправки с компьютера",
 "Submitting": "Отправка",
 "Queued at GarlicSaves": "В очереди GarlicSaves",

@@ -2,10 +2,10 @@
 import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from urllib.parse import urlsplit, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import money, garlic, savedit
+import money, garlic, savedit, service_rank
 
 FROZEN = getattr(sys, 'frozen', False)
 # Desktop mode (packaged builds, or the portable launchers set SAVEGARAGE_DESKTOP=1): per-user data folder,
@@ -52,6 +52,7 @@ try:
 except Exception:
     pass
 G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
+RANKS = service_rank.QueueRanks(G, os.environ.get('GARLIC_QUEUE_COOKIE_FILE') or CFG.get('queueCookieFile'))
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
          'slots': [], 'readyToUpload': False, 'network': None}
@@ -353,16 +354,47 @@ def service_queue():
         if state == 'pending' and JOB['status'] == 'error':
             state = 'skipped'
         rows.append({'operation': row['operation'], 'slot': name, 'status': state,
+                     'queueJob': row.get('jobId') if state == 'queued' else None,
                      'waitSeconds': max(0, int(now - row['queuedAt'])) if state == 'queued' else None})
+    for row in rows:
+        job_id = row.pop('queueJob', None)
+        if job_id:
+            row.update(RANKS.snapshot(job_id))
     return rows
 
 
-def load_slot(sess, name, enc_path):
-    """Decrypt one save slot and read its balances."""
-    dec_root = sess / 'dec'
-    with service_slot(name) as report:
-        top = Path(G.decrypt(str(enc_path), str(dec_root), on_status=report))
-    return read_slot(name, top)
+def remember_service_job(name, job_id):
+    with LOCK:
+        SERVICE_SLOTS[name]['jobId'] = job_id
+
+
+def decrypt_slots(sess, images):
+    slots = []
+    start = 0
+    while start < len(images):
+        end, size = start, 0
+        while end < len(images) and end - start < 64:
+            added = images[end].stat().st_size
+            if end > start and size + added > 64 * 1024 * 1024:
+                break
+            end += 1
+            size += added
+        batch = images[start:end]
+        with ExitStack() as stack:
+            reports = [stack.enter_context(service_slot(p.name)) for p in batch]
+
+            def report(status):
+                for update in reports:
+                    update(status)
+
+            def remember(jid):
+                for path in batch:
+                    remember_service_job(path.name, jid)
+
+            G.decrypt_batch(batch, sess / 'dec', report, remember)
+        slots.extend(read_slot(p.name, sess / 'dec' / p.name) for p in batch)
+        start = end
+    return slots
 
 
 # sce_sdmemory is the game's autosave (what Continue loads); its memory.dat has the same format as manual saves
@@ -771,9 +803,7 @@ def job_download():
     with LOCK:
         SERVICE_SLOTS.update((f.name, {'operation': 'decrypt', 'status': 'pending'}) for f in images)
     stage('decrypting')
-    slots = []
-    for f in images:
-        slots.append(load_slot(sess, f.name, f))
+    slots = decrypt_slots(sess, images)
     if not slots:
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
@@ -824,7 +854,8 @@ def job_patch(slot_file, edits):
     with LOCK:
         SERVICE_SLOTS[slot['file']] = {'operation': 'encrypt', 'status': 'pending'}
     with service_slot(slot['file']) as report:
-        out = G.encrypt(str(z), slot['account'], str(enc / slot['file']), on_status=report)
+        out = G.encrypt(str(z), slot['account'], str(enc / slot['file']), on_status=report,
+                        on_job=lambda jid: remember_service_job(slot['file'], jid))
     stage('importing')
     run_tool(['poc.dt_local_saves', 'import', str(sess / 'lib'), str(STATE['entryId']), slot['file'], out])
     (sess / 'mod' / (slot['file'] + '.edits.json')).write_text(json.dumps(edits), 'utf-8')

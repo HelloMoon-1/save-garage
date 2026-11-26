@@ -8,6 +8,8 @@ bodies are JSON. Long tasks run in the background: a POST returns at once and pr
 
 `job.serviceQueue` lists this operation’s local slots and outstanding key-service requests. A slot row has `operation` (`decrypt` or `encrypt`), `slot`, `status`, and `waitSeconds`. Key requests use `operation: "key"` with local `group` and `attempt` numbers. `pending` means the slot is still on this computer. `queued` means GarlicSaves reported a queue, and `waitSeconds` measures time since that report. `running` means a worker took the job. The worker API does not publish a global queue position. A new operation starts a fresh list.
 
+Queued rows for the official service can include `queueUrl`, shared across slots in the same batch. With an authorized website session, `queuePosition` and `queueTotal` come from the official queue endpoint. Zero position means the endpoint counted no queued task up to this job. Missing numbers mean no current figures are available. Each slot’s `savedAt` is the in-game save timestamp in Unix seconds, or null when unavailable.
+
 The whole app state, polled about once a second by the UI.
 
 ```jsonc

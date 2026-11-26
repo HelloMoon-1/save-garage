@@ -1,4 +1,10 @@
 {
+"Save time": "وقت الحفظ",
+"Save time unavailable": "وقت الحفظ غير متاح",
+"Queue position": "الموضع في قائمة الانتظار",
+"Queued across GarlicSaves": "إجمالي المهام المنتظرة في GarlicSaves",
+"Server queue figures unavailable": "أرقام قائمة الانتظار غير متاحة",
+"View queue on GarlicSaves": "عرض قائمة الانتظار على GarlicSaves",
 "Waiting on this computer": "بانتظار الإرسال من هذا الكمبيوتر",
 "Submitting": "جارٍ الإرسال",
 "Queued at GarlicSaves": "في قائمة انتظار GarlicSaves",

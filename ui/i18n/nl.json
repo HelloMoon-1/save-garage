@@ -1,4 +1,10 @@
 {
+"Save time": "Opslagtijd",
+"Save time unavailable": "Opslagtijd onbekend",
+"Queue position": "Positie in de wachtrij",
+"Queued across GarlicSaves": "Wachtende taken op GarlicSaves",
+"Server queue figures unavailable": "Geen wachtrijgegevens beschikbaar",
+"View queue on GarlicSaves": "Bekijk de wachtrij op GarlicSaves",
 "Waiting on this computer": "Wacht lokaal op verzending",
 "Submitting": "Wordt verzonden",
 "Queued at GarlicSaves": "In de wachtrij bij GarlicSaves",

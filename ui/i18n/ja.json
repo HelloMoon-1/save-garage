@@ -1,4 +1,10 @@
 {
+"Save time": "保存日時",
+"Save time unavailable": "保存日時を取得できません",
+"Queue position": "待機順位",
+"Queued across GarlicSaves": "GarlicSaves 全体の待機件数",
+"Server queue figures unavailable": "サーバーの待機件数を取得できません",
+"View queue on GarlicSaves": "GarlicSaves で待機順位を確認",
 "Waiting on this computer": "この端末で送信待ち",
 "Submitting": "送信中",
 "Queued at GarlicSaves": "GarlicSaves で順番待ち",

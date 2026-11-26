@@ -1,4 +1,10 @@
 {
+"Save time": "Data del salvataggio",
+"Save time unavailable": "Data del salvataggio non disponibile",
+"Queue position": "Posizione in coda",
+"Queued across GarlicSaves": "Operazioni in coda su GarlicSaves",
+"Server queue figures unavailable": "Dati della coda non disponibili",
+"View queue on GarlicSaves": "Vedi la coda su GarlicSaves",
 "Waiting on this computer": "In attesa di invio dal computer",
 "Submitting": "Invio in corso",
 "Queued at GarlicSaves": "In coda su GarlicSaves",

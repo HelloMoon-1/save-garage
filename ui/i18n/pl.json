@@ -1,4 +1,10 @@
 {
+"Save time": "Czas zapisu",
+"Save time unavailable": "Czas zapisu niedostępny",
+"Queue position": "Miejsce w kolejce",
+"Queued across GarlicSaves": "Zadania w kolejce GarlicSaves",
+"Server queue figures unavailable": "Dane kolejki niedostępne",
+"View queue on GarlicSaves": "Sprawdź kolejkę na GarlicSaves",
 "Waiting on this computer": "Oczekuje na wysłanie z komputera",
 "Submitting": "Wysyłanie",
 "Queued at GarlicSaves": "W kolejce GarlicSaves",

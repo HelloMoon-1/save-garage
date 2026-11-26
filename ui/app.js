@@ -346,6 +346,17 @@
     return parts.join(', ');
   }
 
+  function saveTime(slot) {
+    if (!Number.isSafeInteger(slot.savedAt) || slot.savedAt <= 0) return '';
+    const date = new Date(slot.savedAt * 1000);
+    if (!Number.isFinite(date.getTime())) return '';
+    const day = [date.getFullYear(), two(date.getMonth() + 1), two(date.getDate())].join('-');
+    const clock = [date.getHours(), date.getMinutes(), date.getSeconds()].map(two).join(':');
+    const offset = -date.getTimezoneOffset();
+    const zone = 'UTC' + (offset < 0 ? '−' : '+') + two(Math.floor(Math.abs(offset) / 60)) + ':' + two(Math.abs(offset) % 60);
+    return `<time data-no-i18n datetime="${date.toISOString()}">${day} ${clock} ${zone}</time>`;
+  }
+
   function viewEdit() {
     const st = S.state;
     const s = slotOf(S.slot);
@@ -353,11 +364,12 @@
     const tabs = [['known', 'Known save fields'], ['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1 data-no-i18n>${esc(missionName(s))}</h1>
+        <p><span>Save time</span> · <strong>${saveTime(s) || '<span>Save time unavailable</span>'}</strong></p>
         ${st.user?.name ? `<p>PS5 account: <strong>${esc(st.user.name)}</strong></p>` : ''}
         <p>${moneySummary(s) || 'No money balances in this save'}.${overallOf(s) != null ? ` 100% completion: <strong>${nf2.format(overallOf(s))}%</strong>${afterOf(s) != null ? `, <strong class="gold">${nf2.format(afterOf(s))}%</strong> after your edits` : ''}.` : ''}${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
       <div class="saves" role="group" aria-label="Choose a save">${sortedSlots(st).map(x => `
         <button class="save" data-act="slot" data-file="${esc(x.file)}" aria-pressed="${x.file === s.file}">
-          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span>${x.savedAt ? `<small data-no-i18n>${esc(new Date(x.savedAt*1000).toLocaleString())}</small>` : ''}${x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
+          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span><small>${saveTime(x) || '<span>Save time unavailable</span>'}</small>${x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
       <div class="editor">
         <div class="tabs" role="tablist" aria-label="What to edit">${tabs.map(([id, name]) => `
           <button role="tab" aria-selected="${S.tab === id}" data-act="tab" data-tab="${id}">${name}<span class="count" data-count="${id}"></span></button>`).join('')}</div>
@@ -1472,18 +1484,38 @@
     const rows = job.serviceQueue || [];
     if (!rows.length) return '';
     const ops = {key: 'Transfer key', decrypt: 'Decrypt', encrypt: 'Encrypt'};
-    const items = rows.map(r => {
-      const slot = r.slot === 'sdimg_sce_sdmemory' ? T('Autosave') : (r.slot || '').replace(/^sdimg_SAVEDATA/, '');
-      const suffix = r.operation === 'key' ? ` #${r.group}.${r.attempt}` : ' · ' + slot;
+    const groups = new Map();
+    for (const r of rows) {
+      const group = r.operation === 'decrypt' && r.queueUrl ? r.queueUrl : r;
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push(r);
+    }
+    const items = Array.from(groups.values(), group => {
+      const r = group[0];
+      const slots = group.map(x => x.slot === 'sdimg_sce_sdmemory' ? T('Autosave') : (x.slot || '').replace(/^sdimg_SAVEDATA/, ''));
+      const suffix = r.operation === 'key' ? ` #${r.group}.${r.attempt}` : ' · ' + slots.join(', ');
       const sec = r.waitSeconds;
       const wait = r.status === 'queued' && Number.isInteger(sec) && sec >= 0
         ? ` <time>${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}</time>` : '';
+      let rank = '';
+      if (r.status === 'queued') {
+        if (Number.isInteger(r.queueTotal) && r.queueTotal >= 0) {
+          const position = r.queuePosition > 0 ? `${esc(T('Queue position'))} <b>${r.queuePosition}</b> · ` : '';
+          rank = `<small>${position}${esc(T('Queued across GarlicSaves'))} <b>${r.queueTotal}</b></small>`;
+        } else {
+          rank = `<small>${esc(T('Server queue figures unavailable'))}</small>`;
+        }
+        if (/^https:\/\/(?:www\.)?garlicsaves\.com\/jobs\/[\w-]+\/queue$/.test(r.queueUrl || '')) {
+          rank += ` <a href="${esc(r.queueUrl)}" target="_blank" rel="noopener noreferrer">${esc(T('View queue on GarlicSaves'))}</a>`;
+        }
+      }
       return `<li><span>${esc(T(ops[r.operation] || 'GarlicSaves'))}${esc(suffix)}</span>
-        <span class="queue-state" data-state="${esc(r.status)}">${esc(T(queueStatus[r.status] || 'Unknown'))}${wait}</span></li>`;
+        <span class="queue-state" data-state="${esc(r.status)}">${esc(T(queueStatus[r.status] || 'Unknown'))}${wait}${rank}</span></li>`;
     }).join('');
     const hint = rows.some(r => r.status === 'queued')
       ? `<p>${esc(T('Waiting for a free worker. This page updates automatically. The timer shows how long you have waited.'))}</p>` : '';
-    return `<section class="service-queue"><strong>${esc(T('GarlicSaves queue on this computer'))}</strong>${hint}
+    return `<section class="service-queue"><strong>${esc(T('GarlicSaves queue on this computer'))}</strong>
+      ${hint}
       <ul>${items}</ul></section>`;
   }
 

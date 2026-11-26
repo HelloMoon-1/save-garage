@@ -1,4 +1,9 @@
 {
+"Save time unavailable": "未读取到存档时间",
+"Queue position": "服务器排位",
+"Queued across GarlicSaves": "全站排队任务数",
+"Server queue figures unavailable": "服务器排位暂不可用",
+"View queue on GarlicSaves": "在 GarlicSaves 官网查看排位",
 "Waiting on this computer": "本机待提交",
 "Submitting": "正在提交",
 "Queued at GarlicSaves": "服务端排队中",

@@ -1,4 +1,10 @@
 {
+"Save time": "Fecha de guardado",
+"Save time unavailable": "Fecha de guardado no disponible",
+"Queue position": "Puesto en la cola",
+"Queued across GarlicSaves": "Tareas en cola en GarlicSaves",
+"Server queue figures unavailable": "Datos de la cola no disponibles",
+"View queue on GarlicSaves": "Ver cola en GarlicSaves",
 "Waiting on this computer": "Pendiente en este equipo",
 "Submitting": "Enviando",
 "Queued at GarlicSaves": "En cola en GarlicSaves",

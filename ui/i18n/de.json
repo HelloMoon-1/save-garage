@@ -1,4 +1,10 @@
 {
+"Save time": "Speicherzeit",
+"Save time unavailable": "Speicherzeit unbekannt",
+"Queue position": "Warteschlangenplatz",
+"Queued across GarlicSaves": "Wartende Aufträge bei GarlicSaves",
+"Server queue figures unavailable": "Serverzahlen nicht verfügbar",
+"View queue on GarlicSaves": "Warteschlange bei GarlicSaves öffnen",
 "Waiting on this computer": "Wartet lokal auf Übermittlung",
 "Submitting": "Wird gesendet",
 "Queued at GarlicSaves": "Bei GarlicSaves in der Warteschlange",

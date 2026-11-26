@@ -66,6 +66,7 @@ class Derivation:
         self.requests = 0
         self.statuses = {}                      # request number -> the last thing seen of it (Garlic.derive's on_status)
         self.queued_at = {}
+        self.job_ids = {}
         self.retry_after = None                 # the wait GarlicSaves asked for when it rate limited a request, in seconds
         self.limited_at = None                  # when it did, a time.monotonic() value
         self.answered = None                    # True: answered, False: gave up, None: still waiting
@@ -85,12 +86,17 @@ class Derivation:
             if status == 'rate_limited':
                 self.retry_after, self.limited_at = retry_after, time.monotonic()
 
+    def job_created(self, n, job_id):
+        with self._lock:
+            self.job_ids[n] = job_id
+
     def active_rows(self, now):
-        """Public progress for this computer's outstanding requests; no service IDs or key material."""
+        """Progress for outstanding key requests, including their submitted job IDs while queued."""
         with self._lock:
             if self.answered is not None or self.reported:
                 return []
             return [{'operation': 'key', 'attempt': n + 1, 'status': status,
+                     **({'queueJob': self.job_ids[n]} if status == 'queued' and n in self.job_ids else {}),
                      'waitSeconds': max(0, int(now - self.queued_at[n])) if status == 'queued' else None}
                     for n, status in sorted(self.statuses.items()) if status in ('queued', 'running')]
 
@@ -290,11 +296,13 @@ class Garlic:
             time.sleep(5 if status == 'queued' else 1.5)
         raise GarlicError('job timed out')
 
-    def _submit(self, fields, file_path, filename, on_status=None):
+    def _submit(self, fields, file_path, filename, on_status=None, extra_files=()):
         args = ['-X', 'POST', self.server + '/api/v1/jobs']
         for k, v in fields.items():
             args += ['--form-string', '%s=%s' % (k, v)]
         args += ['-F', 'files=@%s;filename=%s;type=application/octet-stream' % (Path(file_path).as_posix(), filename)]
+        for path in extra_files:
+            args += ['-F', 'files=@%s;filename=%s;type=application/octet-stream' % (path.as_posix(), path.name)]
         last = None
         # Cloudflare sometimes answers 5xx: retry. Not a refusal, which would only be refused again and count against the
         # shared key's limit.
@@ -328,9 +336,11 @@ class Garlic:
         self._refusal(status, headers, body)
         raise GarlicError('result: HTTP %d' % status)
 
-    def decrypt(self, image_path, out_dir, on_status=None):
+    def decrypt(self, image_path, out_dir, on_status=None, on_job=None):
         """Encrypted image -> extracted into out_dir; returns the top-level folder."""
         jid = self._submit({'operation': 'decrypt', 'include_sce_sys': 'true', 'platform': 'ps5'}, image_path, os.path.basename(image_path), on_status)
+        if on_job:
+            on_job(jid)
         self._wait(jid, on_status=on_status)
         z = os.path.join(out_dir, os.path.basename(image_path) + '.zip')
         os.makedirs(out_dir, exist_ok=True)
@@ -345,8 +355,38 @@ class Garlic:
         os.remove(z)
         return os.path.join(out_dir, top)
 
-    def encrypt(self, workspace_zip, account_id_hex, out_path, on_status=None):
+    def decrypt_batch(self, images, out_dir, on_status, on_job):
+        """Submit distinct PS5 images together and validate every returned slot before publishing."""
+        import tempfile
+        fields = {'operation': 'decrypt', 'include_sce_sys': 'true', 'platform': 'ps5'}
+        jid = self._submit(fields, images[0], images[0].name, on_status, images[1:])
+        on_job(jid)
+        self._wait(jid, on_status=on_status)
+        out_dir.mkdir(exist_ok=True, parents=True)
+        expected = {p.name for p in images}
+        with tempfile.TemporaryDirectory(dir=out_dir) as temp:
+            archive = Path(temp) / 'result.zip'
+            self._result(jid, str(archive))
+            unpack = Path(temp) / 'slots'
+            with zipfile.ZipFile(archive) as zf:
+                for member in zf.namelist():
+                    parts = member.rstrip('/').split('/')
+                    if (parts[0] not in expected or any(p in ('', '.', '..') for p in parts)
+                            or '\\' in member or ':' in member):
+                        raise GarlicError('unexpected batch result layout')
+                for name in expected:
+                    inner = 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.removeprefix('sdimg_SAVEDATA')
+                    for required in (name + '/' + inner, name + '/sce_sys/param.sfo'):
+                        if required not in zf.NameToInfo or not zf.getinfo(required).file_size:
+                            raise GarlicError('incomplete batch result: ' + name)
+                zf.extractall(unpack)
+            for path in images:
+                (unpack / path.name).rename(out_dir / path.name)
+
+    def encrypt(self, workspace_zip, account_id_hex, out_path, on_status=None, on_job=None):
         jid = self._submit({'operation': 'encrypt', 'account_id': account_id_hex, 'platform': 'ps5'}, workspace_zip, 'workspace.zip', on_status)
+        if on_job:
+            on_job(jid)
         self._wait(jid, on_status=on_status)
         z = out_path + '.zip'
         self._result(jid, z)
@@ -366,7 +406,7 @@ class Garlic:
     HEDGES, HEDGE_AFTER, POLL = 3, 7, 0.8     # requests at most, seconds before the next one, seconds between status checks
     STATUSES = ('queued', 'running', 'done', 'failed')     # a job's statuses on GarlicSaves, in order
 
-    def derive(self, client_hex, server_hex, timeout=28, on_request=None, on_status=None):
+    def derive(self, client_hex, server_hex, timeout=28, on_request=None, on_status=None, on_job=None):
         """Hedged requests: if the first gets no answer within 7 s, send another and use whichever answers first. Worker
         consoles are sometimes slow. Once a request is refused no other goes out, and while a rate limit is known
         (limited()) no hedge does; the refusal is raised at once unless an earlier request is still waited on.
@@ -385,6 +425,8 @@ class Garlic:
                 j = self._json(['-X', 'POST', self.server + '/api/v1/jobs', '-F', 'operation=ppr_derive',
                                 '-F', 'client_value=' + client_hex, '-F', 'server_value=' + server_hex], timeout=40)
                 jid = j['job_id']; t0 = time.time()
+                if on_job:
+                    on_job(n, jid)
                 last = j.get('status') if j.get('status') in self.STATUSES else None
                 if last is not None:
                     tell(n, last)
@@ -457,7 +499,7 @@ class OracleRelay:
                 d += x
             rec = self.derivations.start()
             try:
-                key = self.g.derive(d[:16].hex(), d[16:].hex(), on_request=rec.sent, on_status=rec.saw)
+                key = self.g.derive(d[:16].hex(), d[16:].hex(), on_request=rec.sent, on_status=rec.saw, on_job=rec.job_created)
             except Exception:
                 if rec.end(False):
                     self.log(rec.summary())

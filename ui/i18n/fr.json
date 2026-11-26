@@ -1,4 +1,10 @@
 {
+"Save time": "Date de sauvegarde",
+"Save time unavailable": "Date de sauvegarde indisponible",
+"Queue position": "Position dans la file",
+"Queued across GarlicSaves": "Tâches en attente sur GarlicSaves",
+"Server queue figures unavailable": "Données de la file indisponibles",
+"View queue on GarlicSaves": "Voir la file sur GarlicSaves",
 "Waiting on this computer": "En attente d’envoi sur cet ordinateur",
 "Submitting": "Envoi en cours",
 "Queued at GarlicSaves": "En file chez GarlicSaves",

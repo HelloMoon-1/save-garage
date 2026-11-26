@@ -1,4 +1,10 @@
 {
+"Save time": "저장 시각",
+"Save time unavailable": "저장 시각을 확인할 수 없음",
+"Queue position": "대기 순번",
+"Queued across GarlicSaves": "GarlicSaves 전체 대기 작업",
+"Server queue figures unavailable": "서버 대기열 정보를 확인할 수 없음",
+"View queue on GarlicSaves": "GarlicSaves에서 대기열 보기",
 "Waiting on this computer": "이 컴퓨터에서 제출 대기 중",
 "Submitting": "제출 중",
 "Queued at GarlicSaves": "GarlicSaves 대기열에 있음",
