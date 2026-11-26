@@ -9,7 +9,7 @@ Save Garage edits your **GTA VI story-mode save on PS5**: money, ammo and stats.
 nothing on the console. Your PS5 sends the save to your computer through its own Data Transfer feature, you edit it in
 your browser, and the PS5 takes it back the same way.
 
-<p align="center"><img src="assets/screens/editor-money.png" alt="The money editor" width="88%"></p>
+<p align="center"><img src="assets/screens/editor-money.png" alt="The Money tab: raising the bank to $25,000,000 with the new $85,000 stacks" width="88%"></p>
 
 ## What you can change
 
@@ -29,7 +29,7 @@ your browser, and the PS5 takes it back the same way.
 Every edit in the app carries one of those labels, so you always know how safe it is. Edits are always applied to
 your original save, and the original is backed up on your computer before anything changes.
 
-<p align="center"><img src="assets/screens/editor-stats.png" alt="The stats editor" width="88%"></p>
+<p align="center"><img src="assets/screens/editor-completion.png" alt="The Completion tab: the game's 100% checklist, from 67.51% to 89.81% after picking everything" width="49%">&nbsp;<img src="assets/screens/editor-guns.png" alt="The Ammo tab: picking guns Lucia doesn't have yet" width="49%"></p>
 
 ## Before you start
 
@@ -66,7 +66,7 @@ your original save, and the original is backed up on your computer before anythi
    Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete. Then click Send save to
    PS5 and on the PS5 open Data Transfer, pick **Save Garage** and choose Start Transfer.
 
-<p align="center"><img src="assets/screens/send-back.png" alt="Sending the save back" width="88%"></p>
+<p align="center"><img src="assets/screens/send-back.png" alt="The Send back step: what is being sent and every save that goes back" width="88%"></p>
 
 Start small: change a couple of things, send the save back and check it loads before you change more. If a save
 won't load, delete it on the PS5, click **Put the originals back** and send again.
@@ -92,6 +92,8 @@ carries nothing about you, your PS5 or your saves.
 version 1.29.1, every copy of Save Garage sent the worker key that GarlicTransfer used to have built in; GarlicSaves
 has revoked that key, so those versions can no longer download (1.29.1 says "GarlicSaves isn't accepting key
 requests"). From 1.30.0 Save Garage signs in the way GarlicTransfer 0.4.0 does, with GarlicSaves' device authorisation:
+
+<p align="center"><img src="assets/screens/signin.png" alt="The Sign in step: the code to enter on GarlicSaves" width="88%"></p>
 
 1. On the Sign in step, click **Sign in to GarlicSaves**. Save Garage asks GarlicSaves for a code, as an
    installation called "Save Garage" (nothing about your computer).
