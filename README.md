@@ -2,6 +2,8 @@
 
 [简体中文使用指南](README.zh-CN.md)
 
+> **This is a modified Chinese build of [Save Garage](https://github.com/NotHGM/save-garage) by NotHGM. It is not the official version.** Official releases: https://github.com/NotHGM/save-garage/releases
+
 <p align="center">
   <a href="../../releases/latest"><b>Download the latest release</b></a>
   &nbsp;&nbsp;|&nbsp;&nbsp; Windows, macOS and Linux &nbsp;&nbsp;|&nbsp;&nbsp; Free and open source (GPL-3.0)
@@ -182,7 +184,9 @@ folder with the official embeddable Python, a Mac launcher, and a self-contained
 
 ## Credits and license
 
-NotHGM created the web interface and artwork for the upstream [Save Garage](https://github.com/NotHGM/save-garage).
+Based on [Save Garage](https://github.com/NotHGM/save-garage) by NotHGM, who wrote its save engine and research, every
+editor (money, stats, completion, world, guns and more), the GarlicSaves sign-in, the updater and the interface. This
+copy is a modified build, not the official one.
 
 Save Garage is free software under the [GNU GPL v3](LICENSE). It started from
 [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor) by CoreyLyu76 and includes PS5 Data Transfer code
