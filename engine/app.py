@@ -56,6 +56,7 @@ STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entry
          'slots': [], 'readyToUpload': False, 'network': None}
 JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None, 'log': []}
 CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
+CANCEL = threading.Event()                                  # set by /api/cancel, so a job waiting between tries stops
 PROC = {'p': None}
 RELAY = {'r': None}
 
@@ -110,6 +111,7 @@ def start_job(kind, fn):
         if JOB['status'] == 'running':
             raise Fail('busy')
         JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None, log=[])
+        CANCEL.clear()
 
     def run():
         try:
@@ -516,6 +518,78 @@ def restore_session():
     log('restored session ' + sess.name)
 
 
+# The transfer code waits 30 s for each set of keys from the relay (derive_with_oracle in vendor/poc/dt_ppr_client.py),
+# so a derivation that hasn't answered by then has failed it. How long the PS5 itself waits in that handshake isn't
+# known, so these waits stay as they are.
+KEY_WAIT = 30
+KEY_RETRY_WAIT = 5                      # seconds before the one automatic second try when the key service was too slow
+
+
+def download_try(opts):
+    """Run the download worker once. Returns what it reported, with the last stage it reached."""
+    p = spawn(['dl_worker', json.dumps(opts)])
+    r = {'entries': [], 'users': [], 'nosave': False, 'err': None, 'files': 0, 'chosen': None, 'stage': None}
+
+    def at(s, **kw):
+        r['stage'] = s; stage(s, **kw)
+    at('connecting')
+    for line in p.stdout:
+        line = line.rstrip()
+        if line.startswith('[file] saved'):
+            r['files'] += 1
+            with LOCK:
+                JOB['progress'] = {'files': r['files']}
+            log('saved file %d' % r['files']); continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            if line and not line.startswith(('[ddp]', 'host-', 'device-', 'system-', '[file]')):   # [file] paths hold the PS5 user ID
+                log(line)
+            continue
+        t = ev.get('type')
+        if t == 'powerRequired':
+            at('need_power', needPower=True)
+        elif t == 'status' and ev.get('step') == 3:
+            at('reading_list', needPower=False)
+        elif t == 'status' and ev.get('step') == 4:
+            at('downloading', needPower=False)
+        elif t == 'entries':
+            r['entries'], r['users'] = ev['entries'], ev.get('users') or []
+        elif t == 'accounts':                   # several PS5 accounts have a save: ask which one, then tell the worker
+            CHOICE['owner'] = None; CHOICE['event'].clear()
+            at('choose_account', accounts=ev.get('accounts') or [])
+            while not CHOICE['event'].wait(0.5):
+                if p.poll() is not None:        # cancelled or the worker died
+                    break
+            if p.poll() is not None or not CHOICE['owner']:
+                raise Fail('download_failed', 'cancelled while choosing the account')
+            p.stdin.write(json.dumps({'owner': CHOICE['owner']}) + '\n'); p.stdin.flush()
+            at('downloading', accounts=None)
+        elif t == 'owner':
+            r['chosen'] = ev.get('owner')
+        elif t == 'nosave':
+            r['nosave'] = True
+        elif t == 'error':
+            r['err'] = ev.get('message')
+        elif t == 'log':
+            msg = ev.get('message') or ''
+            log('Encrypted channel: open' if msg.startswith('Encrypted channel:') else msg)    # not the PS5's address: details get shared in bug reports
+    p.wait()
+    return r
+
+
+def download_error(err, reached, late):
+    """The error code for a failed download try. A timeout while the power prompt is up is the power button's; any other
+    timeout is the key service's when a derivation of this try gave the transfer code no keys in time (late), else the
+    PS5's, which didn't answer."""
+    m = err.lower()
+    if 'timed out' not in m and 'timeout' not in m:
+        return 'console_rejected' if 'rejected' in m else 'download_failed'
+    if reached == 'need_power':
+        return 'power_timeout'
+    return 'key_timeout' if late else 'console_timeout'
+
+
 def job_download():
     c = STATE['console']
     if not STATE['paired']:
@@ -523,57 +597,31 @@ def job_download():
     if not G.reachable():
         raise Fail('garlic_unreachable')
     sess = console_dir() / 'sessions' / time.strftime('%Y%m%d-%H%M%S'); lib = sess / 'lib'; lib.mkdir(parents=True)
-    opts = {'oracleHost': '127.0.0.1', 'oraclePort': relay().port, 'clientHost': c['host'], 'output': str(lib), 'interface': '',
+    keys = relay()
+    opts = {'oracleHost': '127.0.0.1', 'oraclePort': keys.port, 'clientHost': c['host'], 'output': str(lib), 'interface': '',
             'hostId': c['hostId'], 'systemVersion': c['firmware'], 'hardware': 0, 'approvalPrefixPath': str(prefix_path()),
             'waitForSelection': True, 'titles': GTA_TITLES}
-    p = spawn(['dl_worker', json.dumps(opts)])
-    stage('connecting')
-    entries, users, nosave, err, files, chosen = [], [], False, None, 0, None
-    for line in p.stdout:
-        line = line.rstrip()
-        if line.startswith('[file] saved'):
-            files += 1
-            with LOCK:
-                JOB['progress'] = {'files': files}
-            log('saved file %d' % files); continue
-        try:
-            ev = json.loads(line)
-        except ValueError:
-            if line and not line.startswith(('[ddp]', 'host-', 'device-', 'system-')):
+    for first in (True, False):
+        t0 = time.monotonic()
+        r = download_try(opts)
+        if not r['err']:
+            break
+        late = [d for d in keys.derivations.since(t0) if d.late(KEY_WAIT)]
+        for d in late:                          # the worker stopped waiting for these: say so in the details
+            line = d.report_unanswered()
+            if line:
                 log(line)
+        code = download_error(r['err'], r['stage'], late)
+        # the key service was too slow before the power prompt and nothing has downloaded: one more try
+        if code == 'key_timeout' and first and r['stage'] == 'connecting' and not (r['files'] or r['entries']):
+            log('The key service was slow, trying again')
+            stage('key_retry')
+            if CANCEL.wait(KEY_RETRY_WAIT):
+                raise Fail(code, r['err'])
             continue
-        t = ev.get('type')
-        if t == 'powerRequired':
-            stage('need_power', needPower=True)
-        elif t == 'status' and ev.get('step') == 3:
-            stage('reading_list', needPower=False)
-        elif t == 'status' and ev.get('step') == 4:
-            stage('downloading', needPower=False)
-        elif t == 'entries':
-            entries, users = ev['entries'], ev.get('users') or []
-        elif t == 'accounts':                   # several PS5 accounts have a save: ask which one, then tell the worker
-            CHOICE['owner'] = None; CHOICE['event'].clear()
-            stage('choose_account', accounts=ev.get('accounts') or [])
-            while not CHOICE['event'].wait(0.5):
-                if p.poll() is not None:        # cancelled or the worker died
-                    break
-            if p.poll() is not None or not CHOICE['owner']:
-                raise Fail('download_failed', 'cancelled while choosing the account')
-            p.stdin.write(json.dumps({'owner': CHOICE['owner']}) + '\n'); p.stdin.flush()
-            stage('downloading', accounts=None)
-        elif t == 'owner':
-            chosen = ev.get('owner')
-        elif t == 'nosave':
-            nosave = True
-        elif t == 'error':
-            err = ev.get('message')
-        elif t == 'log':
-            log(ev.get('message'))
-    p.wait()
-    if err:
-        m = err.lower()
-        raise Fail('power_timeout' if 'timed out' in m or 'timeout' in m else 'console_rejected' if 'rejected' in m else 'download_failed', err)
-    if nosave or not entries:
+        raise Fail(code, r['err'])
+    entries, users, chosen = r['entries'], r['users'], r['chosen']
+    if r['nosave'] or not entries:
         raise Fail('no_gta_save')
     e = next((x for x in entries if chosen and x['owner'].lower() == chosen.lower()), entries[0]); owner = e['owner']
     uname = next((u['name'] for u in users if u['id'].lower() == owner.lower()), 'user')
@@ -869,7 +917,7 @@ class H(BaseHTTPRequestHandler):
                     STATE['network'] = {'ok': ok, 'proxy': bool(G.proxy)}
                 return self._send(200, STATE['network'])
             if path == '/api/cancel':
-                kill_proc()
+                CANCEL.set(); kill_proc()
                 return self._send(200, {'ok': True})
             if path == '/api/quit':
                 if JOB['status'] == 'running' and JOB['stage'] in ('console_connected', 'transferring'):

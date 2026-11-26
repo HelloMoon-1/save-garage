@@ -1328,5 +1328,15 @@
 "Save Garage hasn’t seen these {0} trackers hold any progress in a save, so it can’t tell which cheat each one is. They can only be completed together, and {1} of them are complete already.": "لم يرَ Save Garage أي تقدّم في هذه العدّادات ({0}) في أي ملف حفظ، لذا لا يستطيع أن يعرف أي رمز غش يقابل كل واحد منها. لا يمكن إكمالها إلا معًا، وقد اكتمل {1} منها بالفعل.",
 "That gun can’t be added to this character. Reload the page and try again.": "لا يمكن إضافة هذا السلاح إلى هذه الشخصية. أعِد تحميل الصفحة وحاول مرة أخرى.",
 "Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.": "أعِد تعبئة الذخيرة أو اضبطها لكل سلاح تحمله Lucia وJason. إضافة الأسلحة التي لا يملكانها بعد ميزة تجريبية.",
-"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "أكمل بنود قائمة إكمال {0}: السرقات، وتصريف المسروقات، والمقتنيات، والسباقات والأنشطة، والحركات الاستعراضية، والتحديات، والسلال، والموسوعة. تظهر النسبة الجديدة قبل أن تحفظ. تم اختباره جزئيًا على PS5. فتح رموز الغش ميزة تجريبية."
+"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "أكمل بنود قائمة إكمال {0}: السرقات، وتصريف المسروقات، والمقتنيات، والسباقات والأنشطة، والحركات الاستعراضية، والتحديات، والسلال، والموسوعة. تظهر النسبة الجديدة قبل أن تحفظ. تم اختباره جزئيًا على PS5. فتح رموز الغش ميزة تجريبية.",
+"The power-button wait timed out.": "انتهت مهلة انتظار زر التشغيل.",
+"GarlicSaves’ key service didn’t answer in time.": "لم تستجب خدمة المفاتيح في GarlicSaves في الوقت المناسب.",
+"Its worker consoles are busy, so wait a minute and try again.": "أجهزة الكونسول التي تحسب المفاتيح مشغولة، لذا انتظر دقيقة وحاول مرة أخرى.",
+"Nothing is wrong with your PS5 or Save Garage.": "لا توجد أي مشكلة في جهاز PS5 لديك أو في Save Garage.",
+"The PS5 didn’t answer.": "لم يستجب جهاز PS5.",
+"Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "ارجع إلى الشاشة الرئيسية لجهاز PS5، وتأكد من أنه لا توجد أداة أخرى تستخدم Data Transfer، ثم حاول مرة أخرى.",
+"The key service was slow, trying again": "كانت خدمة المفاتيح بطيئة، جارٍ المحاولة مرة أخرى",
+"The power-button wait timed out. Go back to the PS5 home screen and try again.": "انتهت مهلة انتظار زر التشغيل. ارجع إلى الشاشة الرئيسية لجهاز PS5 وحاول مرة أخرى.",
+"GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "لم تستجب خدمة المفاتيح في GarlicSaves في الوقت المناسب. أجهزة الكونسول التي تحسب المفاتيح مشغولة، لذا انتظر دقيقة وحاول مرة أخرى. لا توجد أي مشكلة في جهاز PS5 لديك أو في Save Garage.",
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "لم يستجب جهاز PS5. ارجع إلى الشاشة الرئيسية لجهاز PS5، وتأكد من أنه لا توجد أداة أخرى تستخدم Data Transfer، ثم حاول مرة أخرى."
 }

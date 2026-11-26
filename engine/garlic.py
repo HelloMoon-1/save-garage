@@ -12,6 +12,74 @@ class GarlicError(Exception):
     pass
 
 
+class Derivation:
+    """One transfer-key derivation as the transfer code sees it: when it started, how many requests went to GarlicSaves,
+    and whether it answered and after how long, or gave up. Timings and counts only, never a key, a client or server
+    value, the worker key or an account ID, so its summary can go in a job's details."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.started = time.monotonic()
+        self.requests = 0
+        self.answered = None                    # True: answered, False: gave up, None: still waiting
+        self.seconds = None                     # from the start until it answered or gave up
+        self.reported = False                   # a job has already said it got no answer, so its end isn't logged again
+
+    def sent(self):
+        with self._lock:
+            self.requests += 1
+
+    def end(self, answered):
+        """Record how it ended. Returns False when a job has already reported it as unanswered."""
+        with self._lock:
+            if self.answered is None:
+                self.answered, self.seconds = bool(answered), time.monotonic() - self.started
+            return not self.reported
+
+    def late(self, wait):
+        """Whether it gave no keys within `wait` seconds: it gave up, is still waiting, or answered after that."""
+        with self._lock:
+            return self.answered is not True or self.seconds >= wait
+
+    def report_unanswered(self):
+        """For a job that stopped waiting: the summary if it is still waiting (marked as reported), else None."""
+        with self._lock:
+            if self.answered is not None or self.reported:
+                return None
+            self.reported = True
+            return self._summary()
+
+    def summary(self):
+        with self._lock:
+            return self._summary()
+
+    def _summary(self):
+        n = '%d request%s' % (self.requests, '' if self.requests == 1 else 's')
+        if self.answered:
+            return 'Key service: answered in %.1f s (%s)' % (self.seconds, n)
+        secs = self.seconds if self.seconds is not None else time.monotonic() - self.started
+        return 'Key service: no answer after %d s (%s)' % (round(secs), n)
+
+
+class Derivations:
+    """The latest derivations, oldest first, for a job that needs to know whether the key service let it down."""
+
+    def __init__(self, keep=50):
+        self._lock = threading.Lock(); self._items = []; self.keep = keep
+
+    def start(self):
+        d = Derivation()
+        with self._lock:
+            self._items.append(d)
+            del self._items[:-self.keep]
+        return d
+
+    def since(self, t):
+        """The derivations started at or after t, a time.monotonic() value."""
+        with self._lock:
+            return [d for d in self._items if d.started >= t]
+
+
 class Garlic:
     def __init__(self, server=None, key=None, proxy=None):
         self.server = (server or DEFAULT_SERVER).rstrip('/')
@@ -120,8 +188,11 @@ class Garlic:
         return out_path
 
     # ---- transfer key derivation ----
-    def derive(self, client_hex, server_hex, timeout=28):
-        """Hedged requests: if the first gets no answer within 7 s, send another and use whichever answers first. Worker consoles are sometimes slow."""
+    HEDGES, HEDGE_AFTER, POLL = 3, 7, 0.8     # requests at most, seconds before the next one, seconds between status checks
+
+    def derive(self, client_hex, server_hex, timeout=28, on_request=None):
+        """Hedged requests: if the first gets no answer within 7 s, send another and use whichever answers first. Worker consoles are sometimes slow.
+        on_request() is called as each request goes out."""
         result = {}; done = threading.Event()
 
         def one():
@@ -139,12 +210,14 @@ class Garlic:
                         return
                     if s.get('status') == 'failed':
                         return
-                    time.sleep(0.8)
+                    time.sleep(self.POLL)
             except Exception as e:
                 result.setdefault('err', repr(e))
-        for delay in (0, 7, 14):
-            if done.wait(delay if delay == 0 else 7):
+        for n in range(self.HEDGES):                # at 0, 7 and 14 s
+            if n and done.wait(self.HEDGE_AFTER):
                 break
+            if on_request:
+                on_request()
             threading.Thread(target=one, daemon=True).start()
         done.wait(timeout)
         if 'v' not in result:
@@ -153,9 +226,11 @@ class Garlic:
 
 
 class OracleRelay:
-    """Local port: receives 32 bytes, returns 40. The transfer code in vendor/poc uses it as its local key oracle."""
+    """Local port: receives 32 bytes, returns 40. The transfer code in vendor/poc uses it as its local key oracle.
+    Each derivation is kept in self.derivations and summed up in the log (timings and counts only)."""
     def __init__(self, garlic, log=lambda m: None):
         self.g = garlic; self.log = log
+        self.derivations = Derivations()
         self.sock = socket.socket(); self.sock.bind(('127.0.0.1', 0)); self.sock.listen(8)
         self.port = self.sock.getsockname()[1]
         threading.Thread(target=self._loop, daemon=True).start()
@@ -173,10 +248,17 @@ class OracleRelay:
                 if not x:
                     return
                 d += x
-            t0 = time.time()
-            c.sendall(self.g.derive(d[:16].hex(), d[16:].hex()))
-            self.log('key derived in %.1fs' % (time.time() - t0))
-        except Exception as e:
-            self.log('key derive failed: %r' % e)
+            rec = self.derivations.start()
+            try:
+                key = self.g.derive(d[:16].hex(), d[16:].hex(), on_request=rec.sent)
+            except Exception:
+                if rec.end(False):
+                    self.log(rec.summary())
+                return
+            if rec.end(True):
+                self.log(rec.summary())
+            c.sendall(key)
+        except Exception as e:                  # only the type: the text of a failure can quote a server answer
+            self.log('key relay: %s' % type(e).__name__)
         finally:
             c.close()

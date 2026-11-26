@@ -1328,5 +1328,15 @@
 "Save Garage hasn’t seen these {0} trackers hold any progress in a save, so it can’t tell which cheat each one is. They can only be completed together, and {1} of them are complete already.": "Save Garage не видел прогресса в этих счётчиках ({0}) ни в одном сохранении, поэтому не может сказать, какой чит какой. Их можно выполнить только вместе, и {1} из них уже выполнены.",
 "That gun can’t be added to this character. Reload the page and try again.": "Это оружие нельзя добавить этому персонажу. Перезагрузи страницу и попробуй снова.",
 "Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.": "Пополни или задай боеприпасы для всего оружия, которое носят Lucia и Jason. Добавление оружия, которого у них ещё нет, экспериментальное.",
-"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "Выполняй пункты чек-листа {0}: ограбления, сбыт краденого, коллекционные предметы, гонки и занятия, трюки, испытания, кольца и справочник. Новый процент виден ещё до сохранения. Частично проверено на PS5. Разблокировка читов экспериментальная."
+"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "Выполняй пункты чек-листа {0}: ограбления, сбыт краденого, коллекционные предметы, гонки и занятия, трюки, испытания, кольца и справочник. Новый процент виден ещё до сохранения. Частично проверено на PS5. Разблокировка читов экспериментальная.",
+"The power-button wait timed out.": "Истекло время ожидания кнопки питания.",
+"GarlicSaves’ key service didn’t answer in time.": "Сервис ключей GarlicSaves не ответил вовремя.",
+"Its worker consoles are busy, so wait a minute and try again.": "Консоли, которые вычисляют ключи, заняты, так что подожди минуту и попробуй снова.",
+"Nothing is wrong with your PS5 or Save Garage.": "С твоей PS5 и с Save Garage всё в порядке.",
+"The PS5 didn’t answer.": "PS5 не ответила.",
+"Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "Вернись на главный экран PS5, убедись, что Data Transfer не занят другой программой, и попробуй снова.",
+"The key service was slow, trying again": "Сервис ключей ответил медленно, пробуем снова",
+"The power-button wait timed out. Go back to the PS5 home screen and try again.": "Истекло время ожидания кнопки питания. Вернись на главный экран PS5 и попробуй снова.",
+"GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "Сервис ключей GarlicSaves не ответил вовремя. Консоли, которые вычисляют ключи, заняты, так что подожди минуту и попробуй снова. С твоей PS5 и с Save Garage всё в порядке.",
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5 не ответила. Вернись на главный экран PS5, убедись, что Data Transfer не занят другой программой, и попробуй снова."
 }

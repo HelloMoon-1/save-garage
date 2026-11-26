@@ -1328,5 +1328,15 @@
 "Save Garage hasn’t seen these {0} trackers hold any progress in a save, so it can’t tell which cheat each one is. They can only be completed together, and {1} of them are complete already.": "Save Garageはこれら{0}個のトラッカーに進行状況が記録されたセーブデータを見たことがないため、どれがどのチートなのか分かりません。まとめてしか完了にできません。このうち{1}個はすでに完了しています。",
 "That gun can’t be added to this character. Reload the page and try again.": "その武器はこのキャラクターに追加できません。ページを再読み込みして、もう一度お試しください。",
 "Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.": "LuciaとJasonが持つすべての武器の弾薬を補充・設定します。まだ持っていない武器の追加は実験的な機能です。",
-"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "{0}達成チェックリストの項目を完了にします：強盗、盗品売却、コレクタブル、レースとアクティビティ、スタント、チャレンジ、バスケットゴール、図鑑。保存前に新しい達成率が表示されます。PS5で一部検証済み。チートの解除は実験的な機能です。"
+"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "{0}達成チェックリストの項目を完了にします：強盗、盗品売却、コレクタブル、レースとアクティビティ、スタント、チャレンジ、バスケットゴール、図鑑。保存前に新しい達成率が表示されます。PS5で一部検証済み。チートの解除は実験的な機能です。",
+"The power-button wait timed out.": "電源ボタンの待機がタイムアウトしました。",
+"GarlicSaves’ key service didn’t answer in time.": "GarlicSavesのキーサービスが時間内に応答しませんでした。",
+"Its worker consoles are busy, so wait a minute and try again.": "キーを計算するコンソールが混み合っているため、1分ほど待ってからもう一度お試しください。",
+"Nothing is wrong with your PS5 or Save Garage.": "PS5にもSave Garageにも問題はありません。",
+"The PS5 didn’t answer.": "PS5が応答しませんでした。",
+"Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5のホーム画面に戻り、ほかのツールがData Transferを使っていないことを確かめてから、もう一度お試しください。",
+"The key service was slow, trying again": "キーサービスの応答が遅かったため、再試行しています",
+"The power-button wait timed out. Go back to the PS5 home screen and try again.": "電源ボタンの待機がタイムアウトしました。PS5のホーム画面に戻って、もう一度お試しください。",
+"GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSavesのキーサービスが時間内に応答しませんでした。キーを計算するコンソールが混み合っているため、1分ほど待ってからもう一度お試しください。PS5にもSave Garageにも問題はありません。",
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5が応答しませんでした。PS5のホーム画面に戻り、ほかのツールがData Transferを使っていないことを確かめてから、もう一度お試しください。"
 }

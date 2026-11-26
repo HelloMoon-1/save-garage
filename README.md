@@ -137,6 +137,9 @@ on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folde
 | Ports 1004 to 1006 are in use | Close any other save-transfer tool or second copy of Save Garage. |
 | The PS5 says there's nothing to transfer | A GTA VI save is still on the console. Delete it, then open Data Transfer again. |
 | Decryption service offline | Check your internet connection. GarlicSaves may also be down for a while. |
+| A download stops with "GarlicSaves' key service didn't answer in time" | The GarlicSaves consoles that work out the transfer keys were busy. Before the power prompt, Save Garage tries once more by itself; if that fails too, wait a minute and download again. Nothing is wrong with your PS5. Show details lists how long the key service took. |
+| A download stops with "The PS5 didn't answer" | Go back to the PS5 home screen, close any other save-transfer tool so Data Transfer is free, and try again. |
+| A download stops with "The power-button wait timed out" | Download again, and when the app asks, press the PS5 power button once within about 5 minutes and let go at the beep. |
 
 ## Linux notes
 

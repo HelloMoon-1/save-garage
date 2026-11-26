@@ -1328,5 +1328,15 @@
 "Save Garage hasn’t seen these {0} trackers hold any progress in a save, so it can’t tell which cheat each one is. They can only be completed together, and {1} of them are complete already.": "Save Garage 从未在任何存档中看到这 {0} 个追踪项记录进度，因此无法判断每个追踪项对应哪个作弊码。它们只能一起完成，其中已有 {1} 个完成。",
 "That gun can’t be added to this character. Reload the page and try again.": "无法为此角色添加这把武器。请重新加载页面，然后重试。",
 "Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.": "为 Lucia 和 Jason 携带的每把武器补充或设置弹药。添加他们还没有的武器属于实验性功能。",
-"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "完成 {0} 完成度清单中的项目：抢劫、销赃、收集品、比赛与活动、特技、挑战、篮筐和图鉴。保存前会显示新的百分比。已在 PS5 上部分测试。解锁作弊码属于实验性功能。"
+"Complete lines of the {0} checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.": "完成 {0} 完成度清单中的项目：抢劫、销赃、收集品、比赛与活动、特技、挑战、篮筐和图鉴。保存前会显示新的百分比。已在 PS5 上部分测试。解锁作弊码属于实验性功能。",
+"The power-button wait timed out.": "等待电源键超时。",
+"GarlicSaves’ key service didn’t answer in time.": "GarlicSaves 的密钥服务没有及时响应。",
+"Its worker consoles are busy, so wait a minute and try again.": "负责计算密钥的主机正忙，请等一分钟后重试。",
+"Nothing is wrong with your PS5 or Save Garage.": "你的 PS5 和 Save Garage 都没有问题。",
+"The PS5 didn’t answer.": "PS5 没有响应。",
+"Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "请返回 PS5 主画面，确认没有其他工具在使用 Data Transfer，然后重试。",
+"The key service was slow, trying again": "密钥服务响应较慢，正在重试",
+"The power-button wait timed out. Go back to the PS5 home screen and try again.": "等待电源键超时。请返回 PS5 主画面，然后重试。",
+"GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.": "GarlicSaves 的密钥服务没有及时响应。负责计算密钥的主机正忙，请等一分钟后重试。你的 PS5 和 Save Garage 都没有问题。",
+"The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.": "PS5 没有响应。请返回 PS5 主画面，确认没有其他工具在使用 Data Transfer，然后重试。"
 }

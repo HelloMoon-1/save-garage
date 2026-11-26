@@ -127,6 +127,19 @@ slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmo
 Each edit names the value it replaces (`value`) and the new one (`newValue`); an edit whose `value` no longer matches
 the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail": "…"}`.
 
+### Download errors
+
+A download that fails ends with `job.status` `error` and `job.error` `{"code": "…", "detail": "…"}`, where `detail` is
+the transfer code's own error, such as `TimeoutError: timed out`. A timeout gets its code from when it came and from
+what GarlicSaves' key service did: `power_timeout` while the power prompt was up (stage `need_power`), `key_timeout` when
+a transfer-key derivation didn't give the transfer code its keys within its 30 s wait (it gave up, was still waiting or
+answered later), and `console_timeout` otherwise, for a PS5 that didn't answer. A `key_timeout` before the power prompt,
+with nothing downloaded yet, starts the download once more by itself after 5 s, with the stage `key_retry` in between
+(`/api/cancel` then ends it); a second one ends the download. The other codes are `not_paired`, `garlic_unreachable`,
+`console_rejected`, `download_failed`, `no_gta_save` and `no_story_slot`. The job's `log` has a line for each
+derivation, such as `Key service: answered in 4.2 s (1 request)` or `Key service: no answer after 30 s (3 requests)`:
+timings and request counts only.
+
 ### The World tab's edits
 
 ```jsonc
