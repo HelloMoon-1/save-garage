@@ -270,17 +270,24 @@ class Garlic:
             return False
 
     def _wait(self, job_id, timeout=600, on_status=None):
-        t0 = time.time(); last = None
-        while time.time() - t0 < timeout:
+        """Poll an existing save job. Time spent in the service queue has no deadline."""
+        deadline = time.monotonic() + timeout
+        last = None
+        while deadline is None or time.monotonic() < deadline:
             j = self._json([self.server + '/api/v1/jobs/' + job_id], timeout=60)
-            if j.get('status') != last and on_status:
-                on_status(j.get('status'))
-            last = j.get('status')
-            if last == 'done':
+            status = j.get('status')
+            if status != last and on_status:
+                on_status(status)
+            last = status
+            if status == 'done':
                 return j
-            if last == 'failed':
+            if status == 'failed':
                 raise GarlicError(j.get('error') or 'job failed')
-            time.sleep(1.5)
+            if status == 'queued':
+                deadline = None
+            elif deadline is None:
+                deadline = time.monotonic() + timeout
+            time.sleep(5 if status == 'queued' else 1.5)
         raise GarlicError('job timed out')
 
     def _submit(self, fields, file_path, filename, on_status=None):

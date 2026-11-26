@@ -81,3 +81,48 @@ class ServiceQueueTests(unittest.TestCase):
             self.assertEqual(observed, [])
             self.assertEqual(client._submit({}, 'unused', 'unused', observed.append), 'two')
             self.assertEqual(observed, ['queued'])
+
+
+class SaveJobWaitTests(unittest.TestCase):
+    def setUp(self):
+        self.client = garlic.Garlic(server='http://localhost', key='test', proxy='')
+        self.elapsed = 0.0
+        stack = ExitStack()
+        self.addCleanup(stack.close)
+        for name in ('monotonic', 'time'):
+            stack.enter_context(patch.object(garlic.time, name, side_effect=lambda: self.elapsed))
+        stack.enter_context(patch.object(garlic.time, 'sleep', side_effect=self.advance))
+
+    def advance(self, seconds):
+        self.elapsed += seconds
+        self.assertLess(self.elapsed, 7200, 'polling did not stop')
+
+    def test_long_queue_then_a_full_processing_window_on_the_same_job(self):
+        def response(args, timeout):
+            self.assertEqual(args, ['http://localhost/api/v1/jobs/original'])
+            if self.elapsed < 3600:
+                return {'status': 'queued'}
+            if self.elapsed < 4190:
+                return {'status': 'running'}
+            return {'status': 'done'}
+
+        updates = []
+        with patch.object(self.client, '_json', side_effect=response):
+            self.assertEqual(self.client._wait('original', on_status=updates.append), {'status': 'done'})
+        self.assertEqual(updates, ['queued', 'running', 'done'])
+
+    def test_stalled_worker_times_out_even_after_a_long_queue(self):
+        def response(args, timeout):
+            return {'status': 'queued' if self.elapsed < 1200 else 'running'}
+
+        with patch.object(self.client, '_json', side_effect=response):
+            with self.assertRaisesRegex(garlic.GarlicError, 'timed out'):
+                self.client._wait('original')
+        self.assertAlmostEqual(self.elapsed, 1800)
+
+    def test_terminal_failure_in_queue_is_reported_immediately(self):
+        responses = [{'status': 'queued'}, {'status': 'failed', 'error': 'worker failed'}]
+        with patch.object(self.client, '_json', side_effect=responses) as poll:
+            with self.assertRaisesRegex(garlic.GarlicError, 'worker failed'):
+                self.client._wait('original')
+        self.assertEqual(poll.call_count, 2)
