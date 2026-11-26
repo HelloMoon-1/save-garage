@@ -4,7 +4,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import money, garlic, savedit
+import money, garlic, savedit, updater
 
 FROZEN = getattr(sys, 'frozen', False)
 # Desktop mode (packaged builds, or the portable launchers set SAVEGARAGE_DESKTOP=1): per-user data folder,
@@ -51,6 +51,35 @@ try:
 except Exception:
     pass
 G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
+
+
+def save_config(**changes):
+    """Save settings to data/config.json, keeping what else it holds (serverUrl, workerKey, proxy, ...)."""
+    path = DATA / 'config.json'
+    with LOCK:
+        try:
+            cur = json.loads(path.read_text('utf-8'))
+        except FileNotFoundError:
+            cur = {}
+        except ValueError:
+            raise Fail('internal', 'data/config.json is not valid JSON, so it was left as it is')
+        if not isinstance(cur, dict):
+            raise Fail('internal', 'data/config.json is not a JSON object, so it was left as it is')
+        cur.update(changes)
+        DATA.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name('config.json.tmp')
+        tmp.write_text(json.dumps(cur, indent=2), 'utf-8')
+        os.replace(tmp, path)
+        CFG.update(changes)
+
+
+# Updates (engine/updater.py): a check at start-up and every 6 hours while autoUpdate is on (the default). A release
+# build downloads and stages a newer signed version, installed on the next start; a source checkout or any other
+# layout only shows that one is out.
+UPDATER = updater.Updater(VERSION, updater.detect(ROOT, VERSION, DESKTOP), proxy=G.proxy,
+                          busy=lambda: JOB['status'] == 'running', auto=CFG.get('autoUpdate', True) is not False)
+RESTART = threading.Event()                                 # set by /api/update/restart: main() starts Save Garage again
+SRV = {'s': None}
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
          'slots': [], 'readyToUpload': False, 'network': None}
@@ -113,7 +142,7 @@ GARLIC_REFUSED = {'rate_limited': 'garlic_rate_limited', 'key_disabled': 'garlic
 
 def start_job(kind, fn):
     with LOCK:
-        if JOB['status'] == 'running':
+        if JOB['status'] == 'running' or RESTART.is_set():      # nothing new starts while Save Garage restarts
             raise Fail('busy')
         JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None,
                    wait=None, log=[])
@@ -837,7 +866,16 @@ def public_state():
         s['titles'] = GTA_TITLES
         s['canQuit'] = DESKTOP
         s['version'] = VERSION
+        s['update'] = update_state()
         return s
+
+
+def update_state():
+    """state.update for the page (docs/API.md): the updater's status, plus whether Restart now can be used."""
+    u = UPDATER.public()
+    u['canRestart'] = u['status'] == 'ready' and JOB['status'] != 'running' and not RESTART.is_set()
+    u['restarting'] = RESTART.is_set()
+    return u
 
 
 class H(BaseHTTPRequestHandler):
@@ -976,6 +1014,26 @@ class H(BaseHTTPRequestHandler):
                 self._send(200, {'ok': True})
                 threading.Thread(target=lambda: (time.sleep(0.3), kill_proc(), os._exit(0)), daemon=True).start()
                 return
+            if path == '/api/update/check':            # check GitHub for a new version now
+                UPDATER.check_now()
+                return self._send(200, update_state())
+            if path == '/api/update/settings':         # {"auto": false} turns automatic updates off
+                auto = body.get('auto')
+                if not isinstance(auto, bool):
+                    raise ValueError('auto must be true or false')
+                save_config(autoUpdate=auto)
+                UPDATER.set_auto(auto)
+                return self._send(200, update_state())
+            if path == '/api/update/restart':          # start again, so the staged update installs
+                with LOCK:
+                    if JOB['status'] == 'running' or RESTART.is_set():
+                        raise Fail('busy')
+                    if not UPDATER.ready() or not SRV['s']:
+                        raise Fail('no_update')
+                    RESTART.set()
+                self._send(200, {'ok': True})
+                threading.Thread(target=lambda: (time.sleep(0.3), SRV['s'].shutdown()), daemon=True).start()
+                return
             if not STATE['console']:
                 raise Fail('no_console')
             if path == '/api/pair':
@@ -1064,12 +1122,19 @@ def main():
         return
     DATA.mkdir(parents=True, exist_ok=True)
     srv = ThreadingHTTPServer((BIND, PORT), H)
+    SRV['s'] = srv
     print('Save Garage running: ' + url, flush=True)
     if DESKTOP and (MAC or os.name == 'nt'):       # desktop builds: quit when the page has been gone a while
         threading.Thread(target=idle_watch, daemon=True).start()
     if open_ui:
         webbrowser.open(url)
+    UPDATER.start()
     srv.serve_forever()
+    if RESTART.is_set():                           # Restart now: free the port, then start again (installs the update)
+        srv.server_close()
+        kill_proc()
+        print('Save Garage is restarting to install %s' % (UPDATER.public().get('latest') or 'the update'), flush=True)
+        updater.restart_process()
 
 
 if __name__ == '__main__':

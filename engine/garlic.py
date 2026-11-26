@@ -186,7 +186,9 @@ class Garlic:
         self.server = (server or DEFAULT_SERVER).rstrip('/')
         self.key = key or DEFAULT_KEY
         self.proxy = proxy if proxy is not None else self.detect_proxy()
-        self.curl = shutil.which('curl') or 'curl'
+        # on Windows the curl Windows ships: a curl.exe in the current folder, which Windows would look in first, must never run
+        self.curl = (os.path.join(os.environ.get('SystemRoot') or r'C:\Windows', 'System32', 'curl.exe') if os.name == 'nt'
+                     else shutil.which('curl') or 'curl')
         self.limited_until = 0.0                # time.monotonic() until which GarlicSaves said it is limiting requests
 
     @staticmethod

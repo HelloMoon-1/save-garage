@@ -77,6 +77,67 @@ Nothing else is uploaded. The editor runs only on your computer, and by default 
 Originals and backups stay in `%LOCALAPPDATA%\SaveGarage` on Windows, `~/Library/Application Support/SaveGarage`
 on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folder when you run from source.
 
+From version 1.30.0, Save Garage also asks GitHub whether a new version is out (see [Updates](#updates)). That request
+carries nothing about you, your PS5 or your saves.
+
+## Updates
+
+From version 1.30.0, Save Garage keeps itself up to date. When it starts, and every 6 hours while it runs, it asks
+GitHub for the latest release. When there is a newer version, it downloads it in the background, checks it (below) and
+installs it the next time you start Save Garage. **Restart now**, at the bottom of the page, does that straight away;
+it can't be used while a download, an edit or a send is running. If the new version doesn't start within 90 seconds,
+or stops before it does, Save Garage puts the old version back by itself and stays on it. The previous version is kept:
+in `SaveGarage/.update/previous` on Windows and macOS, and next to the folder with the Linux build (`.SaveGarage.previous`
+for a folder called `SaveGarage`). The bottom of the page says what is happening and links to the release notes.
+
+**What it contacts.** `api.github.com`, for the latest release of this project, and `github.com` for that release's
+files (GitHub passes downloads on to its file servers, such as `release-assets.githubusercontent.com`). The requests
+carry no account, token or cookie, and nothing about you, your PS5 or your saves: just a fixed User-Agent,
+`SaveGarage-update-check (+https://github.com/NotHGM/save-garage)`. GitHub sees your IP address, as it would for any
+web page. They go through the same proxy as
+the rest of Save Garage. A download only happens when there is a new version.
+
+**How to turn it off.** Untick **Update automatically** at the bottom of the page. Save Garage then contacts GitHub only
+when you click **Check for updates**, and only tells you that a new version is out; an update it had already downloaded
+is dropped and not installed. The setting is saved as `"autoUpdate": false` in `config.json` in the data folder above.
+
+**How the signing protects you.** Every release from 1.30.0 on comes with `SHA256SUMS.txt`, the SHA-256 of each
+download, and `SHA256SUMS.txt.sig`, an Ed25519 signature of that list, made with a key that only the maintainer holds
+and that never leaves their computer. Save Garage has the public half built in, and it installs an update only when:
+
+- the signature matches that key;
+- the download's SHA-256 matches the signed list, and every file the list names carries the new version number;
+- the version is newer than yours (it never goes back, so an old release can't be passed off as a new one), and the
+  release is published, not a draft or a prerelease;
+- the archive holds only ordinary files inside its `SaveGarage` folder (no links, no `..`, no absolute paths), within
+  size limits.
+
+So even someone who took over the GitHub account, GitHub's download servers or your network couldn't make Save Garage
+install anything the maintainer didn't sign. A release that fails a check is not installed, and the page says why.
+You can check a release yourself with OpenSSL 3: save this public key as `savegarage-release.pem` (its fingerprint, the
+SHA-256 of the 32 key bytes, is `869f51ec785be3965a30092c9f9efab9a553096f3d6e95ed585ab691ab325e0a`)
+
+```
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAbwv7xvlWMCQqZ/VVnNwiVN4Mx19Ss4UHWyHVbp6LP1E=
+-----END PUBLIC KEY-----
+```
+
+and run, in the folder with the downloads:
+
+```
+openssl pkeyutl -verify -pubin -inkey savegarage-release.pem -rawin -in SHA256SUMS.txt -sigfile SHA256SUMS.txt.sig
+sha256sum -c --ignore-missing SHA256SUMS.txt
+```
+
+**What it updates.** The Windows and macOS downloads (the app files and launchers in the `SaveGarage` folder; files of
+your own there are left alone) and the Linux build (the whole folder, so only a folder that holds nothing but the
+download's files). If a new version needs a different Python than the one in your Windows folder, or other Python
+packages on a Mac, the page says a new version is out, with a link, and you download that one yourself. When you run
+Save Garage from a git checkout, or from any folder that isn't laid out like a download (or that it can't write to), it
+never changes a file and only tells you a new version is out. It doesn't install, or put anything back, while another
+copy of Save Garage is running. What it did is logged in `update/update.log` in the data folder.
+
 ## Related
 
 - [GTA 6 hash database](https://github.com/NotHGM/gta6-hash-database): every name Save Garage has decoded (stats, items,
@@ -142,6 +203,8 @@ on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folde
 | A download or saving edits stops with "GarlicSaves isn't accepting key requests from Save Garage's shared key" or "GarlicSaves isn't decrypting or encrypting saves for Save Garage's shared key" | GarlicSaves has turned that off for the key every copy of Save Garage uses, so trying again straight away won't help. Update Save Garage when a new version is out, or try again later. |
 | A download stops with "The PS5 didn't answer" | Go back to the PS5 home screen, close any other save-transfer tool so Data Transfer is free, and try again. |
 | A download stops with "The power-button wait timed out" | Download again, and when the app asks, press the PS5 power button once within about 5 minutes and let go at the beep. |
+| The bottom of the page says "Update failed" | Nothing changed: Save Garage stays on the version you have. A download that didn't finish or failed a check is tried again at the next check (or click Check for updates); a version that didn't start isn't tried again. You can always download the new version yourself from [Releases](../../releases/latest). `update/update.log` in the data folder says what happened. |
+| The Linux `SaveGarage` folder is gone after a power cut during an update | Rename `.SaveGarage.backup` (named after your folder), next to where it was, back to `SaveGarage`. |
 
 ## Linux notes
 
@@ -168,8 +231,12 @@ python3 -m venv .venv
 
 Options: `--port N` (default 7283), `--host ADDRESS`, `--allow NETWORKS`, `--no-browser`.
 
+A git checkout never updates itself: it only shows at the bottom of the page when a new version is out.
+
 Release files are built on Linux with [`scripts/package_release.sh`](scripts/package_release.sh): a portable Windows
 folder with the official embeddable Python, a Mac launcher, and a self-contained Linux build, plus `SHA256SUMS.txt`.
+Each holds a `build.json` that tells the updater what kind of build it is. [`scripts/sign_release.py`](scripts/sign_release.py)
+signs `SHA256SUMS.txt` with the release key and checks the signature the way the app does.
 `scripts/build_windows.bat` and `scripts/build_macos.sh` make single-folder builds with PyInstaller on those systems.
 
 ## Credits and license

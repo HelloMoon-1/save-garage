@@ -12,3 +12,5 @@ research*/
 dev_scratch/
 backups/
 screenshots/
+# the build marker scripts/package_release.sh writes into each package: a checkout never has one
+/build.json

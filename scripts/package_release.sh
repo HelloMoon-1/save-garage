@@ -4,18 +4,23 @@
 #   SaveGarage-<version>-macos.zip         double-click launcher; sets up its own Python environment on first run
 #   SaveGarage-<version>-linux-x64.tar.gz  self-contained PyInstaller build
 #   SHA256SUMS.txt
-# Output goes to build_out/release. Needs python3, curl and internet access.
+# Each package holds build.json, the build marker engine/updater.py reads to update it: its flavour and version, and for
+# Windows and macOS the app files and launchers an update replaces and a fingerprint of the Python runtime (an update
+# that changes it has to be downloaded by hand). dev_scratch/ship.sh then signs SHA256SUMS.txt (scripts/sign_release.py).
+# Output goes to build_out/release, or to OUT=<folder>. Needs python3, curl and internet access.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 PYWIN="${PYWIN:-3.14.10}"                    # Python version bundled in the Windows build
 VERSION=$(python3 -c "import re; print(re.search(r\"VERSION = '([^']+)'\", open('engine/app.py').read()).group(1))")
-OUT="$ROOT/build_out/release"
+OUT="$(realpath -m "${OUT:-$ROOT/build_out/release}")"
+case "$ROOT/" in "$OUT"/*) echo "OUT=$OUT would hold the source: not a folder to build into"; exit 1;; esac
+case "$OUT" in /|"$(realpath -m "$HOME")") echo "OUT=$OUT is not a folder to build into"; exit 1;; esac
 CACHE="$ROOT/build_out/cache"
 STAGE="$ROOT/build_out/stage"
 rm -rf "$OUT" "$STAGE"
 mkdir -p "$OUT" "$CACHE" "$STAGE"
-APP_FILES=(engine vendor ui LICENSE CREDITS.md README.md requirements.txt)
+APP_FILES=(engine vendor ui docs LICENSE CREDITS.md README.md requirements.txt)
 
 copy_app() {   # copy the app source into $1, without caches
   mkdir -p "$1"
@@ -39,6 +44,37 @@ with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
 PY
 }
 
+build_json() { # build_json <file> <flavour> [<runtime> <launcher> <readme>]: the build marker engine/updater.py reads
+  # runtime: the bundled Python folder (Windows) or requirements.txt (macOS), as SHA-256 over "<sha256>  <path>" lines
+  # sorted by path (updater.runtime_id), or over the file. Linux: "files" names everything in the folder (with
+  # build.json), which an update renames as a whole, so the updater leaves a folder that holds anything else alone
+  VERSION="$VERSION" APP_LIST="${APP_FILES[*]}" python3 - "$@" <<'PY'
+import hashlib, json, os, sys
+path, flavour, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
+b = {'flavour': flavour, 'version': os.environ['VERSION']}
+if rest:
+    rt, top = rest[0], rest[1:]
+    if os.path.isdir(rt):
+        lines = []
+        for d, _, fs in os.walk(rt):
+            for n in fs:
+                p = os.path.join(d, n)
+                with open(p, 'rb') as f:
+                    lines.append((os.path.relpath(p, rt).replace(os.sep, '/'), hashlib.sha256(f.read()).hexdigest()))
+        b['runtime'] = hashlib.sha256(''.join('%s  %s\n' % (h, p) for p, h in sorted(lines)).encode()).hexdigest()
+    else:
+        with open(rt, 'rb') as f:
+            b['runtime'] = hashlib.sha256(f.read()).hexdigest()
+    b['files'] = os.environ['APP_LIST'].split()
+    b['top'] = top
+else:
+    b['files'] = sorted(set(os.listdir(os.path.dirname(path) or '.')) | {'build.json'})
+with open(path, 'w') as f:
+    json.dump(b, f, indent=1)
+    f.write('\n')
+PY
+}
+
 echo "== Save Garage $VERSION"
 [ -x .venv/bin/python ] || python3 -m venv .venv
 .venv/bin/pip install -q -r requirements.txt pyinstaller
@@ -57,18 +93,21 @@ PYTAG=$(echo "$PYWIN" | awk -F. '{print $1$2}')
   -r requirements.txt -d "$WHEELS"
 mkdir -p "$WIN/app/python/Lib/site-packages"
 for w in "$WHEELS"/*.whl; do python3 -c "import zipfile, sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$w" "$WIN/app/python/Lib/site-packages"; done
+# cmd.exe reads a batch file a line at a time, so the line that runs Save Garage also ends the file: an update can then
+# replace this launcher while it is running
 printf '%s\r\n' '@echo off' 'title Save Garage' \
   'echo Save Garage is starting. Your browser opens in a moment.' \
   'echo Keep this window open while you use Save Garage. Close it, or click Quit in the page, to stop.' \
   'set SAVEGARAGE_DESKTOP=1' \
-  '"%~dp0app\python\python.exe" "%~dp0app\engine\main.py" --open %*' \
-  'if errorlevel 1 pause' > "$WIN/Start Save Garage.bat"
+  'if not exist "%~dp0app\engine\main.py" if exist "%~dp0.update\backup\app\engine\main.py" move "%~dp0.update\backup\app\engine" "%~dp0app\engine" >nul' \
+  '"%~dp0app\python\python.exe" "%~dp0app\engine\main.py" --open %* || pause & exit /b' > "$WIN/Start Save Garage.bat"
 printf '%s\r\n' 'Save Garage for Windows 10 and 11' '' \
   '1. Double-click "Start Save Garage.bat". If Windows SmartScreen appears, click More info, then Run anyway.' \
   '2. When Windows Firewall asks about Python, allow it on private networks. Your PS5 needs to reach this PC.' \
   '3. Your browser opens Save Garage. Follow the steps on screen.' '' \
   'Saves and backups are kept in %LOCALAPPDATA%\SaveGarage.' \
   'Full guide: see app\README.md or the project page.' > "$WIN/README.txt"
+build_json "$WIN/app/build.json" windows "$WIN/app/python" "Start Save Garage.bat" README.txt
 zip_dir "$STAGE/win" SaveGarage "$OUT/SaveGarage-$VERSION-windows-x64.zip"
 
 # ---------------------------------------------------------------- macOS (launcher + source)
@@ -78,6 +117,8 @@ cat > "$MAC/Start Save Garage.command" <<'SH'
 #!/bin/bash
 # Starts Save Garage. The first run sets up a private Python environment, which needs internet access.
 cd "$(dirname "$0")/app" || exit 1
+# an update cut short at the wrong moment can leave engine/ in its backup: put it back (the app then finishes the job)
+[ -f engine/main.py ] || { [ -f ../.update/backup/app/engine/main.py ] && mv ../.update/backup/app/engine engine; }
 SUPPORT="$HOME/Library/Application Support/SaveGarage"
 VENV="$SUPPORT/venv"
 PY=""
@@ -108,6 +149,7 @@ Save Garage for macOS
 
 Saves and backups are kept in ~/Library/Application Support/SaveGarage.
 TXT
+build_json "$MAC/app/build.json" macos "$MAC/app/requirements.txt" "Start Save Garage.command" README.txt
 zip_dir "$STAGE/mac" SaveGarage "$OUT/SaveGarage-$VERSION-macos.zip"
 
 # ---------------------------------------------------------------- Linux (PyInstaller)
@@ -120,6 +162,7 @@ The PS5 protocol uses ports 1004 to 1006, which Linux keeps for root. Allow them
   sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1004
 and set it back afterwards with ...=1024. Saves and backups are kept in ~/.local/share/SaveGarage.
 TXT
+build_json build_out/dist/SaveGarage/build.json linux
 tar -C build_out/dist -czf "$OUT/SaveGarage-$VERSION-linux-x64.tar.gz" SaveGarage
 
 (cd "$OUT" && sha256sum SaveGarage-* > SHA256SUMS.txt)

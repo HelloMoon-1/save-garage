@@ -28,9 +28,14 @@ The whole app state, polled about once a second by the UI.
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": []},
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
   "version": "1.29.1",
-  "canQuit": false                                    // true in the desktop builds
+  "canQuit": false,                                   // true in the desktop builds
+  "update": {"auto": true, "mode": "install", "why": null, "flavour": "windows", "status": "ready", "current": "1.30.0",
+             "latest": "1.30.1", "error": null, "progress": null, "total": null, "checked": 1795651200, "installed": null,
+             "notes": "https://github.com/NotHGM/save-garage/releases/tag/v1.30.1", "canRestart": true, "restarting": false}
 }
 ```
+
+`update` is the updater's state; see [Updates](#updates) below.
 
 ## GET /api/slot?file=…
 
@@ -123,6 +128,9 @@ slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmo
 | `/api/upload` | none | Starts sending the save back to the PS5 |
 | `/api/cancel` | none | Stops the current task |
 | `/api/quit` | none | Closes Save Garage (refused while a transfer is running) |
+| `/api/update/check` | none | Checks GitHub for a new version now, in the background (a check less than 10 s after the last one, or while one runs, is skipped). Answers `state.update` |
+| `/api/update/settings` | `{"auto": false}` | Turns automatic updates on or off, saved as `autoUpdate` in `config.json` in the data folder (its other settings are kept). Turning them off ends a download in progress and drops a staged update. Answers `state.update` |
+| `/api/update/restart` | none | Starts Save Garage again, so the staged update installs; answers `{"ok": true}` first. Refused with `busy` while a task runs and `no_update` when nothing is staged |
 
 Each edit names the value it replaces (`value`) and the new one (`newValue`); an edit whose `value` no longer matches
 the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail": "…"}`.
@@ -229,3 +237,35 @@ touched. Whether the cheat then shows in the game's Progress menu isn't known ye
 trophies and saving for the rest of that session. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
 record isn't shaped as the game writes it), `not_editable` (a record of another challenge set), `unknown_challenge`,
 `bad_request`, `verify_failed`. Errors carry the `save_` prefix in the job's error.
+
+## Updates
+
+`state.update` is what engine/updater.py reports (README.md, "Updates", tells users the same):
+
+- `auto`: the "Update automatically" setting (`autoUpdate` in `config.json` in the data folder, on unless it is
+  `false`). While it is on, Save Garage checks `https://api.github.com/repos/NotHGM/save-garage/releases/latest` at
+  start-up and every 6 hours; while it is off, only `POST /api/update/check` does, and nothing is downloaded or
+  installed.
+- `mode`: `install` for a release build the updater may update, `notify` for anything else, which only shows that a
+  new version is out; then `why` says why: `checkout` (a `.git` in the app's folder or one above it), `not_desktop`
+  (not started by the build's launcher), `read_only` (a folder it can't write to) or `unknown` (another layout, or a
+  `build.json` that doesn't match the running version). `flavour` is `windows`, `macos` or `linux` from `build.json`.
+- `status`: `idle` (no check yet), `checking`, `current` (up to date), `downloading` (`progress` bytes of `total`),
+  `ready` (staged: installs at the next start or with `/api/update/restart`), `available` (a newer version that this
+  copy doesn't install: notify mode, automatic updates off, or a version needing a new Python runtime, `error`
+  `runtime`, not downloaded again), `failed` (`error` says why) or `check_failed` (GitHub couldn't be read; `error`
+  `check_failed`).
+- `current` is this version, `latest` the newest one found. `notes` is the GitHub release page of `latest` (or of this
+  version), for the release notes and the downloads. `installed` is set in the first run of a version the updater
+  just installed. `canRestart` is true while an update is staged and no task runs; `restarting` once it restarts.
+
+A newer version is installed only when `SHA256SUMS.txt.sig` is a valid Ed25519 signature of `SHA256SUMS.txt` by the
+release key pinned in engine/updater.py, the build's file matches its SHA-256 there, every name in the list carries
+that version, and the archive passes the unpacking checks. Otherwise `status` is `failed` with `error`: `unsigned`
+(no signature or no list), `bad_signature`, `bad_version` (a list for another version, or a malformed one),
+`no_asset` (no file for this build), `bad_checksum`, `too_large` (over 100 MB, or unpacking to more than 400 MB),
+`bad_archive` (a link, device, absolute path, `..` or a file outside its `SaveGarage` folder), `bad_package` (not
+this build, or files missing), `network` (the download didn't finish), `disk`, `install_failed` (cut short twice),
+`start_failed` (the new version didn't answer `/api/state` within 90 s, or stopped before it did, so the old version
+was put back) or `internal`. A version that didn't start or couldn't be installed (`start_failed`, `install_failed`)
+is not tried again; the other failures are retried at the next check.

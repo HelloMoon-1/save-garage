@@ -83,13 +83,24 @@
     no_session: 'No save downloaded yet.',
     nothing_to_upload: 'There are no saved edits to send.',
     console_not_found: 'No PS5 answered at that address. Check the IP address and that the PS5 is on.',
+    no_update: 'There’s no update ready to install.',
     request_failed: 'Save Garage didn’t answer. Check that it is still running.'};
+  // why an update was refused or rolled back (state.update.error), after "Update failed:"
+  const UPD_WHY = {
+    network: 'the download didn’t finish', unsigned: 'the release isn’t signed', bad_signature: 'the release signature isn’t valid',
+    bad_version: 'the release files carry the wrong version', no_asset: 'the release has no download for this computer',
+    bad_checksum: 'the download doesn’t match its signed checksum', too_large: 'the download is larger than allowed',
+    bad_archive: 'the download holds unsafe files', bad_package: 'the download isn’t a Save Garage build for this computer',
+    disk: 'the update couldn’t be saved on this computer', install_failed: 'the new version couldn’t be put in place',
+    start_failed: 'the new version didn’t start', internal: 'something went wrong'};
+  const RELEASES = 'https://github.com/NotHGM/save-garage/releases';
 
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
     slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, world: {}, sd: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
     preview: {}, compExp: {}, keep: {},
-    find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
+    find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null,
+    restarting: null, updAuto: null};
 
   // ------------------------------------------------------------ api
   async function api(path, body) {
@@ -150,6 +161,12 @@
   }
 
   function onState(st) {
+    if (S.restarting && (S.restarting.down || st.version !== S.restarting.from) && !st.update?.restarting) {
+      const host = S.restarting.host;           // Save Garage is back after Restart now: check the service, pick the PS5 again
+      S.restarting = null;
+      api('/api/network', {}).catch(() => {});
+      if (host && !st.console) api('/api/console', {host}).then(s => { S.manualView = null; onState(s); }).catch(() => {});
+    }
     const prevJob = S.lastJob;
     const job = st.job || {};
     const jobKey = job.id + ':' + job.status;
@@ -190,6 +207,10 @@
       S.failures = 0; S.offline = false;
       onState(st);
     } catch {
+      if (S.restarting) {
+        S.restarting.down = true;
+        if (Date.now() - S.restarting.at > 180000) S.restarting = null;
+      }
       if (++S.failures >= 3) { S.offline = true; renderStatus(); }
     } finally {
       setTimeout(poll, 1000);
@@ -201,6 +222,36 @@
     const st = S.state || {};
     $('#version').textContent = st.version ? 'Version ' + st.version : '';
     $('#quit').hidden = !st.canQuit;
+    renderUpdate();
+  }
+
+  // the update row of the footer: what the updater is doing (state.update, see docs/API.md) and its controls
+  function renderUpdate() {
+    const box = $('#update'), u = S.state?.update;
+    if (!u) { box.hidden = true; return; }       // a Save Garage from before 1.30.0
+    const link = typeof u.notes === 'string' && u.notes.startsWith(RELEASES + '/') ? u.notes : RELEASES;
+    const pct = u.status === 'downloading' && u.total > 0 && u.progress >= 0 ? Math.min(100, Math.floor(100 * u.progress / u.total)) : null;
+    const [dot, text] = S.restarting || u.restarting ? ['wait', 'Restarting Save Garage…']
+      : u.status === 'checking' ? ['wait', 'Checking for updates…']
+      : u.status === 'downloading' ? ['wait', `Downloading Save Garage ${u.latest}`]
+      : u.status === 'ready' ? ['ok', `${u.latest} will install next time you start Save Garage.`]
+      : u.status === 'failed' ? ['bad', `Update failed: ${UPD_WHY[u.error] || UPD_WHY.internal}, Save Garage stays on ${u.current}.`]
+      : u.status === 'available' ? ['wait', `A new version is out: ${u.latest}.`]
+      : u.status === 'check_failed' ? ['bad', 'Couldn’t reach GitHub to check for updates.']
+      : u.installed ? ['ok', `Save Garage was updated to ${u.installed}.`]
+      : u.status === 'current' ? ['ok', 'Up to date'] : ['', ''];
+    const status = text ? `<span class="dot ${dot}"></span><span>${esc(text)}</span>${pct != null ? `<span class="pct" data-no-i18n>${pct}%</span>` : ''}` : '';
+    const auto = S.updAuto ?? u.auto, busy = running(), restarting = !!(S.restarting || u.restarting);
+    const actions = [
+      u.status === 'ready' && !restarting ? `<button class="btn small primary" type="button" data-act="update-restart" ${u.canRestart && !busy ? '' : 'disabled'}${busy ? ` title="${esc(ERR.busy)}"` : ''}>Restart now</button>` : '',
+      u.status === 'available' ? `<a class="link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Download it</a>`
+        : `<a class="link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Release notes</a>`,
+      `<button class="link" type="button" data-act="update-check" ${['checking', 'downloading'].includes(u.status) || restarting ? 'disabled' : ''}>Check for updates</button>`,
+      `<label class="toggle"><input type="checkbox" data-act="update-auto" ${auto ? 'checked' : ''}> Update automatically</label>`].join('');
+    const sEl = $('#update-status'), aEl = $('#update-actions');
+    if (sEl.dataset.html !== status) { sEl.innerHTML = status; sEl.dataset.html = status; }
+    if (aEl.dataset.html !== actions) { aEl.innerHTML = actions; aEl.dataset.html = actions; }
+    box.hidden = false;
   }
 
   function passed(big, small) {
@@ -216,7 +267,7 @@
     const c = st.console;
     const net = st.network;
     statusEl.innerHTML = [
-      S.offline ? '<span class="pill"><span class="dot bad"></span><b>Editor service not answering</b></span>' : '',
+      S.offline && !S.restarting ? '<span class="pill"><span class="dot bad"></span><b>Editor service not answering</b></span>' : '',
       c ? `<span class="pill"><span class="dot ${st.paired ? 'ok' : 'wait'}"></span><b>${esc(c.name)}</b>${st.paired ? 'paired' : 'not paired'}</span>` : '<span class="pill"><span class="dot"></span>No PS5 selected</span>',
       `<span class="pill"><span class="dot ${net ? (net.ok ? 'ok' : 'bad') : 'wait'}"></span>${net ? (net.ok ? 'Decryption service online' : 'Decryption service offline') : 'Checking the decryption service'}</span>`
     ].join('');
@@ -1519,6 +1570,13 @@
     const a = b.dataset.act;
     if (a === 'deleted') { S.deleted = b.checked; const up = $('[data-act="upload"]'); if (up) up.disabled = !(S.deleted && !running()); return; }
     if (a === 'pick-exp') { S.compExp[S.slot] = b.checked; return; }
+    if (a === 'update-auto') {                  // saved in data/config.json as autoUpdate
+      const on = b.checked;
+      S.updAuto = on;
+      api('/api/update/settings', {auto: on}).then(u => { if (S.state) S.state.update = u; })
+        .catch(e => toast(ERR[e.code] || ERR.internal)).finally(() => { S.updAuto = null; renderUpdate(); });
+      return;
+    }
     if (b.tagName === 'A') return;
     e.preventDefault();
     if (a === 'go') { S.localError = null; S.manualView = b.dataset.view; S.mainKey = ''; renderRoute(); renderMain(); renderJob(); renderPending(); main.focus(); return; }
@@ -1532,6 +1590,19 @@
     if (a === 'download') { act('/api/download'); return; }
     if (a === 'choose-account') { act('/api/choose-account', {owner: b.dataset.owner}); return; }
     if (a === 'cancel') { act('/api/cancel'); return; }
+    if (a === 'update-check') {
+      api('/api/update/check', {}).then(u => { if (S.state) { S.state.update = u; renderUpdate(); } }).catch(e => toast(ERR[e.code] || ERR.internal));
+      return;
+    }
+    if (a === 'update-restart') {               // Save Garage starts again and installs the update; refused while a task runs
+      if (running()) return;
+      const unsaved = (S.state?.slots || []).some(x => editCount(draftOf(x.file)) && dirty(x));
+      if (unsaved && !confirm(T('Restart Save Garage now? Edits you haven’t saved here are lost.'))) return;
+      const from = S.state?.version, host = S.state?.console?.host || null;
+      api('/api/update/restart', {}).then(() => { S.restarting = {from, host, down: false, at: Date.now()}; renderUpdate(); renderStatus(); })
+        .catch(e => toast(ERR[e.code] || ERR.internal));
+      return;
+    }
     if (a === 'upload') { act('/api/upload'); return; }
     if (a === 'restore') {
       if (confirm(T('Put the original saves back? Every edit you saved here is undone. You still need to send the save to the PS5 afterwards.'))) act('/api/restore', {}, () => { S.drafts = {}; });

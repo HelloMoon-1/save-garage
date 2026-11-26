@@ -67,5 +67,7 @@ if __name__ == '__main__':
         runpy.run_module(mod, run_name='__main__', alter_sys=True)
     else:
         _options(sys.argv[1:])
+        import bootstrap                # installs an update downloaded earlier, before the app's modules load
+        bootstrap.run(BASE)
         import app
         app.main()

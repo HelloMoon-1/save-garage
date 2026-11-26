@@ -267,6 +267,17 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 
 .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 18px clamp(16px, 4vw, 44px) 96px; border-top: 1px solid var(--hairline); color: var(--text-3); font-size: 13px; }
 .foot-actions { display: inline-flex; gap: 16px; align-items: center; }
+/* ---------- updates: a row of the footer, under the version ---------- */
+.update { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 18px; }
+.upd-status { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
+.upd-status:empty { display: none; }
+.upd-status .pct { font-variant-numeric: tabular-nums; color: var(--text-3); }
+.upd-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.upd-actions .link { font-size: 13px; }
+.upd-actions .btn.small { min-height: 30px; padding: 3px 12px; font-size: 13px; }
+.upd-actions .toggle { min-height: 0; gap: 7px; font-size: 13px; color: var(--text-2); }
+.upd-actions .toggle input { width: 16px; height: 16px; margin: 0; }
+.link:disabled { opacity: .5; cursor: default; }
 
 @media (max-width: 860px) {
   .field.cheat { grid-template-columns: 1fr; }
@@ -400,3 +411,4 @@ details.more-opts > .callout { margin-bottom: 24px; }
 [dir="rtl"] .weapons li { unicode-bidi: plaintext; }
 [dir="rtl"] .field.cheat .cheat-name[data-no-i18n] { text-align: right; }
 [dir="rtl"] .title-card strong, [dir="rtl"] .comp-summary .big, [dir="rtl"] .raw td small.after { direction: ltr; unicode-bidi: isolate; }
+[dir="rtl"] .upd-status .pct { direction: ltr; unicode-bidi: isolate; }
