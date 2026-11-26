@@ -42,6 +42,26 @@ jobs:
             if [ "$status" -ne 2 ]; then exit "$status"; fi
           fi
 
+      - name: Configure release worker key
+        env:
+          RELEASE_WORKER_KEY: ${{ secrets.SAVEGARAGE_RELEASE_WORKER_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          key = os.environ['RELEASE_WORKER_KEY']
+          if not re.fullmatch(r'[0-9a-fA-F]{64}', key):
+              raise SystemExit('Missing or invalid release worker key')
+          path = Path('engine/garlic.py')
+          source = path.read_text(encoding='utf-8')
+          marker = "DEFAULT_KEY = ''\n"
+          if source.count(marker) != 1:
+              raise SystemExit('Release key placeholder not found')
+          path.write_text(source.replace(marker, 'DEFAULT_KEY = ' + repr(key) + '\n'), encoding='utf-8')
+          PY
+
       - name: Build Windows, macOS and Linux packages
         run: ./scripts/package_release.sh
 

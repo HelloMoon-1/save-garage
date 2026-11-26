@@ -16,7 +16,9 @@ import json, math, re
 from collections import namedtuple
 
 import gamelabels
+import hashnames
 import itemnames
+import meanings
 import money
 import statnames
 
@@ -151,8 +153,15 @@ def _val_span(txt, group, count):
     return s, e
 
 
+# Money earned: TOTAL EARNED and each character's MONEY EARNED are lifetimemoneyearned without a qualifier. They rise
+# with every source of money (tasks, robberies, safes, tills, pickups, fencing), so an edit to a source moves them too.
+# BuckMe is how money was paid, not where it came from, so it isn't added again.
+LIFETIME_EARNED = 0xd5188146
+EARN_SOURCES = {joaat(q) for q in ('tasks', 'robberies', 'safe', 'till', 'pickups')}
+
+
 def _apply_stats(txt, changes):
-    groups, _ = stat_rows(txt)
+    groups, tables = stat_rows(txt)
     final, explicit_total, log = {}, set(), []
     for ch in changes:
         g = ch.get('group')
@@ -194,6 +203,25 @@ def _apply_stats(txt, changes):
         if not _same(G['type'], total, v0):
             final[(g, r0)] = total
             log.append({'what': 'stat_total', 'group': g, 'row': r0, 'from': v0, 'to': total})
+
+    # keep the money-earned totals in step with the sources edited (unless a total was edited itself)
+    A, Q = tables['base'], tables['qual']
+    delta = {1: 0, 2: 0}
+    for (g, r), nv in list(final.items()):
+        G = groups[g]
+        if A[G['base'][r]] == LIFETIME_EARNED and G['qual'][r] and Q[G['qual'][r]] in EARN_SOURCES and G['owner'][r] in (1, 2):
+            delta[G['owner'][r]] += nv - G['value'][r]
+    if delta[1] or delta[2]:
+        for g, G in groups.items():
+            for r in range(len(G['value'])):
+                if A[G['base'][r]] != LIFETIME_EARNED or G['qual'][r] != 0 or (g, r) in final:
+                    continue
+                o = G['owner'][r]
+                add = delta[1] + delta[2] if o == 0 else delta.get(o, 0)
+                if add:
+                    nv = coerce(G['type'], max(0, G['value'][r] + add))
+                    final[(g, r)] = nv
+                    log.append({'what': 'stat_total', 'group': g, 'row': r, 'from': G['value'][r], 'to': nv})
 
     for g in sorted({g for g, _ in final}):
         G = groups[g]
@@ -284,9 +312,12 @@ def apply(b, edits):
         log += rlog
     comp = edits.get('completion') or {}
     if comp:
-        import compendium, discovery, challenges, gyms, activities, checklist
+        import compendium, discovery, challenges, gyms, activities, checklist, robberies, fencing, activities2, hoops, vehicles_compendium
+        import collectibles2 as collectibles
         steps = [(compendium, comp.get('compendium')), (discovery, comp.get('discovery')), (challenges, comp.get('challenges')), (gyms, comp.get('gyms')),
-                 (activities, comp.get('activities'))]
+                 (activities, comp.get('activities')), (robberies, comp.get('robberies')), (fencing, comp.get('fencing')),
+                 (activities2, comp.get('activities2')), (hoops, comp.get('hoops')), (vehicles_compendium, comp.get('vehicles')),
+                 (collectibles, comp.get('collectibles'))]
         if comp.get('stuntDiscovery'):         # the stunt categories in the map's Discovery section follow the stunts
             steps.append((discovery, {'categories': [STUNT_DISCOVERY[i] for g in comp['stuntDiscovery'] for i in STUNT_DISCOVERY_IDS.get(g, ())],
                                       'allow_stunt': True}))
@@ -299,7 +330,7 @@ def apply(b, edits):
                 except (KeyError, ValueError, TypeError) as e:
                     raise SaveError('bad_request') from e
                 log += [dict(x, what='completion', step=x.get('what')) for x in clog]
-        if any(comp.get(k) for k in ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'stuntDiscovery')):
+        if any(comp.get(k) for k in COMPLETION_PARTS + ('stuntDiscovery',)):
             b, clog = checklist.apply(b, {'overall': 'recompute'})     # the 100% figure, as the game works it out
             log += [dict(x, what='completion', step=x.get('what'), label='100% completion') for x in clog]
     if edits.get('world'):
@@ -392,7 +423,7 @@ FEATURED = [
     Spec('busted', 'records', 'Times busted', 'How often you were arrested.', 'caution', 'count', 'busted', 0, LUCIA_JASON),
     Spec('stolen', 'records', 'Vehicles stolen', 'Shown in the game as VEHICLES STOLEN.', 'caution', 'count', 'stolen', 'vehicle', LUCIA_JASON),
     Spec('stolen_slimjim', 'records', 'Vehicles stolen with a slim jim', 'Shown in the game as VEHICLES STOLEN WITH SLIM JIM.', 'caution', 'count', 'stolenvehiclesbymethod', 'slimjim', LUCIA_JASON),
-    Spec('stolen_window', 'records', 'Vehicles stolen by breaking a window', 'Shown in the game as VEHICLES STOLEN BY BREAKING WINDOW.', 'caution', 'count', 'stolenvehiclesbymethod', 'smashedwindow', LUCIA_JASON),
+    Spec('stolen_window', 'records', 'Vehicles stolen by breaking in', 'Shown in the game as VEHICLES STOLEN BY BREAKING IN.', 'caution', 'count', 'stolenvehiclesbymethod', 'smashedwindow', LUCIA_JASON),
     Spec('carjackings', 'records', 'Carjackings', 'Vehicle record.', 'caution', 'count', 'carjackings', 0, LUCIA_JASON),
     Spec('holdups', 'records', 'Holdups', 'Store holdups.', 'caution', 'count', 'holdups', 0, LUCIA_JASON),
     Spec('fish', 'records', 'Fish caught', 'Shown in the game as FISH CAUGHT.', 'caution', 'count', 'totalcaught', 'fish', LUCIA_JASON),
@@ -481,7 +512,9 @@ TESTED_ON_PS5 = {
     'busted', 'stolen', 'stolen_slimjim', 'stolen_window', 'carjackings', 'holdups', 'fish', 'photo_animal', 'rentals', 'taxis',
     'masks', 'armor', 'fenced_packages', 'fenced_doubloons', 'fenced_meteorites', 'stunts_total', 'stunt_jumps', 'base_jumps',
     'knife_flights', 'under_bridges', 'challenges', 'discoverables', 'collectibles', 'collectible_cards', 'collectible_sets', 'vaults',
-    'gadget_metaldetector', 'gadget_masks', 'gadget_headphones'}
+    'gadget_metaldetector', 'gadget_masks', 'gadget_headphones',
+    # seen on the stats screens of a fresh save with every edit (25 Nov): the focus totals, task rewards, time at 6 stars
+    'buffs_focus', 'overpowers_focus', 'earned_tasks', 'wanted_time_l6'}
 EXTRA_HELP = {
     'overall_pct': 'The game shows the value you set; it is not counted again on load.',
     'challenges': 'It also changes CHALLENGES COMPLETED on the 100% checklist.',
@@ -568,9 +601,19 @@ def stats_table(sec_txt):
     names = table_names(tables)
     names['qual_labels'] = {i: gamelabels.QUALIFIER_LABELS[h] for i, h in enumerate(Q) if h in gamelabels.QUALIFIER_LABELS}
     names['owner_labels'] = {i: gamelabels.OWNER_LABELS[h] for i, h in enumerate(O) if i > 2 and h in gamelabels.OWNER_LABELS}
+    # keys whose real name is unknown: what they hold, worked out from the saves (the UI marks these as descriptions)
+    names['base_meanings'] = {i: meanings.BASE[h] for i, h in enumerate(A) if names['base'][i] is None and h in meanings.BASE}
+    qm = {i: meanings.QUALIFIER[h] for i, h in enumerate(Q) if names['qual'][i] is None and i not in names['qual_labels'] and h in meanings.QUALIFIER}
+    om = {i: meanings.OWNER[h] for i, h in enumerate(O) if names['owner'][i] is None and i not in names['owner_labels'] and h in meanings.OWNER}
+    names['qual_labels'].update(qm)
+    names['owner_labels'].update(om)
+    names['meaning'] = {'base': sorted(names['base_meanings']), 'qual': sorted(qm), 'owner': sorted(om)}
+    # values that are IDs of something with a known name (favourite vehicle or station, gang item, biggest fish, …)
+    means = {'%s:%d' % (g, r): m for g, G in groups.items() if G['type'] in ('u32', 'int32', 'int64')
+             for r, v in enumerate(G['value']) for m in [hashnames.lookup(v)] if m}
     return {'groups': [{'key': g, 'type': G['type'], 'base': G['base'], 'qual': G['qual'], 'owner': G['owner'], 'value': G['value']}
                        for g, G in groups.items() if G['value']],
-            'names': names, 'labels': labels,
+            'names': names, 'labels': labels, 'means': means,
             'protected': {MONEY_GROUP: list(MONEY_BASES)}}
 
 
@@ -584,6 +627,7 @@ STUNT_GROUPS = (
     ('bridges', 'Under the bridge and knife flights', completiondata.BRIDGES_AND_KNIFE_FLIGHTS, (('underthebridge', 202), ('knifeflights', 40)), 242),
 )
 STUNTS_FOR_100 = 300            # the 100% checklist asks for any 300 of the game's 397 stunts
+COMPLETION_PARTS = ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles')
 # Discovery section categories for each stunt type (their found bits mirror numfound.<type> in every game save)
 STUNT_DISCOVERY = {'jumps': 0x07b59c95, 'base': 0xec841e35, 'bridges': 0x0f25b442, 'knife': 0xc8c1866f}
 STUNT_DISCOVERY_IDS = {'jumps': ('jumps',), 'base': ('base',), 'bridges': ('bridges', 'knife')}

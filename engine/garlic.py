@@ -3,8 +3,8 @@ import json, subprocess, time, urllib.request, shutil, os, socket, threading, zi
 from pathlib import Path
 
 DEFAULT_SERVER = 'https://garlicsaves.com'
-# Public worker key built into GarlicTransfer 0.3.7 (electron/config.cjs defaults.workerKey). Override with workerKey in data/config.json.
-DEFAULT_KEY = 'd398596b0dd4ad811173e3324a94d1cc90246a1c7f75b405a5696eed200b353e'
+# Packaged releases receive the default during the build.
+DEFAULT_KEY = ''
 NOWIN = 0x08000000 if os.name == 'nt' else 0
 
 
@@ -15,7 +15,7 @@ class GarlicError(Exception):
 class Garlic:
     def __init__(self, server=None, key=None, proxy=None):
         self.server = (server or DEFAULT_SERVER).rstrip('/')
-        self.key = key or DEFAULT_KEY
+        self.key = key or os.environ.get('GARLIC_WORKER_KEY') or DEFAULT_KEY
         self.proxy = proxy if proxy is not None else self.detect_proxy()
         self.curl = shutil.which('curl') or 'curl'
 

@@ -9,36 +9,32 @@
   <title>Save Garage</title>
   <link rel="icon" href="art/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
-  <script defer src="zh-CN.js"></script>
   <script defer src="i18n.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#main" data-ui-text="Skip to content">Skip to content</a>
+  <a class="skip" href="#main">Skip to content</a>
   <header class="masthead">
     <img class="scene" src="art/leonida.svg" alt="" aria-hidden="true">
     <div class="masthead-row">
-      <a class="brand" href="./" aria-label="Save Garage home" data-ui-label="Save Garage home">
+      <a class="brand" href="./" aria-label="Save Garage home">
         <img src="art/icon.svg" alt="" width="40" height="40">
-        <span><span class="brand-name">Save Garage</span><span class="brand-sub" data-ui-text="Story saves for GTA VI on PS5">Story saves for GTA VI on PS5</span></span>
+        <span><span class="brand-name">Save Garage</span><span class="brand-sub">Story saves for GTA VI on PS5</span></span>
       </a>
-      <div class="header-actions">
-        <select class="language" id="language" aria-label="Language" data-ui-label="Language">
-          <option value="en-US" lang="en">English</option>
-          <option value="zh-CN" lang="zh-CN">简体中文</option>
-        </select>
+      <div class="masthead-side">
         <div class="status" id="status" aria-live="polite"></div>
+        <label class="lang" data-no-i18n><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><select id="lang" aria-label="Language"></select></label>
       </div>
     </div>
-    <nav class="steps-nav" id="route" aria-label="Steps" data-ui-label="Steps"></nav>
+    <nav class="steps-nav" id="route" aria-label="Steps"></nav>
   </header>
   <main id="main" tabindex="-1"></main>
   <div class="pending" id="pending" hidden></div>
   <div class="passed" id="passed" hidden role="status" aria-live="assertive"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <footer class="foot">
-    <span data-ui-text="Runs on your own computer. Your PS5 talks to it over your home network.">Runs on your own computer. Your PS5 talks to it over your home network.</span>
-    <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden data-ui-text="Quit Save Garage">Quit Save Garage</button></span>
+    <span>Runs on your own computer. Your PS5 talks to it over your home network.</span>
+    <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden>Quit Save Garage</button></span>
   </footer>
   <noscript>Save Garage needs JavaScript.</noscript>
 </body>

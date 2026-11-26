@@ -41,8 +41,10 @@ and cleared in one visit; A0 -> A1 the Kolt bowling alley is the same)
     weaponkit_shotgun_pumpaction_reward_kolt_01 was collected in the same interval) and an office safe.
   What exactly makes a location 'cleared' is game logic. The four cleared ones have every seen item taken and every
   Task resolved; the clubhouse, staging point and fish warehouse each have an item or Task left. The Kolt stash
-  house has its one seen item taken and its one Task resolved and is still not cleared, so either it holds an item
-  that was never seen or clearing needs more than the items.
+  house has its one seen item taken and its one Task resolved and is still not cleared. The guides say a location is
+  cleared when all of its key valuables are looted, so the stash house holds a valuable not found yet. The staging
+  point's custom vehicle is 'taken' while its Task (Progress 1) is unresolved, so a custom vehicle probably has to be
+  driven away or delivered (weak).
 
 WHY NOT EDITABLE
   * 23 of the 44 locations have no Enterprises record at all; their TipId, Task ids, item slots and item types are
@@ -51,20 +53,37 @@ WHY NOT EDITABLE
     the operation itself would still be active, the unique items (custom weapons, custom vehicles, watches, safe
     cash) would never be given, and clearing it later for real would count it again (allgangs past 39, a gang past
     its total).
-  * Which 39 of the 44 count is not settled. The map categories hold 41 locations (Other criminals 10, Fronts 5,
-    Kolt 5, Final Chapter 4, San4San 4, Kingfishers 3, PTT Youngin$ 3, Guardia Brothers 3, La Polilla Negra 2, M7 2);
-    Kingfishers has 4 stats owners for 3 operations; the two banks are in no category.
   * Gang operations feed other things the save cannot show: the 'Pest Control' trophy (rob an operation of each
     gang), the partner photo filter (tracker b0f97f25 in Challenges, 'Clear 25 gang operations with your partner'),
     and the tips that come from contacts.
   A counter-only edit of ganglocationscleared.allgangs is possible through the stats editor and changes the screen,
   but completes nothing and would be pushed past 39 by later real clears.
 
+WHICH 39 COUNT (settled in round 16)
+  PowerPyx lists the 39 by gang in the game's menu order, with their map names: Kingfishers 3, Kolt & Associates 5,
+  M7 2, La Polilla Negra 2, Final Chapter 4, San4San 5, PTT Youngin$ 2, Guardia Brothers 3, Other criminals 13 (TOTALS).
+  Every map name is in the game text, and the game's own descriptions tie each one to a stats owner (MAP_NAMES), e.g.
+  'Kolt & Associates move prescription meds through the Brooks Boatworks docks' for compoundkoltandassociatesdocks,
+  'A criminal group use the Chatfield Storage & Logistics dock to move high-end, stolen vehicles' for the car theft ring.
+  The five owners that do not count (NOT_COUNTED): the Kingfishers stilt house (only a label in the game text, no
+  description; the Kingfishers map category holds 3), e6902700 (no name; the five Kolt operations map one to one onto
+  the five named Kolt owners), the PTT Illegal Goods Store (Ultimate Edition bonus; PowerPyx: 'not needed for the 100%
+  completion', 'the in-game progress gangs menu only tracks 2'), and the two banks.
+  The map categories hold 41 locations (Other criminals 10, Fronts 5, Kolt 5, Final Chapter 4, San4San 4, Kingfishers 3,
+  PTT Youngin$ 3, Guardia Brothers 3, La Polilla Negra 2, M7 2): fronts sit in their own category except the Final
+  Chapter biker bar, the PTT category includes the bonus store, and Other criminals has one map location that is not
+  among the 39. So the GANGS page totals ('of') come from TOTALS, not from the category sizes, which differ for San4San
+  (4), Other criminals (10) and PTT (3). Kingfishers 3 is on screen at 67.5%; the other totals are the guide's.
+  'Cleared' means every key valuable of the location looted (PowerPyx, GTABase: the map icon shows how many it holds).
+  In the save each found valuable becomes an Enterprises Task; the four cleared locations have all of theirs resolved.
+
 NAMES
-  The two unnamed owners were cracked here: 7fc09fac = frontcriminalbarbershopdrugs (likely: the game text has a
-  'Barbershop Weed Front') and e6902700 = compoundkoltarmadillotycoon (weak: a chance match is possible; a decoy run
-  of the same search hit 10 of 40 random hashes). Qualifier 9386ea4c is M7 (its category and counter moved with the
-  M7 junkyard) and 0f9c45d3 is PTT Youngin$ (its category got both PTT compounds when they were tipped).
+  7fc09fac = frontcriminalbarbershopdrugs (likely; brute force). Its location is confirmed as one of the 39: PowerPyx's
+  'Backroom Weed Front', and the game text has 'Barbershop Weed Front' and the internal-style 'Front Barbershop Weed'
+  (like 'Criminal Gas Station Meth' for frontcriminalgasstationmeth). e6902700 has no name: the earlier weak crack
+  'compoundkoltarmadillotycoon' was rejected in round 16 (no 'Tycoon' anywhere in the game text; a rerun of the grammar
+  hit the hash with two different strings). Its gang is unknown. Qualifier 9386ea4c is M7 (its category and counter
+  moved with the M7 junkyard) and 0f9c45d3 is PTT Youngin$ (its category got both PTT compounds when they were tipped).
   Hints come from the game's own descriptions, matched by place words; check them in game.
 
 RISK: none (read-only).
@@ -117,7 +136,7 @@ LOCATIONS = (
     ('compoundkoltbowlingalley', 'koltandassociates', 'compound', 'Bowling Alley', 'abandoned Kingpin Bowling alley'),
     ('compoundkoltstashhouse', 'koltandassociates', 'compound', 'Stash House', 'small house in Port Gellhorn'),
     ('compoundkoltworkvangarage', 'koltandassociates', 'compound', 'Work Van Garage', 'June Warehouse, where the pill vans are kept (Port Gellhorn)'),
-    (0xe6902700, 'koltandassociates', 'compound', 'Armadillo Tycoon (name weak)', None),
+    (0xe6902700, None, 'compound', 'Unnamed location', None),
     ('compoundfinalchaptercarwash', 'finalchapter', 'compound', 'Car Wash', "Hog Stars garage behind Big Joe's Car Wash, Ambrosia"),
     ('compoundfinalchapterclubhouse', 'finalchapter', 'compound', 'Clubhouse', 'large compound beyond a vehicle graveyard'),
     ('compoundfinalchaptermethfacility', 'finalchapter', 'compound', 'Meth Facility', 'rural meth facility near Bellville'),
@@ -153,7 +172,43 @@ LOCATIONS = (
     ('bankdruthers', None, 'bank', 'Bank (Druthers)', None),
     ('bankfleecavcia', None, 'bank', 'Bank (Fleeca VCIA)', None),
 )
-CRACKED = {0x7fc09fac: ('frontcriminalbarbershopdrugs', 'likely'), 0xe6902700: ('compoundkoltarmadillotycoon', 'weak')}
+CRACKED = {0x7fc09fac: ('frontcriminalbarbershopdrugs', 'likely')}
+# operations per gang on the GANGS pages (PowerPyx's 39; they sum to the checklist's 39)
+TOTALS = {'kingfishers': 3, 'koltandassociates': 5, 'm7': 2, 'lapolillanegra': 2, 'finalchapter': 4, 'san4san': 5, 'ptty': 2,
+          'guardiabrothers': 3, 'criminal': 13}
+# owner -> (number in the game's menu order as PowerPyx lists it, name on the map), for the 39 that count
+MAP_NAMES = {
+    'compoundkingfishersfishingshacks': (1, 'Fishing Shacks'), 'compoundkingfishersbreedingcamp': (2, 'Sunrise RV Park'),
+    'compoundkingfishersseedymotel': (3, 'Manatee Motel'), 'compoundkoltbowlingalley': (4, 'Kingpin Bowling'),
+    'compoundkoltworkvangarage': (5, 'June Warehouse'), 'compoundkoltabandonedhotel': (6, 'La Cascara Motel'),
+    'compoundkoltandassociatesdocks': (7, 'Brooks Boatworks'), 'compoundkoltstashhouse': (8, 'Stash House'),
+    'compoundm7junkyard': (9, 'M7 Compound'), 'compoundm7weedgrow': (10, 'Weed Grow'),
+    'compoundlapolillanegrafishwarehouse': (11, 'Palmer Fishing Warehouse'), 'compoundlapolillanegrasafehouse': (12, 'Watson Bay Safehouse'),
+    'compoundfinalchaptermethfacility': (13, 'Farm Fix Meth Lab'), 'frontfinalchapterbikerbar': (14, 'Biker Hideout'),
+    'compoundfinalchaptercarwash': (15, 'Hog Stars Garage'), 'compoundfinalchapterclubhouse': (16, 'Irons Building Supply'),
+    'compoundsan4sanrecordingstudio': (17, 'Sound4Sound Studio'), 'compoundsan4sandrughouse': (18, 'La Perle Trap House'),
+    'frontsan4sanrareshoes': (19, 'Illegal Sneaker Trade'), 'compoundsan4sanimportgarage': (20, "JanJak's Garage"),
+    'compoundsan4santowerblock': (21, 'Parlor Apartments'), 'compoundpttyhouselockup': (22, 'Southside Trap House'),
+    'compoundpttyabandonedcommunitycenter': (23, 'Kamar Devon Community Center'), 'compoundguardiabrothersboatyard': (24, 'Saber Shipping Yard'),
+    'compoundguardiabrothersstagingpoint': (25, 'Casa Guardia'), 'compoundguardiabrothersdistributioncenter': (26, 'Saber Shipping Facility'),
+    'frontcriminalexoticanimals': (27, 'Exotic Animals Front'), 'compoundcriminalgraffitilab': (28, 'Mill Station Radar Base'),
+    'compoundcriminalindustrialweedgrow': (29, 'Industrial Weed Grow'), 'compoundcriminalvehiclechopshop': (30, 'Slator Towing Inc'),
+    'compoundcriminalweaponsexport': (31, 'Leonida Carrier Warehouse'), 'frontcriminalcigarimport': (32, 'Cigar Import Front'),
+    'compoundcriminalcartheftring': (33, 'Chatfield Storage & Logistics'), 'compoundcriminalecstasygarage': (34, 'Ocean Beach Lab'),
+    'compoundcriminaldrugkingpin': (35, 'Vespucci Mansion'), 'frontcriminalgasstationmeth': (36, 'Gas Station Meth Front'),
+    'compoundcriminalmushroomgrow': (37, 'Walker Farm'), 0x7fc09fac: (38, 'Backroom Weed Front'),
+    'compoundcriminalnarcoboatrunner': (39, 'Carter Mining Boathouse'),
+}
+# the five stats owners that are not among the 39: (name to show, why)
+NOT_COUNTED = {
+    'compoundkingfishersstilthouse': ('Kingfishers Stilt House', 'Not one of the 39: no description in the game text, probably cut.'),
+    0xe6902700: ('Unnamed location', 'Not one of the 39: no name in the game text.'),
+    'compoundpttyillegalgoodsstore': ('Illegal Goods Store', 'Not one of the 39: Ultimate Edition bonus, not needed for 100%.'),
+    'bankdruthers': ('Bank (Druthers)', 'Not a gang operation.'),
+    'bankfleecavcia': ('Bank (Fleeca VCIA)', 'Not a gang operation.'),
+}
+_MAP = {(k if isinstance(k, int) else fl.joaat(k)): v for k, v in MAP_NAMES.items()}
+_NOT = {(k if isinstance(k, int) else fl.joaat(k)): v for k, v in NOT_COUNTED.items()}
 
 SLOTS = (0x1a4b1e08, 0x28c1baf5, 0x76fb5767, 0x8544f3fa)
 B_SLOT_TAKEN, B_SLOT_ITEM = 0x0e3a164e, 0x6112a557
@@ -211,7 +266,15 @@ def read(b):
     locations, sums, in_sync = [], {}, True
     for name, gang, kind, label, hint in LOCATIONS:
         o = _owner(name)
-        own = name if isinstance(name, str) else CRACKED[o][0]
+        own = name if isinstance(name, str) else (CRACKED[o][0] if o in CRACKED else fl.hexid(o))
+        counted = o in _MAP
+        if counted:
+            order, map_name = _MAP[o]
+            why = None
+        else:
+            order = None
+            map_name, why = _NOT[o]
+            hint = why + (' ' + hint if hint else '')
         discovered, cleared = stat('ganglocationdiscovered', 0, o), stat('ganglocationcleared', 0, o)
         hits, items = stat('successfulhits', 0, o), stat('uniqueitemsfound', 0, o)
         if discovered is None or cleared is None:
@@ -237,8 +300,10 @@ def read(b):
         if f is not None:
             sync = sync and bool(f & FS_DISCOVERED) == bool(discovered) and bool(f & FS_CLEARED) == bool(cleared)
         in_sync = in_sync and sync
-        locations.append({'id': fl.hexid(o), 'owner': own, 'nameConfidence': CRACKED[o][1] if o in CRACKED else 'known',
-                          'gang': gang, 'kind': kind, 'label': label, 'hint': hint,
+        locations.append({'id': fl.hexid(o), 'owner': own,
+                          'nameConfidence': CRACKED[o][1] if o in CRACKED else ('known' if isinstance(name, str) else 'unknown'),
+                          'gang': gang, 'kind': kind, 'label': map_name, 'mapName': map_name if counted else None,
+                          'operation': label, 'counted': counted, 'countedWhy': why, 'menuOrder': order, 'hint': hint,
                           'state': _state(cleared, hits or items, discovered, tipped, e is not None),
                           'discovered': bool(discovered), 'cleared': bool(cleared), 'hits': hits, 'itemsFound': items,
                           'items': slots, 'enterprise': rec, 'mapFlags': None if f is None else '0x%x' % f, 'inSync': sync})
@@ -262,18 +327,18 @@ def read(b):
             category = {'known': 0, 'size': None, 'complete': False}
         mine = [x for x in locations if x['gang'] == key]
         sm = sums.get(key, {})
-        if category['size'] is not None:
-            of, of_source = category['size'], 'map category size'
-        else:
-            of, of_source = CATEGORY_SIZES.get(cat), 'map category size seen in other saves of this console'
+        if category['size'] is None:
+            category['sizeSeenElsewhere'] = CATEGORY_SIZES.get(cat)
         gangs.append({'key': key, 'name': display, 'qualifier': fl.hexid(q), 'known': known.get(q),
                       'counters': counters, 'mapCategory': category,
                       'page': {'OPERATIONS DISCOVERED': counters['discovered'], 'OPERATIONS CLEARED': counters['cleared'],
-                               'of': of, 'ofSource': of_source, 'OPERATION GOODS STOLEN': counters['goodsStolen'],
+                               'of': TOTALS[key], 'ofSource': "the guide's 39 (PowerPyx; Kingfishers 3 seen on screen)",
+                               'OPERATION GOODS STOLEN': counters['goodsStolen'],
                                'ENCOUNTERS': counters['encounters'], 'MEMBERS KILLED': counters['membersKilled']},
                       'countersMatchLocations': all(counters[k] == sm.get(k, 0) for k in ('discovered', 'cleared', 'hits', 'itemsFound', 'uniqueHits')),
-                      'locations': [x['owner'] for x in mine],
-                      'left': [{'label': x['label'], 'state': x['state'], 'hint': x['hint']} for x in mine if not x['cleared']]})
+                      'locations': [x['owner'] for x in mine if x['counted']],
+                      'notCounted': [x['owner'] for x in mine if not x['counted']],
+                      'left': [{'label': x['label'], 'state': x['state'], 'hint': x['hint']} for x in mine if x['counted'] and not x['cleared']]})
     fronts = {'known': 0, 'size': CATEGORY_SIZES[FRONTS_CATEGORY], 'complete': FRONTS_CATEGORY in done_cats}
     if FRONTS_CATEGORY in cats:
         fronts['known'], fronts['size'] = _bits(cats[FRONTS_CATEGORY])
@@ -291,7 +356,11 @@ def read(b):
                              countersMatchLocations=all(total[k] == all_sum[k] for k in all_sum)),
             'gangs': gangs,
             'frontsCategory': fronts,
-            'locations': locations,
+            'locations': sorted(locations, key=lambda x: (not x['counted'], x['menuOrder'] or 0)),
+            'counted': {'operations': sum(1 for x in locations if x['counted']),
+                        'cleared': sum(1 for x in locations if x['counted'] and x['cleared']),
+                        'notCounted': [{'id': x['id'], 'label': x['label'], 'why': x['countedWhy'], 'cleared': x['cleared']}
+                                       for x in locations if not x['counted']]},
             'sectionsInSync': in_sync,
             'left': OF - min(cleared or 0, OF),
             'editable': False,
@@ -299,10 +368,10 @@ def read(b):
             'why': ['A clear is written in three places (stats, Enterprises, the map), and they agree in every game-written save.',
                     '23 of 44 locations have no Enterprises record; their tip, tasks and unique items are not in the save.',
                     'The unique items (custom weapons, vehicles, watches, safe cash) would never be given, and a later real '
-                    'clear would count the location again.',
-                    'Which 39 of the 44 locations count is not settled.'],
-            'notes': ['Each gang page reads its stats counters; the "of" total is the size of the gang\'s map category '
-                      '(Kingfishers 3, as on screen). Guardia Brothers\' category is complete, so its size is not stored (3 '
-                      'locations).',
-                      'The map categories hold 41 locations, the stats 44 owners and the checklist asks for 39.',
+                    'clear would count the location again.'],
+            'notes': ['Each gang page reads its stats counters; the "of" total is the gang\'s number of operations among the 39 '
+                      '(PowerPyx: Kingfishers 3, Kolt 5, M7 2, La Polilla Negra 2, Final Chapter 4, San4San 5, PTT 2, Guardia 3, '
+                      'Other criminals 13). Kingfishers 3 is on screen at 67.5%.',
+                      'Locations are listed in the game\'s menu order under their map names; the five stats owners that are '
+                      'not among the 39 come last, with the reason in their hint.',
                       'Hints are from the game\'s own descriptions, matched by place words; check them in game.']}

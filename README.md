@@ -1,11 +1,11 @@
 <p align="center"><img src="assets/banner.png" alt="Save Garage: edit your GTA VI story save on PS5" width="100%"></p>
 
+[简体中文使用指南](README.zh-CN.md)
+
 <p align="center">
   <a href="../../releases/latest"><b>Download the latest release</b></a>
   &nbsp;&nbsp;|&nbsp;&nbsp; Windows, macOS and Linux &nbsp;&nbsp;|&nbsp;&nbsp; Free and open source (GPL-3.0)
 </p>
-
-[简体中文](README.zh-CN.md) · Select **简体中文** in the editor to switch the interface language.
 
 Save Garage edits your **GTA VI story-mode save on PS5**: money, ammo and stats. It needs no jailbreak and installs
 nothing on the console. Your PS5 sends the save to your computer through its own Data Transfer feature, you edit it in
@@ -17,15 +17,16 @@ your browser, and the PS5 takes it back the same way.
 
 | | What | Status |
 |---|---|---|
-| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Goes past the BuckMe limits: up to about $2,000,000 in the bank and in Family Savings, $20,000 cash. | Tested on PS5 |
+| **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank goes up to what its own money boxes hold at your point in the story, because shops only spend from those. Cash goes up to $20,000. | Tested on PS5 |
 | **Ammo** | Every ammo type each character is carrying, named the way the game names it, with one click to refill to a full load (for example 300 assault rifle rounds) or to set the maximum of 9,999. Also lists the weapons each character carries. | Tested on PS5 up to a full load; a save with more loads fine |
 | **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. | Tested on PS5, except times, distances and the story and styles percentages |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Tested on PS5 |
-| **Completion** | Marks every stunt done (jumps, base jumps, under-the-bridge flights and knife flights), discovers every animal and seen weapon in the compendium and every kind of shop and place on the map, completes challenges by category, adds all 8 gym memberships and completes the meditation spots, each with the counters the 100% checklist reads, then works out the 100% figure the way the game does. Also shows the game's whole 100% checklist and which lines the save can complete. | Not tested yet |
+| **Completion** | Marks every stunt done (jumps, base jumps, under-the-bridge flights and knife flights), discovers every animal and seen weapon in the compendium and every kind of shop and place on the map, completes challenges by category, adds all 8 gym memberships, completes the meditation spots, marks every robbery location and vault fully hit, records the fencing still missing, completes races, ranges, video games, pool, mini golf, drone trials and Bret's decks, scores all 100 basketball hoops, fills the vehicle compendium to 200 base models and marks every collectible card, luxury watch and identified magazine found (book swaps, magazine styles and cocaine flamingos as experimental options), each with the counters the 100% checklist reads, then works out the 100% figure the way the game does. Shows the game's whole 100% checklist, what each line can be set to, and the new 100% figure before you save. | A save with every option loads and plays on PS5; gym memberships, map discoveries, meditation and fencing confirmed in game, the rest not checked yet |
 | **World** | The time of day (the date stays the same), health up to overpowered, and full armour for both characters. | Not tested yet |
-| **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for many more. | Can break your save |
-| **Save data** | Every section of the save, with names for 63 of the 82 sections and 464 of the 843 keys. Any number or true/false value can be changed; text, the story flow, heists and vehicle records stay read-only. | Can break your save |
+| **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for most of the rest. Where a real name is still unknown, a plain description of what the stat holds is shown instead, so 99% of the rows in a full-story save read as words. | Can break your save |
+| **Save data** | Every section of the save, with names for 64 of the 82 sections and 610 of the 843 keys. Values that are the ID of a known item, stat, place, mission, news article or social media post show its name or opening words. Any number or true/false value can be changed; text, the story flow, heists and vehicle records stay read-only. | Can break your save |
 | **Trophies** | Not editable. The Trophies page in the app explains what a save edit can and can't do for them. | |
+| **Languages** | The app in English (the default), Deutsch, Nederlands, Français, Español, Português (Brasil), Italiano, Polski, Русский, العربية (right to left), 日本語, 한국어 and 中文（简体）. Pick one at the top of the page; the choice is remembered. Names from the game stay as the game writes them. The translations were made with the help of AI, not by native speakers, so corrections are welcome as an issue or pull request (`ui/i18n/<language>.json`). | |
 
 Every edit in the app carries one of those labels, so you always know how safe it is. Edits are always applied to
 your original save, and the original is backed up on your computer before anything changes.
@@ -55,7 +56,8 @@ your original save, and the original is backed up on your computer before anythi
    expected: pairing has already happened.
 4. **Download.** In GTA VI, save your game and go back to the PS5 home screen. Click Download save. When the app
    asks, press the PS5 power button once and let go at the beep. The console restarts into transfer mode, and
-   again when the download is done.
+   again when the download is done. If more than one account on the PS5 has a GTA VI save, the app asks which
+   account's save to edit; pick one straight away, while the PS5 waits in transfer mode.
 5. **Edit.** Pick a save (the autosave is what Continue loads), change what you want and click Save edits.
 6. **Send back.** Delete the GTA VI save on the PS5 (it won't overwrite an existing one): Settings, then Saved
    Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete. Then click Send save to
@@ -77,10 +79,19 @@ Nothing else is uploaded. The editor runs only on your computer, and by default 
 Originals and backups stay in `%LOCALAPPDATA%\SaveGarage` on Windows, `~/Library/Application Support/SaveGarage`
 on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folder when you run from source.
 
+## Related
+
+- [GTA 6 hash database](https://github.com/NotHGM/gta6-hash-database): every name Save Garage has decoded (stats, items,
+  vehicles, missions, save keys) with the evidence for each, plus 1.1 million GTA VI hashes from the community's name
+  lists, as searchable text tables.
+
 ## Good to know
 
-- **Money is capped by the game.** Each account holds money in boxes of a fixed size. Above your current limit,
-  Save Garage adds the larger boxes the game itself uses for Family Savings goals. Cash stays at the $20,000 wallet.
+- **Money is capped by the game.** Each account holds money in boxes of a fixed size. Family Savings gets the larger
+  boxes the game itself uses for savings goals. The bank stays within its own boxes, because shops only spend money
+  from those: versions before 1.24.0 put extra money in Family Savings boxes under the bank, which BuckMe showed but
+  shops couldn't spend (issue #3). Editing the bank again, or **Make it spendable** on the Money tab, moves it back.
+  Cash stays at the $20,000 wallet.
 - **A balance of 0 can't be edited.** The game doesn't store it. Get a little money in the game, save and download again.
 - **Only ammo you carry is listed.** Pick some up in the game first to add a new type.
 - **Turn off PS Plus auto-sync for GTA VI** while you test an edited save, so it can't replace your cloud backup.
@@ -129,11 +140,12 @@ folder with the official embeddable Python, a Mac launcher, and a self-contained
 
 ## Credits and license
 
-- **Save Garage web UI and artwork** — NotHGM created the interface and artwork for the upstream [Save Garage](https://github.com/NotHGM/save-garage) project.
-- **Original save editor** — CoreyLyu76 wrote [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor). Its local service and money editor are the foundation of Save Garage.
-- **PS5 Data Transfer** — earthonion wrote [GarlicTransfer](https://github.com/earthonion/GarlicTransfer), which provides the transfer code.
+NotHGM created the web interface and artwork for the upstream [Save Garage](https://github.com/NotHGM/save-garage).
 
-Save Garage and both underlying projects use the [GNU GPL v3](LICENSE). See [CREDITS.md](CREDITS.md) for component versions and additional credits.
+Save Garage is free software under the [GNU GPL v3](LICENSE). It started from
+[gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor) by CoreyLyu76 and includes PS5 Data Transfer code
+from [GarlicTransfer](https://github.com/earthonion/GarlicTransfer) by earthonion, both GPL-3.0. Details in
+[CREDITS.md](CREDITS.md).
 
 Save Garage is not affiliated with or endorsed by Rockstar Games, Take-Two Interactive or Sony Interactive
 Entertainment. Grand Theft Auto and PlayStation are trademarks of their owners. Use it on your own single-player saves.

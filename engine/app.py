@@ -23,7 +23,7 @@ else:
 DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.14.0'
+VERSION = '1.25.0'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -50,9 +50,10 @@ except Exception:
     pass
 G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
 
-STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None,
+STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
          'slots': [], 'readyToUpload': False, 'network': None}
-JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'log': []}
+JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None, 'log': []}
+CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
 PROC = {'p': None}
 RELAY = {'r': None}
 
@@ -106,21 +107,21 @@ def start_job(kind, fn):
     with LOCK:
         if JOB['status'] == 'running':
             raise Fail('busy')
-        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, log=[])
+        JOB.update(id=JOB['id'] + 1, kind=kind, status='running', stage='starting', needPower=False, progress=None, error=None, hint=None, accounts=None, log=[])
 
     def run():
         try:
             fn()
             with LOCK:
-                JOB.update(status='done', needPower=False)
+                JOB.update(status='done', needPower=False, accounts=None)
         except Fail as e:
             log('FAIL %s %s' % (e.code, e.detail))
             with LOCK:
-                JOB.update(status='error', error={'code': e.code, 'detail': str(e.detail)[:300]}, needPower=False)
+                JOB.update(status='error', error={'code': e.code, 'detail': str(e.detail)[:300]}, needPower=False, accounts=None)
         except Exception as e:
             log(traceback.format_exc()[-600:])
             with LOCK:
-                JOB.update(status='error', error={'code': 'internal', 'detail': repr(e)[:300]}, needPower=False)
+                JOB.update(status='error', error={'code': 'internal', 'detail': repr(e)[:300]}, needPower=False, accounts=None)
         finally:
             kill_proc()
     threading.Thread(target=run, daemon=True).start()
@@ -325,6 +326,46 @@ def cached(key, fn):
     return CACHE[k]
 
 
+def completion_readers(b):
+    """(key, reader) for every part of the Completion tab."""
+    import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium
+    import collectibles2 as collectibles
+    return [('stunts', lambda: savedit.stunts(savedit.section(b, money.SEC_STAT))), ('compendium', lambda: compendium.read(b)),
+            ('discovery', lambda: discovery.read(b)), ('challenges', lambda: challenges.read(b)), ('gyms', lambda: gyms.read(b)),
+            ('activities', lambda: activities.read(b)), ('checklist', lambda: checklist.read(b)), ('tasks', lambda: tasks.read(b)),
+            ('gangs', lambda: gangs.read(b)), ('robberies', lambda: robberies.read(b)), ('fencing', lambda: fencing.read(b)),
+            ('activities2', lambda: activities2.read(b)), ('hoops', lambda: hoops.read(b)), ('vehicles', lambda: vehicles_compendium.read(b)),
+            ('collectibles', lambda: collectibles.read(b))]
+
+
+def completion_preview(slot, body):
+    """The game's 100% checklist as it would be after these stat and Completion edits. Nothing is written."""
+    import checklist
+    c = body.get('completion') or {}
+    if not isinstance(c, dict) or not isinstance(body.get('stats') or [], list):
+        raise ValueError('completion must be an object and stats a list')
+    edits = {'stats': body.get('stats') or [], 'completion': {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}}
+    b = slot_bytes(slot)
+    try:
+        nb, _ = savedit.apply(b, edits)
+    except Exception as e:                      # find which parts fail on their own, so the page can say which
+        failed = []
+        for k, v in edits['completion'].items():
+            try:
+                savedit.apply(b, {'completion': {k: v}})
+            except Exception:
+                failed.append(k)
+        if edits['stats']:
+            try:
+                savedit.apply(b, {'stats': edits['stats']})
+            except Exception:
+                failed.append('stats')
+        return {'ok': False, 'failed': failed, 'detail': repr(e)[:200]}
+    r = checklist.read(nb)
+    return {'ok': True, 'overall': r['overall'],
+            'lines': [{'key': l['key'], 'value': l.get('value'), 'of': l.get('of'), 'percent': l.get('percent'), 'done': l.get('done')} for l in r['lines']]}
+
+
 def slot_featured(slot):
     return cached(('featured', slot['file']), lambda: savedit.featured(savedit.section(slot_bytes(slot), money.SEC_STAT)))
 
@@ -449,7 +490,7 @@ def restore_session():
         return
     with LOCK:
         STATE.update(session=str(sess), user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
-                     slots=slots, readyToUpload=any(s['modified'] for s in slots))
+                     slots=slots, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
 
@@ -465,7 +506,7 @@ def job_download():
             'waitForSelection': True, 'titles': GTA_TITLES}
     p = spawn(['dl_worker', json.dumps(opts)])
     stage('connecting')
-    entries, users, nosave, err, files = [], [], False, None, 0
+    entries, users, nosave, err, files, chosen = [], [], False, None, 0, None
     for line in p.stdout:
         line = line.rstrip()
         if line.startswith('[file] saved'):
@@ -488,6 +529,18 @@ def job_download():
             stage('downloading', needPower=False)
         elif t == 'entries':
             entries, users = ev['entries'], ev.get('users') or []
+        elif t == 'accounts':                   # several PS5 accounts have a save: ask which one, then tell the worker
+            CHOICE['owner'] = None; CHOICE['event'].clear()
+            stage('choose_account', accounts=ev.get('accounts') or [])
+            while not CHOICE['event'].wait(0.5):
+                if p.poll() is not None:        # cancelled or the worker died
+                    break
+            if p.poll() is not None or not CHOICE['owner']:
+                raise Fail('download_failed', 'cancelled while choosing the account')
+            p.stdin.write(json.dumps({'owner': CHOICE['owner']}) + '\n'); p.stdin.flush()
+            stage('downloading', accounts=None)
+        elif t == 'owner':
+            chosen = ev.get('owner')
         elif t == 'nosave':
             nosave = True
         elif t == 'error':
@@ -500,7 +553,7 @@ def job_download():
         raise Fail('power_timeout' if 'timed out' in m or 'timeout' in m else 'console_rejected' if 'rejected' in m else 'download_failed', err)
     if nosave or not entries:
         raise Fail('no_gta_save')
-    e = entries[0]; owner = e['owner']
+    e = next((x for x in entries if chosen and x['owner'].lower() == chosen.lower()), entries[0]); owner = e['owner']
     uname = next((u['name'] for u in users if u['id'].lower() == owner.lower()), 'user')
     save_dir = lib / 'Saves' / owner / e['title']
     imgs = sorted(save_dir.glob('sdimg_*'))
@@ -518,8 +571,19 @@ def job_download():
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False)
+        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
     stage('ready')
+
+
+def choose_account(owner):
+    """Called when the user picks a PS5 account during a download; unblocks job_download."""
+    with LOCK:
+        if JOB['status'] != 'running' or JOB['stage'] != 'choose_account':
+            raise Fail('bad_request')
+        if str(owner or '').lower() not in [str(a['id']).lower() for a in JOB['accounts'] or []]:
+            raise Fail('bad_request')
+        CHOICE['owner'] = str(owner)
+    CHOICE['event'].set()
 
 
 def job_patch(slot_file, edits):
@@ -717,13 +781,18 @@ class H(BaseHTTPRequestHandler):
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs
                 b = slot_bytes(slot)
-                return self._send(200, {'stunts': savedit.stunts(savedit.section(b, money.SEC_STAT)), 'compendium': compendium.read(b),
-                                        'discovery': discovery.read(b), 'challenges': challenges.read(b), 'gyms': gyms.read(b),
-                                        'activities': activities.read(b), 'checklist': checklist.read(b), 'tasks': tasks.read(b), 'gangs': gangs.read(b)})
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
+            # each part on its own: one a save can't show yet (an early save lacks some records) leaves the rest working
+            out, errors = {}, {}
+            for key, fn in completion_readers(b):
+                try:
+                    out[key] = fn()
+                except Exception as e:
+                    out[key], errors[key] = None, repr(e)[:200]
+            out['errors'] = errors
+            return self._send(200, out)
         if path in ('/api/slot', '/api/stats'):       # detail data for the editor
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
@@ -784,6 +853,9 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {'job': start_job('pair', job_pair)})
             if path == '/api/download':
                 return self._send(200, {'job': start_job('download', job_download)})
+            if path == '/api/choose-account':
+                choose_account(body.get('owner'))
+                return self._send(200, {'ok': True})
             if not STATE['session']:
                 raise Fail('no_session')
             if path == '/api/stunt-edits':             # stat edits that mark whole stunt types done
@@ -792,6 +864,11 @@ class H(BaseHTTPRequestHandler):
                     raise Fail('no_slot')
                 ids = [i for i in (body.get('groups') or []) if i in {g[0] for g in savedit.STUNT_GROUPS}]
                 return self._send(200, {'edits': savedit.stunt_edits(savedit.section(slot_bytes(slot), money.SEC_STAT), ids)})
+            if path == '/api/preview':                 # the 100% checklist after the edits picked so far (nothing is written)
+                slot = slot_by_file(body.get('file') or '')
+                if not slot:
+                    raise Fail('no_slot')
+                return self._send(200, completion_preview(slot, body))
             if path == '/api/patch':                   # money, ammo and stats in one request
                 slot = body['slot']
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
@@ -801,7 +878,7 @@ class H(BaseHTTPRequestHandler):
                     c = body['completion']
                     if not isinstance(c, dict):
                         raise ValueError('completion must be an object')
-                    edits['completion'] = {k: c[k] for k in ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'stuntDiscovery') if c.get(k)}
+                    edits['completion'] = {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}
                 if body.get('raw'):
                     if not isinstance(body['raw'], list):
                         raise ValueError('raw must be a list')
