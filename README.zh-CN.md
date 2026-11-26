@@ -2,6 +2,8 @@
 
 [English](README.md) · [下载最新版](../../releases/latest) · [GPL-3.0 许可证](LICENSE)
 
+> **这是 NotHGM 的 [Save Garage](https://github.com/NotHGM/save-garage) 的简体中文修改版，并非官方版本。** 官方版本发布于 https://github.com/NotHGM/save-garage/releases
+
 Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的“数据传输”功能将存档下载到电脑，在浏览器中编辑，再传回主机。浏览器使用简体中文时会自动显示中文，也可以在编辑器右上方手动切换语言。
 
 本版同步原作者的 `1.29.1`，支持游戏编号 `PPSA01547`、`PPSA38500` 和 `PPSA29660`。[查看 1.29.1 中文更新日志](docs/releases/v1.29.1.md)
@@ -47,7 +49,7 @@ Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的�
 
 ## 署名与许可
 
-- **Save Garage 网页界面与美术**由 NotHGM 创作。本简体中文版基于其 [Save Garage 原项目](https://github.com/NotHGM/save-garage)。
+- **Save Garage** 由 NotHGM 开发：存档引擎与研究、全部编辑功能（金钱、统计、完成度、世界、武器等）、GarlicSaves 登录、自动更新和界面。本简体中文版基于其 [Save Garage 原项目](https://github.com/NotHGM/save-garage)，是修改版而非官方版本。
 - **原版存档修改器**由 CoreyLyu76 开发。Save Garage 的本地服务和金钱编辑功能源自其 [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor)。
 - **PS5 数据传输**使用 earthonion 开发的 [GarlicTransfer](https://github.com/earthonion/GarlicTransfer)。
 
