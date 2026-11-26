@@ -297,8 +297,10 @@ def _apply_ammo(txt, changes):
 
 # ---------------------------------------------------------------- whole-file
 def apply(b, edits):
-    """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'world': {...}} applied to the original file -> (bytes, log).
-    'world' holds world.py's time, health and armour, player.py's 'lucia', 'jason' and 'relationship', and fog.py's 'fog'."""
+    """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'guns': {...}, 'completion': {...}, 'world': {...}} applied to
+    the original file -> (bytes, log). 'guns' is guns.py's choice ({'lucia': [...], 'jason': [...]}); 'completion' holds
+    one choice per Completion part, 'cheats' (challenges.apply_cheats) among them; 'world' holds world.py's time, health
+    and armour, player.py's 'lucia', 'jason' and 'relationship', and fog.py's 'fog'."""
     b, log = _apply_core(b, edits)
     if edits.get('raw'):
         import savebrowse
@@ -311,21 +313,31 @@ def apply(b, edits):
         except Exception as e:                       # a path that no longer exists, for example
             raise SaveError('stale_item') from e
         log += rlog
+    if edits.get('guns'):                            # before the Completion parts: its compendium entries count there too
+        import guns
+        try:
+            b, glog = guns.apply(b, edits['guns'])
+        except SaveError:
+            raise
+        except (KeyError, ValueError, TypeError, IndexError) as e:
+            raise SaveError('bad_request') from e
+        log += glog
     comp = edits.get('completion') or {}
     if comp:
         import compendium, discovery, challenges, gyms, activities, checklist, robberies, fencing, activities2, hoops, vehicles_compendium
         import collectibles2 as collectibles
-        steps = [(compendium, comp.get('compendium')), (discovery, comp.get('discovery')), (challenges, comp.get('challenges')), (gyms, comp.get('gyms')),
-                 (activities, comp.get('activities')), (robberies, comp.get('robberies')), (fencing, comp.get('fencing')),
-                 (activities2, comp.get('activities2')), (hoops, comp.get('hoops')), (vehicles_compendium, comp.get('vehicles')),
-                 (collectibles, comp.get('collectibles'))]
+        steps = [(compendium.apply, comp.get('compendium')), (discovery.apply, comp.get('discovery')), (challenges.apply, comp.get('challenges')),
+                 (challenges.apply_cheats, comp.get('cheats')), (gyms.apply, comp.get('gyms')),
+                 (activities.apply, comp.get('activities')), (robberies.apply, comp.get('robberies')), (fencing.apply, comp.get('fencing')),
+                 (activities2.apply, comp.get('activities2')), (hoops.apply, comp.get('hoops')), (vehicles_compendium.apply, comp.get('vehicles')),
+                 (collectibles.apply, comp.get('collectibles'))]
         if comp.get('stuntDiscovery'):         # the stunt categories in the map's Discovery section follow the stunts
-            steps.append((discovery, {'categories': [STUNT_DISCOVERY[i] for g in comp['stuntDiscovery'] for i in STUNT_DISCOVERY_IDS.get(g, ())],
-                                      'allow_stunt': True}))
-        for mod, choice in steps:
+            steps.append((discovery.apply, {'categories': [STUNT_DISCOVERY[i] for g in comp['stuntDiscovery'] for i in STUNT_DISCOVERY_IDS.get(g, ())],
+                                            'allow_stunt': True}))
+        for fn, choice in steps:
             if choice:
                 try:
-                    b, clog = mod.apply(b, choice)
+                    b, clog = fn(b, choice)
                 except SaveError:
                     raise
                 except (KeyError, ValueError, TypeError) as e:
@@ -640,6 +652,9 @@ STUNT_GROUPS = (
 )
 STUNTS_FOR_100 = 300            # the 100% checklist asks for any 300 of the game's 397 stunts
 COMPLETION_PARTS = ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles')
+# Every key a Completion edit may hold. The cheat trackers are counted by no 100% line, so 'cheats' alone doesn't make
+# the 100% figure be worked out again (COMPLETION_PARTS and the stunts do).
+COMPLETION_KEYS = COMPLETION_PARTS + ('stuntDiscovery', 'cheats')
 # Discovery section categories for each stunt type (their found bits mirror numfound.<type> in every game save)
 STUNT_DISCOVERY = {'jumps': 0x07b59c95, 'base': 0xec841e35, 'bridges': 0x0f25b442, 'knife': 0xc8c1866f}
 STUNT_DISCOVERY_IDS = {'jumps': ('jumps',), 'base': ('base',), 'bridges': ('bridges', 'knife')}

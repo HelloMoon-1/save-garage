@@ -337,16 +337,19 @@ def completion_readers(b):
             ('activities', lambda: activities.read(b)), ('checklist', lambda: checklist.read(b)), ('tasks', lambda: tasks.read(b)),
             ('gangs', lambda: gangs.read(b)), ('robberies', lambda: robberies.read(b)), ('fencing', lambda: fencing.read(b)),
             ('activities2', lambda: activities2.read(b)), ('hoops', lambda: hoops.read(b)), ('vehicles', lambda: vehicles_compendium.read(b)),
-            ('collectibles', lambda: collectibles.read(b))]
+            ('collectibles', lambda: collectibles.read(b)), ('cheats', lambda: challenges.read_cheats(b))]
 
 
 def completion_preview(slot, body):
-    """The game's 100% checklist as it would be after these stat and Completion edits. Nothing is written."""
+    """The game's 100% checklist as it would be after these stat, gun and Completion edits (the guns add weapons to the
+    compendium, which the checklist counts). Nothing is written."""
     import checklist
     c = body.get('completion') or {}
-    if not isinstance(c, dict) or not isinstance(body.get('stats') or [], list):
-        raise ValueError('completion must be an object and stats a list')
-    edits = {'stats': body.get('stats') or [], 'completion': {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}}
+    if not isinstance(c, dict) or not isinstance(body.get('stats') or [], list) or not isinstance(body.get('guns') or {}, dict):
+        raise ValueError('completion and guns must be objects and stats a list')
+    edits = {'stats': body.get('stats') or [], 'completion': {k: c[k] for k in savedit.COMPLETION_KEYS if c.get(k)}}
+    if body.get('guns'):
+        edits['guns'] = body['guns']
     b = slot_bytes(slot)
     try:
         nb, _ = savedit.apply(b, edits)
@@ -357,6 +360,11 @@ def completion_preview(slot, body):
                 savedit.apply(b, {'completion': {k: v}})
             except Exception:
                 failed.append(k)
+        if edits.get('guns'):
+            try:
+                savedit.apply(b, {'guns': edits['guns']})
+            except Exception:
+                failed.append('guns')
         if edits['stats']:
             try:
                 savedit.apply(b, {'stats': edits['stats']})
@@ -389,9 +397,21 @@ def slot_weapons(slot):
     return cached(('weapons', slot['file']), lambda: savedit.weapons(savedit.section(slot_bytes(slot), money.SEC_INV)))
 
 
+def slot_guns(slot):
+    """The guns each character can be given (guns.py), or None with the reason when the save can't show them."""
+    def build():
+        import guns
+        try:
+            return guns.read(slot_bytes(slot)), None
+        except Exception as e:                  # a save this can't read leaves the rest of the Ammo tab working
+            return None, repr(e)[:200]
+    return cached(('guns', slot['file']), build)
+
+
 def slot_detail(slot):
+    guns, err = slot_guns(slot)
     return {'file': slot['file'], 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
-            'applied': slot.get('applied'), 'modified': slot['modified']}
+            'guns': guns, 'errors': {'guns': err} if err else {}, 'applied': slot.get('applied'), 'modified': slot['modified']}
 
 
 def slot_stats(slot):
@@ -426,7 +446,7 @@ def summarize(plog):
         elif w == 'ammo':
             out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
-        elif w in ('world', 'raw', 'completion'):
+        elif w in ('world', 'raw', 'completion', 'guns'):
             label = str(x.get('label') or _completion_label(x))
             same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
             if same and w == 'completion':
@@ -589,7 +609,7 @@ def choose_account(owner):
 
 
 def job_patch(slot_file, edits):
-    """edits = {'money': [...], 'ammo': [...], 'stats': [...]}, always applied to the original slot."""
+    """edits: what savedit.apply takes (money, ammo, stats, guns, completion, world, raw), always applied to the original slot."""
     sess = Path(STATE['session'])
     slot = slot_by_file(slot_file)
     if not slot:
@@ -879,7 +899,7 @@ class H(BaseHTTPRequestHandler):
                 if not slot:
                     raise Fail('no_slot')
                 return self._send(200, completion_preview(slot, body))
-            if path == '/api/patch':                   # money, ammo and stats in one request
+            if path == '/api/patch':                   # every edit for one save in one request
                 slot = body['slot']
                 edits = {'money': body.get('money', body.get('changes')) or [], 'ammo': body.get('ammo') or [], 'stats': body.get('stats') or []}
                 if not all(isinstance(v, list) for v in edits.values()):
@@ -888,7 +908,11 @@ class H(BaseHTTPRequestHandler):
                     c = body['completion']
                     if not isinstance(c, dict):
                         raise ValueError('completion must be an object')
-                    edits['completion'] = {k: c[k] for k in savedit.COMPLETION_PARTS + ('stuntDiscovery',) if c.get(k)}
+                    edits['completion'] = {k: c[k] for k in savedit.COMPLETION_KEYS if c.get(k)}
+                if body.get('guns'):
+                    if not isinstance(body['guns'], dict):
+                        raise ValueError('guns must be an object')
+                    edits['guns'] = body['guns']
                 if body.get('raw'):
                     if not isinstance(body['raw'], list):
                         raise ValueError('raw must be a list')

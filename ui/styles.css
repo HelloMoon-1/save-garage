@@ -45,8 +45,8 @@ body {
 a { color: var(--text); text-underline-offset: 3px; }
 button, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--flamingo); outline-offset: 3px; border-radius: 4px; }
-.skip { position: absolute; left: -999px; top: 8px; z-index: 50; background: var(--flamingo); color: var(--flamingo-ink); padding: 6px 12px; border-radius: var(--r-button); }
-.skip:focus { left: 8px; }
+.skip { position: absolute; inset-inline-start: -999px; top: 8px; z-index: 50; background: var(--flamingo); color: var(--flamingo-ink); padding: 6px 12px; border-radius: var(--r-button); }
+.skip:focus { inset-inline-start: 8px; }
 [hidden] { display: none !important; }
 .cash { color: var(--cash); font-variant-numeric: tabular-nums; }
 
@@ -269,6 +269,8 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .foot-actions { display: inline-flex; gap: 16px; align-items: center; }
 
 @media (max-width: 860px) {
+  .field.cheat { grid-template-columns: 1fr; }
+  .field.cheat .inputs { justify-content: flex-start; }
   .masthead { min-height: 230px; }
   .masthead-row { flex-direction: column; }
   .status { justify-content: flex-start; }
@@ -287,6 +289,26 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .weapons .kind { color: var(--text-3); }
 
 .crumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+
+/* ---------- guns to add (Ammo tab) and cheat unlocks (Completion tab) ---------- */
+.empty + .group, .group.guns { margin-top: 34px; }
+.field.gunfield { align-items: start; }
+.field.gunfield .inputs { flex-direction: column; align-items: flex-start; gap: 12px; }
+.weapons.guns { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); width: 100%; }
+.weapons.guns li { padding: 0; }
+.weapons.guns label { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 10px; cursor: pointer; }
+.weapons.guns input { flex: none; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--flamingo); }
+.weapons.guns li.on { background: rgba(255, 211, 107, .1); border-color: rgba(255, 211, 107, .55); color: var(--text); }
+.field.cheat { grid-template-columns: 1fr auto; align-items: start; }
+.field.cheat .inputs { justify-content: flex-end; }
+.field.cheat .cheat-name { display: block; }
+.field.cheat .effect { display: block; font-weight: 400; }
+.field.cheat .help b { font-weight: 600; color: var(--text-2); }
+.cheats { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.field.cheat.unmatched .cheats { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px 24px; }
+.field.cheat.unmatched .cheat-name { font-size: 15px; }
+.field.cheat > .name > .help { margin: 0 0 12px; }
+.done-mark { color: #a6ecc8; font-weight: 600; font-size: 14px; }
 
 .checklist { margin: 0 0 18px; }
 .checklist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
@@ -340,6 +362,7 @@ details.more-opts > summary { cursor: pointer; padding: 12px 0; font: 400 22px/1
 details.more-opts > summary::marker { color: var(--flamingo); }
 details.more-opts > .note { margin-bottom: 18px; }
 details.more-opts[open] > summary { margin-bottom: 4px; }
+details.more-opts > .callout { margin-bottom: 24px; }
 @media (max-width: 860px) {
   .caps dl > div { grid-template-columns: 1fr; }
   .caps dd.r { justify-self: start; }
@@ -374,4 +397,6 @@ details.more-opts[open] > summary { margin-bottom: 4px; }
   [dir="rtl"] .tabs button[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--flamingo); }
 }
 [dir="rtl"] [data-no-i18n] { unicode-bidi: plaintext; }
+[dir="rtl"] .weapons li { unicode-bidi: plaintext; }
+[dir="rtl"] .field.cheat .cheat-name[data-no-i18n] { text-align: right; }
 [dir="rtl"] .title-card strong, [dir="rtl"] .comp-summary .big, [dir="rtl"] .raw td small.after { direction: ltr; unicode-bidi: isolate; }

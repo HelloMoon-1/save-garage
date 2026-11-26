@@ -320,12 +320,13 @@ def _fresh_guid(v):
     return g
 
 
-def _add_row(txt, nth, v, parent_idx, item, slot, qty):
-    """Add a row to the main list and register it in Items; returns (new text, row, Guid)."""
+def _add_row(txt, nth, v, parent_idx, item, slot, qty, equipped=False):
+    """Add a row to the main list and register it in Items; returns (new text, row, Guid). Money rows are not
+    equipped; a gun's kit and parts are (guns.py)."""
     g = _fresh_guid(v); row = len(v['guid'])
     for key, val in ((K_GUID, g), (K_PARENT, parent_idx), (K_ITEM, item), (K_SLOT, slot), (K_QTY, qty)):
         txt = _append(txt, nth, key, b'%d' % val)
-    txt = _append(txt, nth, K_FLAG, b'false')
+    txt = _append(txt, nth, K_FLAG, b'true' if equipped else b'false')
     txt = _append(txt, nth, K_ITEMS, b'%d' % ((row << 4) | 1))
     return txt, row, g
 

@@ -45,6 +45,16 @@ Each weapon is
 `label` is what the game calls it (empty while the weapon isn't identified) and `kind` is the type of weapon when the
 label doesn't say it.
 
+`guns` lists the guns each character can be given (`null`, with the reason in `errors.guns`, when the save can't show
+them): `characters`, one per character (`key` `lucia` or `jason`, `name`), with `problem` (a refusal code, below, while
+no gun can be added), `items` (the inventory's Items entries) and `itemsFree` (entries left above the 300 kept free),
+and three lists of guns: `offered` (can be added), `owned` (already there) and `left` (a grenade or sticky bomb whose
+ammo the character has without the weapon, a state no save has shown, so it is left alone). Each gun is
+`{"id": "5ea6e528", "name": "weaponspec_smg_heavy_default", "label": "BZI Vatra", "kind": "Heavy SMG", "rows": 11,
+"thrown": false, "ammo": null, "discovered": true}`: `rows` is the inventory entries it takes, `ammo` the grenades or
+sticky bombs that come with a thrown weapon, `discovered` whether the compendium lists it already. `notOffered` names,
+per character, the guns seen in game saves that can't be added yet, and `itemLimit` and `itemReserve` are 4,095 and 300.
+
 ## GET /api/stats?file=…
 
 Every stat in the save as compact columns per typed group (`base`, `qual`, `owner`, `value`), the readable names
@@ -55,8 +65,17 @@ that are known, the rows that change between the downloaded saves (`varies`) and
 Everything the Completion tab shows, one key per part: `stunts`, `compendium`, `discovery`, `challenges`, `gyms`,
 `activities`, `checklist` (the game's 100% checklist: `lines` with `key`, `label`, `section`, `value`, `of`, `percent`,
 `weight`, `grade`, `module`, `done`, plus `overall`), `tasks`, `gangs`, `robberies`, `fencing`, `activities2`, `hoops`,
-`vehicles` and `collectibles`. A part a save can't show yet (an early save lacks some records) is `null`, and
+`vehicles`, `collectibles` and `cheats`. A part a save can't show yet (an early save lacks some records) is `null`, and
 `errors` says why, so the other parts still work.
+
+`cheats` is the cheat unlock trackers (challenge set `d6d53427`, 62 records): `done` of `of` complete, `problem` (a
+refusal code, then `entries` is empty) and `entries` in the order the tab lists them. Each entry is one pick:
+`{"key": "0c7d4ae2", "kind": "single" | "pair" | "unmatched", "ids": ["0c7d4ae2"], "done": 0, "of": 1, "cheats":
+[{"name": "Super Jump", "effect": "Increases the height of your jump by 10x with no fall damage.", "unlock": "Jump a
+vehicle 15 meters or more over a drawbridge 50 times."}]}`. `effect` and `unlock` are the game's words; `name` is the
+game's name for the cheat where its text has one that plainly matches, else `null`. A `pair` is a challenge category's
+two trackers (5 challenges and all of them), which the save can't tell apart; `unmatched` is the 23 trackers that held
+no progress in any save checked, with the 23 cheats they are between them.
 
 ## GET /api/world?file=…
 
@@ -98,8 +117,8 @@ slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmo
 | `/api/download` | none | Downloads, backs up and decrypts the GTA VI saves |
 | `/api/choose-account` | `{"owner": "<account id>"}` | Answers the download's question when several PS5 accounts have a GTA VI save: while the job's stage is `choose_account`, `job.accounts` lists `{id, name, saves}` and only those ids are accepted |
 | `/api/stunt-edits` | `{"file": "…", "groups": ["jumps", "base", "bridges"]}` | The stat edits that mark those stunt types found and completed, for the page to add to `stats` |
-| `/api/preview` | `{"file": "…", "stats": [...], "completion": {...}}` | Works out the 100% checklist as it would be after these edits, without writing anything: `{"ok": true, "overall": {...}, "lines": [{key, value, of, percent, done}]}`, or `{"ok": false, "failed": [part names]}` naming the parts that fail on this save |
-| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...], "completion": {...}, "world": {...}, "raw": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send. `completion` holds one choice per part (see the Completion tab), `world` the World tab's edits (below), `raw` single Save data values |
+| `/api/preview` | `{"file": "…", "stats": [...], "completion": {...}, "guns": {...}}` | Works out the 100% checklist as it would be after these edits, without writing anything: `{"ok": true, "overall": {...}, "lines": [{key, value, of, percent, done}]}`, or `{"ok": false, "failed": [part names]}` naming the parts that fail on this save (`guns` among them) |
+| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...], "guns": {...}, "completion": {...}, "world": {...}, "raw": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send. `guns` the Ammo tab's guns to add (below), `completion` holds one choice per part (see the Completion tab, and the cheats below), `world` the World tab's edits (below), `raw` single Save data values |
 | `/api/restore` | none | Puts the original saves back, ready to send |
 | `/api/upload` | none | Starts sending the save back to the PS5 |
 | `/api/cancel` | none | Stops the current task |
@@ -140,3 +159,40 @@ Every key may be left out, and every edit is checked against the save before any
 Out-of-range values are `out_of_range`, wrong types `bad_value`, and unknown keys in a character's object
 `bad_request` (other keys of `world` are ignored); in the job's error they carry the `save_` prefix. Applying the
 same edits again changes nothing.
+
+### Guns to add (Ammo tab)
+
+```jsonc
+"guns": {
+  "lucia": ["5ea6e528", "c24e18bf"],        // weapon ids from guns.characters[].offered, or "all"
+  "jason": "all"
+}
+```
+
+Each gun a character doesn't have (no row of that weapon in its weapons list) is added the way the game writes a gun
+you buy, row for row as the game itself wrote bought guns in a save: the weapon row under the character's weapon
+container, its `_001` kit and default `regular_01` parts under it, their ParentGuids and Items entries, and the weapon in
+OwnedWeaponsHistory (not for the grenade and sticky bomb, which the game leaves out). The grenade and sticky bomb come
+with the ammo row the game added with them (5 and 4). A weapon the compendium doesn't list yet is added to it, with its
+counters, and the 100% figure is worked out again. Nothing a character has is changed: guns it has are skipped, so the
+same edit applied again changes nothing. No money is spent, and the purchase counters stay as they are.
+
+Refused, with nothing written: `guns_layout` (the inventory isn't shaped as the game writes it: InventoryId, list
+columns, one character root with one weapon container, a sorted OwnedWeaponsHistory), `inventory_damaged` (a Guid used
+twice, Items not listing every row exactly once, a parent index that dangles or a ParentGuids entry without a child),
+`item_limit` (Items would pass 4,095 less the 300 kept free), `not_offered` (a gun that can't be added to that
+character), `bad_request`, `verify_failed` (the result isn't the old inventory plus exactly the new rows).
+
+### Cheats (Completion tab)
+
+```jsonc
+"completion": {"cheats": {"trackers": ["0c7d4ae2", "d40c07aa", "c2737d73"]}}     // or {"trackers": "all"}
+```
+
+Each chosen cheat tracker that isn't complete is completed the way the game completes one when its condition is met:
+`isComplete` true and the empty parameter, nothing else. No counter or 100% line counts these trackers, so the
+checklist and the 100% figure stay as they are; the profile-wide awards, the goals and the unlock catalogs aren't
+touched. Whether the cheat then shows in the game's Progress menu isn't known yet. Using a cheat in the game turns off
+trophies and saving for the rest of that session. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
+record isn't shaped as the game writes it), `not_editable` (a record of another challenge set), `unknown_challenge`,
+`bad_request`, `verify_failed`. Errors carry the `save_` prefix in the job's error.
