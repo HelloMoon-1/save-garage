@@ -33,7 +33,7 @@ your original save, and the original is backed up on your computer before anythi
 
 ## Before you start
 
-- A PS5 with GTA VI (PPSA01547 or PPSA38500). Tested on system software 14.23.
+- A PS5 with GTA VI (PPSA01547, PPSA38500 or PPSA29660). Tested on system software 14.23.
 - A Windows 10 or 11 PC, a Mac, or a Linux computer on the **same home network** as the PS5.
 - An internet connection: decrypting and re-encrypting the save runs on the [GarlicSaves](https://garlicsaves.com) service.
 

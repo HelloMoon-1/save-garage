@@ -31,7 +31,7 @@ PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAV
 BIND = os.environ.get('SAVEGARAGE_HOST', '127.0.0.1')
 ALLOW_NETS = [ipaddress.ip_network(n.strip(), strict=False) for n in os.environ.get('SAVEGARAGE_ALLOW', '127.0.0.0/8').split(',') if n.strip()]
 OK_HOSTS = ['127.0.0.1', 'localhost'] + ([BIND] if BIND not in ('', '0.0.0.0', '127.0.0.1', 'localhost') else [])
-GTA_TITLES = ['PPSA01547', 'PPSA38500']          # GTA VI title IDs for each region
+GTA_TITLES = ['PPSA01547', 'PPSA38500', 'PPSA29660']   # GTA VI title IDs (regions); PPSA29660: GarlicSaves treats it as GTA VI too
 NOWIN = 0x08000000 if os.name == 'nt' else 0
 PY = sys.executable
 LAST_SEEN = {'t': time.time()}
