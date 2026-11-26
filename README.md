@@ -36,6 +36,8 @@ your original save, and the original is backed up on your computer before anythi
 - A PS5 with GTA VI (PPSA01547, PPSA38500 or PPSA29660). Tested on system software 14.23.
 - A Windows 10 or 11 PC, a Mac, or a Linux computer on the **same home network** as the PS5.
 - An internet connection: decrypting and re-encrypting the save runs on the [GarlicSaves](https://garlicsaves.com) service.
+- A GarlicSaves account. From version 1.30.0 Save Garage asks you to sign in to GarlicSaves once on each computer (see
+  [Signing in to GarlicSaves](#signing-in-to-garlicsaves)).
 
 ## How to use it
 
@@ -49,15 +51,18 @@ your original save, and the original is backed up on your computer before anythi
      itself up on the first start. Allow access to devices on your local network when asked.
    - **Linux:** unpack `SaveGarage-…-linux-x64.tar.gz` and run `./SaveGarage --open`. See [Linux notes](#linux-notes).
 2. **Connect.** Click Find my PS5, or type its IP address.
-3. **Pair (once per console).** Click Start pairing, then on the PS5 go to Settings, then System, then System
+3. **Sign in to GarlicSaves (once per computer).** Click Sign in to GarlicSaves. Save Garage shows a code; click Open
+   GarlicSaves (or open the address it shows on your phone), sign in to your GarlicSaves account there and enter the
+   code. Save Garage carries on by itself once you have approved it.
+4. **Pair (once per console).** Click Start pairing, then on the PS5 go to Settings, then System, then System
    Software, then Data Transfer, and pick **Save Garage Pairing**. The PS5 says it can't transfer data. That's
    expected: pairing has already happened.
-4. **Download.** In GTA VI, save your game and go back to the PS5 home screen. Click Download save. When the app
+5. **Download.** In GTA VI, save your game and go back to the PS5 home screen. Click Download save. When the app
    asks, press the PS5 power button once and let go at the beep. The console restarts into transfer mode, and
    again when the download is done. If more than one account on the PS5 has a GTA VI save, the app asks which
    account's save to edit; pick one straight away, while the PS5 waits in transfer mode.
-5. **Edit.** Pick a save (the autosave is what Continue loads), change what you want and click Save edits.
-6. **Send back.** Delete the GTA VI save on the PS5 (it won't overwrite an existing one): Settings, then Saved
+6. **Edit.** Pick a save (the autosave is what Continue loads), change what you want and click Save edits.
+7. **Send back.** Delete the GTA VI save on the PS5 (it won't overwrite an existing one): Settings, then Saved
    Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete. Then click Send save to
    PS5 and on the PS5 open Data Transfer, pick **Save Garage** and choose Start Transfer.
 
@@ -71,7 +76,8 @@ won't load, delete it on the PS5, click **Put the originals back** and send agai
 Your save is encrypted with a key that never leaves the PS5, so Save Garage sends the encrypted save to the
 [GarlicSaves](https://garlicsaves.com) service to decrypt it, and the edited save to re-encrypt it for your account.
 That upload includes your PSN account ID, which is stored in the save. GarlicSaves runs the work on PS5 consoles of
-its own. Its consoles also work out the keys for each Data Transfer session.
+its own. Its consoles also work out the keys for each Data Transfer session. Every request to GarlicSaves carries the
+key of your GarlicSaves sign-in (below), so GarlicSaves knows which account it works for.
 
 Nothing else is uploaded. The editor runs only on your computer, and by default only your computer can open it.
 Originals and backups stay in `%LOCALAPPDATA%\SaveGarage` on Windows, `~/Library/Application Support/SaveGarage`
@@ -79,6 +85,38 @@ on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folde
 
 From version 1.30.0, Save Garage also asks GitHub whether a new version is out (see [Updates](#updates)). That request
 carries nothing about you, your PS5 or your saves.
+
+## Signing in to GarlicSaves
+
+**Why.** GarlicSaves now requires each app installation to be authorised with your own GarlicSaves account. Until
+version 1.29.1, every copy of Save Garage sent the worker key that GarlicTransfer used to have built in; GarlicSaves
+has revoked that key, so those versions can no longer download (1.29.1 says "GarlicSaves isn't accepting key
+requests"). From 1.30.0 Save Garage signs in the way GarlicTransfer 0.4.0 does, with GarlicSaves' device authorisation:
+
+1. On the Sign in step, click **Sign in to GarlicSaves**. Save Garage asks GarlicSaves for a code, as an
+   installation called "Save Garage" (nothing about your computer).
+2. Click **Open GarlicSaves**, or open the address shown on another device, sign in to your GarlicSaves account and
+   enter the code. The code works for up to 10 minutes; the page counts down.
+3. Save Garage checks every few seconds and carries on by itself once you have approved it. Cancel stops it.
+
+You do this once on each computer. Pairing, downloading, saving edits and sending saves back all go through
+GarlicSaves, so until you are signed in the page shows the Sign in step instead of starting them.
+
+**What is stored where.** GarlicSaves gives Save Garage on this computer a worker key of its own, with an installation
+ID and your GarlicSaves username. Save Garage keeps the three as `"garlicSaves"` in `config.json` in its data folder
+(see [What leaves your computer](#what-leaves-your-computer) for where that is), a file only you can read: mode 600 on
+macOS and Linux, and on Windows the data folder is your own. The key goes to GarlicSaves only, with each of its
+requests (it is handed to curl on its standard input, not on its command line). It never appears on the page, in Show
+details or in an error message; the page shows your GarlicSaves username, and only on your computer. Updates never
+touch `config.json`, so you stay signed in when Save Garage updates itself or puts an older version back. The
+`workerKey` setting of earlier versions is no longer used.
+
+**Signing out.** Go to the Sign in step and click **Sign out**. Save Garage forgets the key on this computer (it
+takes `"garlicSaves"` out of `config.json`); it doesn't tell GarlicSaves. To use Save Garage again, sign in again.
+
+**When GarlicSaves refuses the sign-in.** If GarlicSaves turns the key down (the sign-in was turned off or has
+expired), the download, edit or send stops with "GarlicSaves refused your sign-in", the top of the page says "GarlicSaves
+sign-in refused", and a **Sign in again** button gets you a new key.
 
 ## Updates
 
@@ -136,7 +174,9 @@ download's files). If a new version needs a different Python than the one in you
 packages on a Mac, the page says a new version is out, with a link, and you download that one yourself. When you run
 Save Garage from a git checkout, or from any folder that isn't laid out like a download (or that it can't write to), it
 never changes a file and only tells you a new version is out. It doesn't install, or put anything back, while another
-copy of Save Garage is running. What it did is logged in `update/update.log` in the data folder.
+copy of Save Garage is running. What it did is logged in `update/update.log` in the data folder. An update or a
+rollback changes only the app's own folder and its working files in `update` in the data folder, never your saves,
+backups or GarlicSaves sign-in.
 
 ## Related
 
@@ -199,8 +239,10 @@ copy of Save Garage is running. What it did is logged in `update/update.log` in 
 | The PS5 says there's nothing to transfer | A GTA VI save is still on the console. Delete it, then open Data Transfer again. |
 | Decryption service offline | Check your internet connection. GarlicSaves may also be down for a while. |
 | A download stops with "GarlicSaves' key service didn't answer in time" | The GarlicSaves consoles that work out the transfer keys were busy. Before the power prompt, Save Garage tries once more by itself; if that fails too, wait a minute and download again. Nothing is wrong with your PS5. Show details lists how long the key service took and why, for example no worker free or a worker that took too long. |
-| A download or saving edits stops with "GarlicSaves is getting too many requests right now" | Every copy of Save Garage uses the same GarlicSaves key, and GarlicSaves takes only so many requests a minute from one key. Before the power prompt, Save Garage waits as long as GarlicSaves asks, about a minute (the page counts down), and tries once more by itself. Otherwise, or if that is limited too, wait a minute and try again. Nothing is wrong with your PS5 or Save Garage. |
-| A download or saving edits stops with "GarlicSaves isn't accepting key requests from Save Garage's shared key" or "GarlicSaves isn't decrypting or encrypting saves for Save Garage's shared key" | GarlicSaves has turned that off for the key every copy of Save Garage uses, so trying again straight away won't help. Update Save Garage when a new version is out, or try again later. |
+| A download or saving edits stops with "GarlicSaves is getting too many requests right now" | GarlicSaves takes only so many requests a minute from each sign-in's key. Before the power prompt, Save Garage waits as long as GarlicSaves asks, about a minute (the page counts down), and tries once more by itself. Otherwise, or if that is limited too, wait a minute and try again. Nothing is wrong with your PS5 or Save Garage. |
+| Pairing, a download, saving edits or sending stops with "GarlicSaves refused your sign-in" | GarlicSaves turned down the key of your sign-in: the sign-in may have been turned off, or it may have expired. Click Sign in again and approve Save Garage on GarlicSaves once more, then try again. |
+| Signing in says the code expired | Click Sign in to GarlicSaves again for a new code, and enter it on GarlicSaves before the time shown runs out. |
+| Version 1.29.1 or older stops with "GarlicSaves isn't accepting key requests from Save Garage's shared key" | GarlicSaves revoked that key. Update to 1.30.0 or newer and sign in to GarlicSaves. |
 | A download stops with "The PS5 didn't answer" | Go back to the PS5 home screen, close any other save-transfer tool so Data Transfer is free, and try again. |
 | A download stops with "The power-button wait timed out" | Download again, and when the app asks, press the PS5 power button once within about 5 minutes and let go at the beep. |
 | The bottom of the page says "Update failed" | Nothing changed: Save Garage stays on the version you have. A download that didn't finish or failed a check is tried again at the next check (or click Check for updates); a version that didn't start isn't tried again. You can always download the new version yourself from [Releases](../../releases/latest). `update/update.log` in the data folder says what happened. |
@@ -231,6 +273,9 @@ python3 -m venv .venv
 
 Options: `--port N` (default 7283), `--host ADDRESS`, `--allow NETWORKS`, `--no-browser`.
 
+For development and tests only, the environment variable `SAVEGARAGE_DEV_WORKER_KEY` gives Save Garage a GarlicSaves
+worker key to use in place of the sign-in.
+
 A git checkout never updates itself: it only shows at the bottom of the page when a new version is out.
 
 Release files are built on Linux with [`scripts/package_release.sh`](scripts/package_release.sh): a portable Windows
@@ -243,7 +288,8 @@ signs `SHA256SUMS.txt` with the release key and checks the signature the way the
 
 Save Garage is free software under the [GNU GPL v3](LICENSE). It started from
 [gta6-save-editor](https://github.com/CoreyLyu76/gta6-save-editor) by CoreyLyu76 and includes PS5 Data Transfer code
-from [GarlicTransfer](https://github.com/earthonion/GarlicTransfer) by earthonion, both GPL-3.0. Details in
+and the GarlicSaves sign-in flow from [GarlicTransfer](https://github.com/earthonion/GarlicTransfer) by earthonion, both
+GPL-3.0. Details in
 [CREDITS.md](CREDITS.md).
 
 Save Garage is not affiliated with or endorsed by Rockstar Games, Take-Two Interactive or Sony Interactive

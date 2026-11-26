@@ -1,18 +1,84 @@
-"""GarlicSaves client: decrypt, encrypt and transfer-key derivation. Uses curl because Cloudflare blocks Python's own HTTP fingerprint."""
-import json, subprocess, time, urllib.request, shutil, os, re, socket, threading, zipfile
+"""GarlicSaves client: decrypt, encrypt and transfer-key derivation, and the sign-in that gets this installation its
+worker key. Uses curl because Cloudflare blocks Python's own HTTP fingerprint."""
+import json, subprocess, time, urllib.request, urllib.parse, shutil, os, re, socket, threading, unicodedata, zipfile
 from pathlib import Path
 
 DEFAULT_SERVER = 'https://garlicsaves.com'
-# Public worker key built into GarlicTransfer 0.3.7 (electron/config.cjs defaults.workerKey). Override with workerKey in data/config.json.
-DEFAULT_KEY = 'd398596b0dd4ad811173e3324a94d1cc90246a1c7f75b405a5696eed200b353e'
+# No worker key is built in. GarlicSaves authorises each installation with the user's own account (Garlic.sign_in);
+# engine/app.py keeps the key it gives in config.json in the data folder. For development and tests only, a key can
+# come from this environment variable instead.
+DEV_KEY_ENV = 'SAVEGARAGE_DEV_WORKER_KEY'
 NOWIN = 0x08000000 if os.name == 'nt' else 0
-# GarlicSaves takes at most so many jobs a minute from each worker key, and every copy of Save Garage uses the same key.
-# A rate limit that comes without a Retry-After is taken to last this many seconds.
+# GarlicSaves takes at most so many jobs a minute from each worker key. A rate limit that comes without a Retry-After is
+# taken to last this many seconds.
 RATE_WINDOW = 60
+
+# The sign-in: GarlicSaves' device authorisation, adapted from GarlicTransfer 0.4.0 (electron/device_auth.cjs, GPL-3.0).
+DEVICE_NAME = 'Save Garage'     # what GarlicSaves calls this installation: the app's name, nothing about the computer
+SIGNIN_LIMIT = 600              # seconds a sign-in waits for the user at most (less when its code expires sooner)
+SIGNIN_EVERY = 3                # the fewest seconds between two checks, whatever interval GarlicSaves asks for
+SIGNIN_SLOWER = 5               # seconds added to the interval each time GarlicSaves asks to slow down (HTTP 429)
+SIGNIN_MISSES = 3               # checks in a row that may get no answer, or a 5xx, before the sign-in gives up
+# What the sign-in accepts from GarlicSaves. A worker key or device code is printable ASCII without spaces, quotes or
+# backslashes (it goes in a header, and to curl on its standard input); the code the user types is letters, digits,
+# hyphens and spaces; an installation ID letters, digits and ._:-
+TOKEN_RE = re.compile(r'[!#-\[\]-~]{16,512}')
+DEVICE_CODE_RE = re.compile(r'[!#-\[\]-~]{1,512}')
+USER_CODE_RE = re.compile(r'[A-Za-z0-9](?:[A-Za-z0-9 -]{0,30}[A-Za-z0-9])?')
+INSTALL_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}')
+# the words a device answer's "error" (or "status") may hold, lower-case: RFC 8628's and the obvious variants
+PENDING = {'authorization_pending', 'pending'}
+SLOW_DOWN = {'slow_down'}
+EXPIRED = {'expired_token', 'expired', 'token_expired', 'code_expired', 'expired_code'}
+DENIED = {'access_denied', 'denied', 'authorization_denied', 'rejected', 'declined'}
+
+
+def valid_key(v):
+    """Whether v can be a worker key."""
+    return isinstance(v, str) and TOKEN_RE.fullmatch(v) is not None
+
+
+def clean_username(v):
+    """A GarlicSaves username to show on the page: text without control or formatting characters, at most 64
+    characters; '' for anything that isn't text."""
+    if not isinstance(v, str):
+        return ''
+    return ''.join(c for c in v if c == ' ' or unicodedata.category(c)[0] not in 'CZ').strip()[:64]
+
+
+def web_link(v):
+    """Whether v is an http or https address with a host: plain ASCII, no spaces, no user name in front of the host."""
+    if not isinstance(v, str) or not 0 < len(v) <= 2048 or any(not 0x21 <= ord(c) <= 0x7e for c in v) or '\\' in v:
+        return False
+    try:
+        u = urllib.parse.urlsplit(v)
+        host = u.hostname
+    except ValueError:
+        return False
+    return u.scheme.lower() in ('http', 'https') and bool(host) and '@' not in u.netloc
 
 
 class GarlicError(Exception):
     pass
+
+
+class NotSignedIn(GarlicError):
+    """No worker key: Save Garage isn't signed in to GarlicSaves (and no development key is set)."""
+
+    def __init__(self):
+        super().__init__('not signed in to GarlicSaves')
+
+
+class SignInError(GarlicError):
+    """Why a sign-in stopped. code: unreachable (no answer from GarlicSaves), rate_limited (HTTP 429 to the first
+    request), unavailable (a 5xx), expired (the code ran out first, or GarlicSaves said so), refused (GarlicSaves turned
+    the sign-in down), bad_link (a sign-in link that isn't an http or https address), bad_answer (an answer Save Garage
+    doesn't understand) or cancelled. status: the HTTP status of the answer it stopped at, if any. Its text is these two
+    only, never GarlicSaves' words, which could quote a key."""
+
+    def __init__(self, code, status=None):
+        self.code, self.status = code, status
+        super().__init__('GarlicSaves sign-in: %s%s' % (code, ' (HTTP %d)' % status if status is not None else ''))
 
 
 class GarlicRefused(GarlicError):
@@ -33,7 +99,8 @@ class RateLimited(GarlicRefused):
 
 
 class KeyDisabled(GarlicRefused):
-    """HTTP 403 (or 401) from GarlicSaves' API: this kind of job is turned off for the worker key."""
+    """HTTP 401, or a 403 from GarlicSaves' API: the worker key isn't accepted (the sign-in was turned off or has
+    expired) or this kind of job is turned off for it."""
     reason, what = 'key_disabled', 'turned the request down for this worker key'
 
 
@@ -53,6 +120,37 @@ def _json_object(body):
         return isinstance(json.loads(body), dict)
     except ValueError:
         return False
+
+
+def _word(ans):
+    """A device answer's "error", else its "status", lower-case ('' when it has neither), to compare with the words
+    above. Only compared, never shown."""
+    for k in ('error', 'status'):
+        v = ans.get(k) if isinstance(ans, dict) else None
+        if isinstance(v, str) and v.strip():
+            return v.strip().lower()[:64]
+    return ''
+
+
+def _seconds(ans, key, low, high, default):
+    """A number of seconds from a device answer: `default` when it is missing or null, None when it isn't a number from
+    low to high."""
+    v = ans.get(key)
+    if v is None:
+        return float(default)
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or not low <= v <= high:
+        return None
+    return float(v)
+
+
+def _credentials(ans, status):
+    """What an authorised sign-in gives: the worker key, the installation ID and the username, checked."""
+    key, inst = ans.get('worker_key'), ans.get('installation_id')
+    if isinstance(inst, int) and not isinstance(inst, bool) and inst >= 0:
+        inst = str(inst)
+    if not valid_key(key) or not isinstance(inst, str) or not INSTALL_RE.fullmatch(inst):
+        raise SignInError('bad_answer', status)
+    return {'worker_key': key, 'installation_id': inst, 'username': clean_username(ans.get('username'))}
 
 
 class Derivation:
@@ -184,12 +282,13 @@ class Derivations:
 class Garlic:
     def __init__(self, server=None, key=None, proxy=None):
         self.server = (server or DEFAULT_SERVER).rstrip('/')
-        self.key = key or DEFAULT_KEY
+        self.key = key or None                  # the worker key: from the sign-in (engine/app.py), None while signed out
         self.proxy = proxy if proxy is not None else self.detect_proxy()
         # on Windows the curl Windows ships: a curl.exe in the current folder, which Windows would look in first, must never run
         self.curl = (os.path.join(os.environ.get('SystemRoot') or r'C:\Windows', 'System32', 'curl.exe') if os.name == 'nt'
                      else shutil.which('curl') or 'curl')
         self.limited_until = 0.0                # time.monotonic() until which GarlicSaves said it is limiting requests
+        self.refused_key = None                 # the key GarlicSaves turned down in its latest answer (KeyDisabled)
 
     @staticmethod
     def detect_proxy():
@@ -201,18 +300,31 @@ class Garlic:
 
     HEAD = re.compile(rb'HTTP/[^\r\n]*\r?\n(?:[^\r\n]+\r?\n)*\r?\n')    # a response's status line and headers
 
-    def _curl(self, args, timeout=320):
+    def _curl(self, args, timeout=320, key=True, data=None):
         """Run curl. Returns (HTTP status, headers, body), the headers a dict with lower-case names. curl prints each
         response's headers (-D -; a proxy's CONNECT answer or a 100 Continue comes before the real one), then the body
         unless -o sends it to a file, then the status (-w). Without -f an HTTP error comes back like any other answer.
-        A curl failure raises GarlicError('network: ...')."""
-        cmd = [self.curl, '-sS', '-m', str(timeout - 10), '-D', '-', '-w', r'\n%{http_code}']
+        The worker key (sent unless key is False: the sign-in's own requests) and a request body (data) go to curl on its
+        standard input (-K -), never on its command line, which other users of the computer can read; -q keeps a
+        ~/.curlrc out. Without a key NotSignedIn is raised before anything is sent. A curl failure raises
+        GarlicError('network: ...')."""
+        conf, k = [], None
+        if key:
+            k = self.key
+            if not valid_key(k):
+                raise NotSignedIn()
+            conf.append('header = "X-Worker-Key: %s"' % k)
+        if data is not None:
+            conf.append('data-raw = "%s"' % data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n'))
+        cmd = [self.curl, '-q', '-sS', '-m', str(timeout - 10), '-D', '-', '-w', r'\n%{http_code}', '-K', '-']
         if self.proxy:
             cmd += ['-x', self.proxy]
-        cmd += ['-H', 'X-Worker-Key: ' + self.key, *args]
-        r = subprocess.run(cmd, capture_output=True, timeout=timeout, creationflags=NOWIN)
+        cmd += args
+        r = subprocess.run(cmd, input=''.join(c + '\n' for c in conf).encode('utf-8'), capture_output=True, timeout=timeout,
+                           creationflags=NOWIN)
         if r.returncode != 0:
-            raise GarlicError('network: ' + r.stderr.decode('utf-8', 'replace').strip()[:200])
+            err = r.stderr.decode('utf-8', 'replace').strip()
+            raise GarlicError('network: ' + (err.replace(k, '<worker key>') if k else err)[:200])
         out, _, code = r.stdout.rpartition(b'\n')
         headers, m = {}, self.HEAD.match(out)
         while m:                                # the last response's headers count
@@ -225,21 +337,29 @@ class Garlic:
         return (int(code) if code.strip().isdigit() else 0), headers, out
 
     def _refusal(self, status, headers, body):
-        """Raise the GarlicRefused an answer stands for: RateLimited (429, which also starts limited()), KeyDisabled (401
-        or 403 from GarlicSaves' API, which answers in JSON; a Cloudflare 403 page isn't about the key) or BadRequest
-        (400). Any other answer returns."""
+        """Raise the GarlicRefused an answer stands for: RateLimited (429, which also starts limited()), KeyDisabled (401,
+        or a 403 from GarlicSaves' API, which answers in JSON; a Cloudflare 403 page isn't about the key; it also marks
+        the key refused()) or BadRequest (400). Any other answer returns; a 2xx clears refused()."""
         if status == 429:
             wait = retry_after(headers.get('retry-after'))
             self.limited_until = time.monotonic() + (RATE_WINDOW if wait is None else wait)
             raise RateLimited(status, wait)
-        if status in (401, 403) and _json_object(body):
+        if status == 401 or status == 403 and _json_object(body):
+            self.refused_key = self.key
             raise KeyDisabled(status)
         if status == 400:
             raise BadRequest(status)
+        if 200 <= status < 300:
+            self.refused_key = None
 
     def limited(self):
         """Whether a rate limit GarlicSaves announced is still on."""
         return time.monotonic() < self.limited_until
+
+    def refused(self):
+        """Whether GarlicSaves turned down the worker key in use (HTTP 401, or a 403 from its API) in its latest answer
+        to a request that carried it: the sign-in was turned off or has expired, or that job is turned off for it."""
+        return self.key is not None and self.refused_key == self.key
 
     def _json(self, args, **kw):
         status, headers, body = self._curl(args, **kw)
@@ -280,7 +400,7 @@ class Garlic:
         args += ['-F', 'files=@%s;filename=%s;type=application/octet-stream' % (Path(file_path).as_posix(), filename)]
         last = None
         # Cloudflare sometimes answers 5xx: retry. Not a refusal, which would only be refused again and count against the
-        # shared key's limit.
+        # key's limit.
         for attempt in range(4):
             try:
                 j = self._json(args)
@@ -298,6 +418,7 @@ class Garlic:
         """Download a finished job's result to path. An HTTP error raises (a refusal as its GarlicRefused) and leaves no file."""
         status, headers, _ = self._curl([self.server + '/api/v1/jobs/%s/result' % job_id, '-o', path])
         if 200 <= status < 300:
+            self.refused_key = None
             return
         body = b''
         try:
@@ -343,6 +464,81 @@ class Garlic:
             f.write(data)
         return out_path
 
+    # ---- the sign-in: GarlicSaves' device authorisation ----
+    def _device(self, path, obj):
+        """POST obj as JSON to one of GarlicSaves' device endpoints, without the worker key. Returns (HTTP status,
+        headers, the answer when it is a JSON object, else None). No answer at all raises SignInError('unreachable')."""
+        try:
+            status, headers, body = self._curl(['-X', 'POST', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json',
+                                                self.server + path], timeout=40, key=False, data=json.dumps(obj))
+        except (GarlicError, subprocess.SubprocessError, OSError):   # curl's own words can name this computer's address
+            raise SignInError('unreachable') from None
+        if not 100 <= status <= 599:
+            raise SignInError('unreachable')
+        try:
+            ans = json.loads(body)
+        except ValueError:
+            ans = None
+        return status, headers, ans if isinstance(ans, dict) else None
+
+    def sign_in(self, on_code, stop, name=DEVICE_NAME, limit=None, clock=time.monotonic):
+        """Sign this installation in to GarlicSaves, as GarlicTransfer 0.4.0 does (electron/device_auth.cjs): ask for a
+        code (POST /api/v1/device/code with the installation's name), hand it to on_code(user_code, verification_uri,
+        seconds left) for the user to enter on GarlicSaves, then check (POST /api/v1/device/token) every
+        max(SIGNIN_EVERY, interval) seconds until they approve it: authorization_pending (HTTP 202) waits on, HTTP 429
+        slows down. Gives up after `limit` seconds (SIGNIN_LIMIT) or when the code expires, whichever is sooner.
+        stop: a threading.Event that cancels it. Returns {'worker_key', 'installation_id', 'username'}, every field
+        checked; anything else raises SignInError. Of GarlicSaves' answers nothing but those fields is kept or shown."""
+        limit = SIGNIN_LIMIT if limit is None else limit
+        start = clock()
+        status, headers, ans = self._device('/api/v1/device/code', {'name': str(name)[:64]})
+        if not 200 <= status < 300:
+            raise SignInError('rate_limited' if status == 429 else 'unavailable' if status >= 500 else 'bad_answer', status)
+        a = ans or {}
+        dc, uc, link = a.get('device_code'), a.get('user_code'), a.get('verification_uri')
+        expires, interval = _seconds(a, 'expires_in', 1, 86400, SIGNIN_LIMIT), _seconds(a, 'interval', 0, 3600, SIGNIN_EVERY)
+        if (ans is None or not isinstance(dc, str) or not DEVICE_CODE_RE.fullmatch(dc) or not isinstance(uc, str)
+                or not USER_CODE_RE.fullmatch(uc) or not isinstance(link, str) or not link or expires is None or interval is None):
+            raise SignInError('bad_answer', status)
+        if not web_link(link):                  # never opened, never shown: javascript:, file:, a user name before the host...
+            raise SignInError('bad_link', status)
+        deadline = min(start + limit, clock() + expires)
+        on_code(uc, link, max(0.0, deadline - clock()))
+        interval, misses = max(SIGNIN_EVERY, interval), 0
+        while True:
+            if stop.wait(max(0.0, min(interval, deadline - clock()))):
+                raise SignInError('cancelled')
+            if clock() >= deadline:
+                raise SignInError('expired')
+            try:
+                status, headers, ans = self._device('/api/v1/device/token', {'device_code': dc})
+            except SignInError:                 # no answer this time
+                misses += 1
+                if misses >= SIGNIN_MISSES:
+                    raise
+                continue
+            if stop.is_set():
+                raise SignInError('cancelled')
+            word = _word(ans)
+            if status == 429 or word in SLOW_DOWN:  # wait longer from now on: 5 s more (RFC 8628), or what Retry-After asks
+                interval, misses = max(interval + SIGNIN_SLOWER, retry_after(headers.get('retry-after')) or 0), 0
+                continue
+            if status >= 500:
+                misses += 1
+                if misses >= SIGNIN_MISSES:
+                    raise SignInError('unavailable', status)
+                continue
+            misses = 0
+            if word in PENDING:
+                continue
+            if 200 <= status < 300 and word == 'authorized':
+                return _credentials(ans, status)
+            if word in EXPIRED or status == 410:
+                raise SignInError('expired', status)
+            if word in DENIED or status == 403 and ans is not None:
+                raise SignInError('refused', status)
+            raise SignInError('bad_answer', status)
+
     # ---- transfer key derivation ----
     HEDGES, HEDGE_AFTER, POLL = 3, 7, 0.8     # requests at most, seconds before the next one, seconds between status checks
     STATUSES = ('queued', 'running', 'done', 'failed')     # a job's statuses on GarlicSaves, in order
@@ -354,7 +550,9 @@ class Garlic:
         on_request() is called as each request goes out. on_status(n, status, retry_after) is told what became of
         request n (0, 1, 2): each job status seen ('queued', 'running', 'done', 'failed'), 'network' when it got no
         usable answer, or the refusal's reason ('rate_limited' with the seconds GarlicSaves asked to wait or None,
-        'key_disabled', 'bad_request')."""
+        'key_disabled', 'bad_request'). Without a worker key it raises NotSignedIn and sends nothing."""
+        if not self.key:
+            raise NotSignedIn()
         result = {}; done = threading.Event(); lock = threading.Lock(); live = set()
 
         def tell(n, status, retry_after=None):

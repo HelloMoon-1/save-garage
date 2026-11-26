@@ -1,5 +1,5 @@
 """Save Garage local service. The web UI only talks to the /api endpoints here; see docs/API.md."""
-import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math
+import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math, secrets
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
@@ -50,11 +50,66 @@ try:
     CFG = json.loads((DATA / 'config.json').read_text('utf-8'))
 except Exception:
     pass
-G = garlic.Garlic(CFG.get('serverUrl'), CFG.get('workerKey'), CFG.get('proxy'))
+if not isinstance(CFG, dict):
+    CFG = {}
+
+# The GarlicSaves sign-in. GarlicSaves authorises each installation with the user's own account (garlic.Garlic.sign_in,
+# docs/API.md). The worker key it gives is kept with the installation ID and the username in config.json in the data
+# folder, as "garlicSaves", in a file only its owner can read (mode 600), and is sent nowhere but GarlicSaves: never to
+# the page, the job log or an error. The update install and rollback (bootstrap.py) never touch the data folder's
+# config.json. A key in SAVEGARAGE_DEV_WORKER_KEY, for development and tests only, takes the stored key's place.
+SIGNED_IN = 'garlicSaves'                                   # its entry in config.json
+DEV_KEY = os.environ.get(garlic.DEV_KEY_ENV) if garlic.valid_key(os.environ.get(garlic.DEV_KEY_ENV)) else None
 
 
-def save_config(**changes):
-    """Save settings to data/config.json, keeping what else it holds (serverUrl, workerKey, proxy, ...)."""
+def stored_signin(cfg):
+    """The sign-in config.json holds, checked: {'key', 'installation', 'username'}, or None."""
+    a = cfg.get(SIGNED_IN) if isinstance(cfg, dict) else None
+    if not isinstance(a, dict) or not garlic.valid_key(a.get('workerKey')):
+        return None
+    inst = a.get('installationId')
+    return {'key': a['workerKey'], 'installation': inst if isinstance(inst, str) and garlic.INSTALL_RE.fullmatch(inst) else '',
+            'username': garlic.clean_username(a.get('username'))}
+
+
+ACCOUNT = {'signin': stored_signin(CFG)}                     # the stored sign-in, or None
+G = garlic.Garlic(CFG.get('serverUrl'), DEV_KEY or (ACCOUNT['signin'] or {}).get('key'), CFG.get('proxy'))
+
+
+def write_private(path, text):
+    """Write a file so a reader never sees half of it and it survives a power cut once this returns, readable and
+    writable by its owner only (mode 600; on Windows the per-user data folder keeps it to the user)."""
+    path = Path(path)
+    tmp = path.with_name('%s.%s.tmp' % (path.name, secrets.token_hex(4)))
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0), 0o600)
+    try:
+        with os.fdopen(fd, 'wb') as f:
+            f.write(text.encode('utf-8'))
+            f.flush()
+            os.fsync(f.fileno())
+        if os.name != 'nt':
+            os.chmod(str(tmp), 0o600)           # whatever the umask
+        os.replace(str(tmp), str(path))
+    except BaseException:
+        try:
+            os.unlink(str(tmp))
+        except OSError:
+            pass
+        raise
+    if os.name != 'nt':                         # the rename itself, too
+        try:
+            d = os.open(str(path.parent), os.O_RDONLY)
+            try:
+                os.fsync(d)
+            finally:
+                os.close(d)
+        except OSError:
+            pass
+
+
+def save_config(remove=(), **changes):
+    """Save settings to config.json in the data folder (written by write_private, mode 600: it can hold the sign-in),
+    keeping what else it holds (serverUrl, proxy, autoUpdate, garlicSaves, ...). remove: entries to take out."""
     path = DATA / 'config.json'
     with LOCK:
         try:
@@ -65,12 +120,37 @@ def save_config(**changes):
             raise Fail('internal', 'data/config.json is not valid JSON, so it was left as it is')
         if not isinstance(cur, dict):
             raise Fail('internal', 'data/config.json is not a JSON object, so it was left as it is')
+        if not changes and not any(k in cur for k in remove):
+            return                              # nothing to change: the file is left as it is
         cur.update(changes)
+        for k in remove:
+            cur.pop(k, None)
         DATA.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name('config.json.tmp')
-        tmp.write_text(json.dumps(cur, indent=2), 'utf-8')
-        os.replace(tmp, path)
+        write_private(path, json.dumps(cur, indent=2))
         CFG.update(changes)
+        for k in remove:
+            CFG.pop(k, None)
+
+
+def load_signin():
+    """Read the sign-in from config.json in the data folder again and use its key (the development key, when one is
+    set, still comes first). A config.json holding a sign-in that others may read is made private (mode 600)."""
+    path = DATA / 'config.json'
+    try:
+        cfg = json.loads(path.read_text('utf-8'))
+    except (OSError, ValueError):
+        cfg = {}
+    a = stored_signin(cfg)
+    if a and os.name != 'nt':
+        try:
+            if path.stat().st_mode & 0o077:
+                os.chmod(str(path), 0o600)
+        except OSError:
+            pass
+    with LOCK:
+        ACCOUNT['signin'] = a
+        G.key = DEV_KEY or (a or {}).get('key')
+    return a
 
 
 # Updates (engine/updater.py): a check at start-up and every 6 hours while autoUpdate is on (the default). A release
@@ -105,6 +185,7 @@ def relay():
 
 def vendor_env(extra=None):
     e = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUNBUFFERED='1')
+    e.pop(garlic.DEV_KEY_ENV, None)             # the tools get their keys from the relay, never a worker key
     e.update(extra or {})
     return e
 
@@ -160,6 +241,8 @@ def start_job(kind, fn):
                 JOB.update(status='done', needPower=False, accounts=None)
         except Fail as e:
             failed(e.code, e.detail)
+        except garlic.NotSignedIn:              # a backstop: no job that needs the key starts without one, and Sign out waits
+            failed('not_signed_in', '')
         except garlic.GarlicRefused as e:       # its text is the HTTP status and the wait, never GarlicSaves' words
             failed(GARLIC_REFUSED.get(e.reason, 'internal'), e)
         except Exception as e:
@@ -201,6 +284,104 @@ def run_tool(args, timeout=120):
     if r.returncode != 0:
         raise Fail('tool_failed', (r.stdout + r.stderr)[-300:])
     return r.stdout
+
+
+# ---------------- GarlicSaves sign-in (docs/API.md, "Signing in to GarlicSaves")
+# One sign-in at a time, in a thread: status idle, starting (asking for a code), waiting (the code is shown until the
+# user approves it on GarlicSaves), done or error (with the reason and HTTP status). Each run has a number, so a run that
+# was cancelled or replaced changes nothing when it ends.
+SIGNIN = {'run': 0, 'status': 'idle', 'code': None, 'link': None, 'until': None, 'error': None, 'http': None, 'stop': None}
+# the jobs that go through GarlicSaves (the key relay, decrypt, encrypt): refused with not_signed_in without a key
+NEEDS_SIGNIN = ('/api/pair', '/api/download', '/api/patch', '/api/upload')
+
+
+def signin_start():
+    """Start signing in to GarlicSaves, unless a sign-in is already under way."""
+    with LOCK:
+        if SIGNIN['status'] in ('starting', 'waiting'):
+            return
+        stop = threading.Event()
+        SIGNIN.update(run=SIGNIN['run'] + 1, status='starting', code=None, link=None, until=None, error=None, http=None, stop=stop)
+        run = SIGNIN['run']
+    threading.Thread(target=signin_run, args=(run, stop), daemon=True).start()
+
+
+def signin_end(run, status, error=None, http=None):
+    with LOCK:
+        if SIGNIN['run'] == run:
+            SIGNIN.update(status=status, code=None, link=None, until=None, error=error, http=http)
+
+
+def signin_run(run, stop):
+    def mine():
+        return SIGNIN['run'] == run and not stop.is_set()
+
+    def on_code(code, link, seconds):
+        with LOCK:
+            if mine():
+                SIGNIN.update(status='waiting', code=code, link=link, until=time.monotonic() + seconds)
+    try:
+        got = G.sign_in(on_code, stop)
+    except garlic.SignInError as e:             # the reason and the HTTP status only, never GarlicSaves' words
+        if e.code == 'cancelled':
+            signin_end(run, 'idle')
+        else:
+            signin_end(run, 'error', e.code, e.status)
+        return
+    except Exception:
+        signin_end(run, 'error', 'internal')
+        return
+    with LOCK:
+        if not mine():
+            return                              # cancelled while the last answer came: its key isn't kept
+        try:
+            keep_signin(got)
+        except (Fail, OSError):                 # config.json couldn't be written: nothing is kept
+            signin_end(run, 'error', 'not_saved')
+            return
+        SIGNIN.update(status='done', code=None, link=None, until=None, error=None, http=None)
+
+
+def keep_signin(got):
+    """Store a new sign-in in config.json (mode 600) and use its key from now on."""
+    with LOCK:
+        save_config(**{SIGNED_IN: {'workerKey': got['worker_key'], 'installationId': got['installation_id'],
+                                   'username': got['username']}})
+        ACCOUNT['signin'] = {'key': got['worker_key'], 'installation': got['installation_id'], 'username': got['username']}
+        G.key = DEV_KEY or got['worker_key']
+
+
+def signin_cancel():
+    with LOCK:
+        if SIGNIN['status'] in ('starting', 'waiting'):
+            SIGNIN['stop'].set()
+            SIGNIN.update(run=SIGNIN['run'] + 1, status='idle', code=None, link=None, until=None, error=None, http=None)
+
+
+def sign_out():
+    """Forget the GarlicSaves sign-in on this computer: its entry in config.json and its key. Refused while a job runs,
+    which may still need the key."""
+    with LOCK:
+        if JOB['status'] == 'running':
+            raise Fail('busy')
+        signin_cancel()
+        save_config(remove=(SIGNED_IN,))
+        ACCOUNT['signin'] = None
+        G.key = DEV_KEY
+        SIGNIN.update(status='idle', error=None, http=None)
+
+
+def garlic_state():
+    """state.garlic for the page (docs/API.md): whether Save Garage is signed in to GarlicSaves, and how a sign-in is
+    going. Never the key."""
+    with LOCK:
+        a, s = ACCOUNT['signin'], dict(SIGNIN)
+    waiting = s['status'] == 'waiting'
+    return {'signedIn': bool(G.key), 'username': (a['username'] or None) if a and not DEV_KEY else None, 'stored': bool(a),
+            'devKey': bool(DEV_KEY), 'refused': G.refused(),
+            'signin': {'status': s['status'], 'code': s['code'] if waiting else None, 'link': s['link'] if waiting else None,
+                       'expiresIn': max(0, math.ceil(s['until'] - time.monotonic())) if waiting and s['until'] else None,
+                       'error': s['error'], 'http': s['http']}}
 
 
 # ---------------- steps ----------------
@@ -280,10 +461,20 @@ def probe_host(host):
     return cons[0] if cons else None
 
 
+def refused_key_request(t0):
+    """Pairing and sending back can't go on without the keys of a transfer-key request either: when one GarlicSaves
+    turned down (KEY_REFUSED) has ended since t0, a time.monotonic() value, raise its code, with its line as the detail."""
+    for d in relay().derivations.since(t0):
+        why = d.reason()
+        if d.answered is False and why in KEY_REFUSED:
+            raise Fail(KEY_REFUSED[why], d.summary())
+
+
 def job_pair():
     c = STATE['console']; prefix_path().parent.mkdir(parents=True, exist_ok=True)
     opts = {'ps5Ip': c['host'], 'hostId': c['hostId'], 'systemVersion': c['firmware'], 'oracleHost': '127.0.0.1', 'oraclePort': relay().port,
             'prefixPath': str(prefix_path()), 'duration': 300}
+    t0 = time.monotonic()
     p = spawn(['poc.dt_pair', '-'], stdin_text=json.dumps(opts) + '\n')
     stage('pair_waiting_console')
     ok = False
@@ -298,9 +489,11 @@ def job_pair():
         if ev.get('type') == 'paired':
             ok = True
         if ev.get('type') == 'error':
+            refused_key_request(t0)             # GarlicSaves turned the sign-in down: say so, not just "pairing failed"
             raise Fail('pair_failed', ev.get('message'))
     p.wait()
     if not ok:
+        refused_key_request(t0)
         raise Fail('pair_failed')
     refresh_paired(); stage('paired')
 
@@ -801,6 +994,7 @@ def job_upload():
            'DT_ORACLE_HOST': '127.0.0.1', 'DT_ORACLE_PORT': str(relay().port), 'DT_SYSTEM_VERSION': c['firmware']}
     if MAC:     # a Mac on Wi-Fi often misses the console's search broadcast, so the source announces itself
         env['DT_CONSOLE_IP'] = c['host']
+    t0 = time.monotonic()
     p = spawn(['poc.dt_source'], env=env)
     stage('waiting_console')
     files = 0; finished = False
@@ -808,6 +1002,8 @@ def job_upload():
         line = line.rstrip(); low = line.lower()
         if 'srch' in low or not line:
             continue
+        if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:
+            refused_key_request(t0)             # a channel closed because GarlicSaves turned its key request down
         if '[tcp] connection from' in low:
             stage('console_connected', hint=None)
         elif 'gfp5 id=' in low and files == 0:
@@ -831,6 +1027,7 @@ def job_upload():
         elif 'traceback' in low or 'error' in low:
             log(line)
     if not (finished and files):
+        refused_key_request(t0)
         raise Fail('upload_failed', 'process ended')
     time.sleep(3)
     (sess / 'uploaded').touch()                 # a download that was sent back is not picked up again
@@ -867,6 +1064,7 @@ def public_state():
         s['canQuit'] = DESKTOP
         s['version'] = VERSION
         s['update'] = update_state()
+        s['garlic'] = garlic_state()
         return s
 
 
@@ -1034,8 +1232,19 @@ class H(BaseHTTPRequestHandler):
                 self._send(200, {'ok': True})
                 threading.Thread(target=lambda: (time.sleep(0.3), SRV['s'].shutdown()), daemon=True).start()
                 return
+            if path == '/api/signin':                  # sign in to GarlicSaves (or go on with the sign-in under way)
+                signin_start()
+                return self._send(200, garlic_state())
+            if path == '/api/signin/cancel':
+                signin_cancel()
+                return self._send(200, garlic_state())
+            if path == '/api/signout':                 # forget the GarlicSaves sign-in on this computer
+                sign_out()
+                return self._send(200, garlic_state())
             if not STATE['console']:
                 raise Fail('no_console')
+            if path in NEEDS_SIGNIN and not G.key:
+                raise Fail('not_signed_in')
             if path == '/api/pair':
                 return self._send(200, {'job': start_job('pair', job_pair)})
             if path == '/api/download':
@@ -1121,9 +1330,12 @@ def main():
             webbrowser.open(url)
         return
     DATA.mkdir(parents=True, exist_ok=True)
+    load_signin()                               # and a config.json holding a sign-in that others could read is made private
     srv = ThreadingHTTPServer((BIND, PORT), H)
     SRV['s'] = srv
     print('Save Garage running: ' + url, flush=True)
+    if DEV_KEY:
+        print('Using the worker key in %s (development and tests only).' % garlic.DEV_KEY_ENV, flush=True)
     if DESKTOP and (MAC or os.name == 'nt'):       # desktop builds: quit when the page has been gone a while
         threading.Thread(target=idle_watch, daemon=True).start()
     if open_ui:

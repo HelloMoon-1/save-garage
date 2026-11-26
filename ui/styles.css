@@ -145,6 +145,14 @@ p { margin: 0; }
 .power svg { width: 44px; height: 44px; }
 .power svg path, .power svg line { stroke: var(--edit); stroke-width: 4; fill: none; stroke-linecap: round; }
 .power strong { display: block; font: 400 24px var(--display); color: #ffd395; letter-spacing: .01em; }
+/* ---------- GarlicSaves sign-in: the code to enter on GarlicSaves (codes and addresses read left to right) ---------- */
+.signin-code { display: grid; gap: 12px; justify-items: start; }
+.signin-code .lbl { color: var(--text-2); font-size: 14px; }
+.signin-code .code { font: 600 clamp(30px, 6vw, 44px)/1.1 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; letter-spacing: .12em; color: #ffd36b; user-select: all; direction: ltr; unicode-bidi: isolate; }
+.signin-code .addr { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; color: var(--text); overflow-wrap: anywhere; direction: ltr; unicode-bidi: isolate; }
+.signin-code a.btn { text-decoration: none; }
+.callout.signin-first { align-items: center; }
+.callout.signin-first .btn { flex: none; margin-inline-start: auto; }
 details.log { margin-top: 10px; }
 details.log summary { cursor: pointer; color: var(--text-2); font-size: 14px; }
 details.log pre { max-height: 220px; overflow: auto; background: var(--field); padding: 10px; border-radius: var(--r-input); font-size: 12px; white-space: pre-wrap; color: var(--text-2); }
