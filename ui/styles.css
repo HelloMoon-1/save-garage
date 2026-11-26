@@ -179,7 +179,7 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .section-head { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 6px 16px; margin: 4px 0 12px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .section-head p { grid-column: 1 / -1; color: var(--text-2); font-size: 14px; max-width: 68ch; }
-.group + .group { margin-top: 34px; }
+.group + .group, .fields + .group { margin-top: 34px; }
 .fields { border-top: 1px solid var(--hairline); }
 .field { display: grid; grid-template-columns: minmax(200px, 1.25fr) 2fr; gap: 10px 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
 .field .name { font-weight: 600; }

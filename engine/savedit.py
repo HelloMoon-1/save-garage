@@ -297,7 +297,8 @@ def _apply_ammo(txt, changes):
 
 # ---------------------------------------------------------------- whole-file
 def apply(b, edits):
-    """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'world': {...}} applied to the original file -> (bytes, log)."""
+    """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'world': {...}} applied to the original file -> (bytes, log).
+    'world' holds world.py's time, health and armour, player.py's 'lucia', 'jason' and 'relationship', and fog.py's 'fog'."""
     b, log = _apply_core(b, edits)
     if edits.get('raw'):
         import savebrowse
@@ -334,12 +335,23 @@ def apply(b, edits):
             b, clog = checklist.apply(b, {'overall': 'recompute'})     # the 100% figure, as the game works it out
             log += [dict(x, what='completion', step=x.get('what'), label='100% completion') for x in clog]
     if edits.get('world'):
-        import world
+        import world, player, fog
+        w = edits['world']
         try:
-            b, wlog = world.apply(b, edits['world'])
+            b, wlog = world.apply(b, w)
         except (world.WorldError, KeyError, ValueError, TypeError) as e:
             raise SaveError(str(e) if isinstance(e, world.WorldError) else 'bad_request') from e
         log += wlog
+        # the characters (attributes, criminal profile, relationship, vest) and the map, on the same tab
+        for mod, choice in ((player, {k: w[k] for k in player.KEYS if w.get(k) is not None}), (fog, w.get('fog'))):
+            if choice:
+                try:
+                    b, plog = mod.apply(b, choice)
+                except SaveError:
+                    raise
+                except (KeyError, ValueError, TypeError, IndexError) as e:
+                    raise SaveError('bad_request') from e
+                log += plog
     return b, log
 
 

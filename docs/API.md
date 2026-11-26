@@ -61,15 +61,31 @@ Everything the Completion tab shows, one key per part: `stunts`, `compendium`, `
 ## GET /api/world?file=…
 
 The time of day (`clock`), `health` and `healthMax` (250, the game's overpowered maximum), and the armour of both
-characters' outfits (`armour`, `armourMax`).
+characters' outfits (`armour`, `armourMax`). Two more parts are read on their own; one a save can't show is `null`,
+and `errors` says why:
+
+- `player`: `characters`, one per character (`key` `lucia` or `jason`, `name`), with `meter` (attribute slot 24),
+  `skills` (the values of slots 9, 10, 13, 14, 15, 19, 20 and 35), `profile` (the criminal profile score),
+  `attributesProblem` (a refusal code when the attributes can't be edited) and `vest`
+  (`{"state": "can_add" | "worn" | "no_vest" | "unknown", "armour", "max", "owned"}`); `relationship` (`value`,
+  `lowerCap` and `cap`, the range the story allows now, `level`, `locked`, `disabled` and `problem`, a refusal code
+  while it can't be changed); and the limits: `meterFull` (100), `skillMin` and `skillMax` (1 and 99),
+  `skillChoices` (60 and 99), `profileMin` and `profileMax` (-100 and 0.25), `profileNewGame` (-25), `vestArmour` (150).
+- `fog`: the map's fog of war. `regions` uncovered in the save (`named` and `cells`), `known` (the 722 regions Save
+  Garage knows: `knownNamed` 52, `knownCells` 670), `mapTotal` (889), `missing` (known regions the save still lacks),
+  `unknown` (regions in the save that Save Garage doesn't know, kept as they are) and `problem` (a refusal code).
 
 ## GET /api/savedata?file=…[&section=…&path=…&offset=…]
 
 Without `section`: every section of the save (`hash`, `name` where known, `bytes`, `readOnly` reason, `risky`).
 With `section` and a JSON `path`: up to 200 members of that object or list, each with its `key`, `label`, `kind` and
 `raw` value, or `count` for an object or list. `means` names what a value stands for when it is the ID of something
-known (`{"kind": "Item", "text": "…"}`), and `readOnly` or `min` and `max` mark single fields with their own rule
-(maximum health is read-only; health is 1 to 250).
+known (`{"kind": "Item", "text": "…"}`), and `readOnly` or `min` and `max` mark single fields with their own rule,
+the same limits the World tab keeps to: maximum health is read-only; health is 1 to 250; the criminal profile is -100
+to 0.25; the relationship stays within the story's caps and is read-only while the story has it locked or switched
+off, and those caps and flags are read-only themselves; the skill slots of a character's attributes go up to 99 and
+slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmour up to 150. FogOfWar is read-only
+(the World tab reveals the map).
 
 ## POST endpoints
 
@@ -83,7 +99,7 @@ known (`{"kind": "Item", "text": "…"}`), and `readOnly` or `min` and `max` mar
 | `/api/choose-account` | `{"owner": "<account id>"}` | Answers the download's question when several PS5 accounts have a GTA VI save: while the job's stage is `choose_account`, `job.accounts` lists `{id, name, saves}` and only those ids are accepted |
 | `/api/stunt-edits` | `{"file": "…", "groups": ["jumps", "base", "bridges"]}` | The stat edits that mark those stunt types found and completed, for the page to add to `stats` |
 | `/api/preview` | `{"file": "…", "stats": [...], "completion": {...}}` | Works out the 100% checklist as it would be after these edits, without writing anything: `{"ok": true, "overall": {...}, "lines": [{key, value, of, percent, done}]}`, or `{"ok": false, "failed": [part names]}` naming the parts that fail on this save |
-| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...], "completion": {...}, "world": {...}, "raw": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send. `completion` holds one choice per part (see the Completion tab), `world` the time, health and armour, `raw` single Save data values |
+| `/api/patch` | `{"slot": "…", "money": [...], "ammo": [...], "stats": [...], "completion": {...}, "world": {...}, "raw": [...]}` | Applies every edit for one save to its original, re-encrypts it and gets it ready to send. `completion` holds one choice per part (see the Completion tab), `world` the World tab's edits (below), `raw` single Save data values |
 | `/api/restore` | none | Puts the original saves back, ready to send |
 | `/api/upload` | none | Starts sending the save back to the PS5 |
 | `/api/cancel` | none | Stops the current task |
@@ -91,3 +107,36 @@ known (`{"kind": "Item", "text": "…"}`), and `readOnly` or `min` and `max` mar
 
 Each edit names the value it replaces (`value`) and the new one (`newValue`); an edit whose `value` no longer matches
 the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail": "…"}`.
+
+### The World tab's edits
+
+```jsonc
+"world": {
+  "time": {"hour": 21, "minute": 30},       // the date stays the same
+  "health": 250,                            // 1 to 250
+  "armour": "full",                         // every armour part of both characters up to its maximum
+  "fog": "known",                           // reveal every map region Save Garage knows
+  "lucia": {"meter": "full", "skills": 99, "profile": -25.0, "vest": true},
+  "jason": {"skills": 60},                  // any of the four, for either character
+  "relationship": 69                        // within the story's caps
+}
+```
+
+Every key may be left out, and every edit is checked against the save before anything is written:
+
+- `fog` appends each known region the save lacks, the way the game writes one, and never changes, removes or moves
+  an entry. It is refused when the map data's version isn't 9 (`fog_version`), an entry has other keys, a type other
+  than 1 or 2 or a known region with the other type (`fog_entry`), or a region is listed twice (`fog_repeat`).
+- `meter` fills attribute slot 24 to 100; `skills` raises slots 9, 10, 13, 14, 15, 19, 20 and 35 to the value given
+  (1 to 99). Both only ever raise, and slots 17 and 23 and the core slots 0-3 and 30-33 are never written. The
+  attributes must have their 37 values (`attributes_layout`).
+- `profile` sets the criminal profile, -100 to 0.25, written as the game writes it (float32 with six decimals).
+- `vest` puts on the vest a character owns when that character wears no armour: armour part 1 becomes 150 of 150
+  and the outfit's cached-armour flag true. Refused when the character has no vest in the wardrobe (`no_vest`); a
+  character who already wears armour is left as is.
+- `relationship` is refused while the story has it locked (`relationship_locked`) or switched off
+  (`relationship_disabled`), and outside its caps (`out_of_range`). Its level isn't changed.
+
+Out-of-range values are `out_of_range`, wrong types `bad_value`, and unknown keys in a character's object
+`bad_request` (other keys of `world` are ignored); in the job's error they carry the `save_` prefix. Applying the
+same edits again changes nothing.

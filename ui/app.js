@@ -46,6 +46,13 @@
     save_bad_value: 'One of the new values isn’t valid for its field.',
     save_out_of_range: 'One of the new values is outside the allowed range.',
     save_bad_time: 'The time of day needs an hour from 0 to 23 and a minute from 0 to 59.',
+    save_fog_version: 'This save’s map data has a version Save Garage doesn’t know yet, so the map is left alone.',
+    save_fog_entry: 'An entry in this save’s map data doesn’t look the way Save Garage expects, so the map is left alone.',
+    save_fog_repeat: 'This save’s map data lists a region twice, so the map is left alone.',
+    save_attributes_layout: 'This character’s attributes don’t have the 37 values Save Garage expects, so they are left alone.',
+    save_relationship_locked: 'The game has locked the relationship at this point in the story, so it can’t be changed.',
+    save_relationship_disabled: 'The game has switched the relationship off at this point in the story, so it can’t be changed.',
+    save_no_vest: 'This character wears no armour and has no vest in the wardrobe to put on.',
     save_read_only: 'That part of the save is read-only.',
     save_not_editable: 'Only numbers and true/false values can be changed.',
     save_bad_request: 'The edit didn’t match this save. Reload the page and try again.',
@@ -259,7 +266,7 @@
     ['Ammo', 'Refill or set the ammo for every weapon Lucia and Jason carry.', 'tested'],
     ['Stats', 'Fitness, overpowers and buffs, time played, distances, earnings, wanted levels and trophy counters, with the game’s own labels.', 'tested'],
     ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5.', 'caution'],
-    ['World', 'Time of day, health and armour.', 'caution'],
+    ['World', 'Time of day, health, armour and the map, plus Lucia’s and Jason’s skills, special meter, criminal profile and relationship.', 'caution'],
     ['All stats and Save data', 'Every one of the save’s values, with names or descriptions for almost all of them. For experts.', 'danger']];
 
   const fw = f => /^[0-9a-f]{8}$/i.test(f || '') ? `${Number(f.slice(0, 2))}.${f.slice(2, 4)}` : (f || 'unknown');
@@ -362,14 +369,15 @@
   }
 
   const riskTag = r => ({tested: '<span class="risk tested">Tested on PS5</span>', caution: '<span class="risk caution">Not tested yet</span>',
-                         danger: '<span class="risk danger">Can break your save</span>'})[r] || '';
+                         danger: '<span class="risk danger">Can break your save</span>', untested: '<span class="risk caution">Not tested on a PS5 yet</span>',
+                         experimental: '<span class="risk caution">Experimental, not tested on a PS5 yet</span>'})[r] || '';
 
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
     const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}};
     const a = s.applied || {};
-    if (a.world) d.world = {...a.world};
+    if (a.world) d.world = JSON.parse(JSON.stringify(a.world));
     if (a.completion) d.completion = JSON.parse(JSON.stringify(a.completion));
     for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
     for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
@@ -383,9 +391,12 @@
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {}))});
   const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles'].filter(k => c && c[k]).length;
-  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + Object.keys(d.world || {}).length
+  // World edits: each key is one change, except a character's object ({meter, skills, profile, vest}), where each counts
+  const worldCount = w => Object.entries(w || {}).reduce((n, [k, v]) => n + (k === 'lucia' || k === 'jason' ? Object.keys(v || {}).length : 1), 0);
+  const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + worldCount(d.world)
                          + Object.keys(d.raw || {}).length + compCount(d.completion);
-  const worldKey = w => JSON.stringify(Object.keys(w || {}).sort().map(k => [k, w[k]]));
+  const stable = v => v && typeof v === 'object' && !Array.isArray(v) ? `{${Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',')}}` : JSON.stringify(v);
+  const worldKey = w => stable(w || {});
   const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world)
     + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort()) + worldKey(e?.completion);
   const dirty = s => norm(draftList(draftOf(s.file))) !== norm(s.applied);
@@ -946,7 +957,76 @@
         <div class="field"><div class="name">Armour<span class="help">Now ${nf2.format(w.armour)} of ${nf2.format(w.armourMax)}, for both characters’ armour together.</span></div>
           <div class="inputs">${d.armour === 'full' ? '<span class="note">Will be filled. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="armour">Undo</button>'
             : `<button class="btn small" data-act="world-fill" data-what="armour" ${w.armour >= w.armourMax ? 'disabled' : ''}>${w.armour >= w.armourMax ? 'Already full' : 'Fill armour'}</button>`}</div></div>
-      </div>`;
+      </div>
+      ${mapGroup(s)}${characterGroups(s)}`;
+  }
+
+  // a World field with its own risk label; help is plain text
+  const worldField = (name, risk, help, ctl) => `<div class="field"><div class="name">${name} ${riskTag(risk)}<span class="help">${esc(help)}</span></div>
+    <div class="inputs">${ctl}</div></div>`;
+  // a number cell of the World tab: what = skills | profile | relationship, who = lucia | jason (none for the relationship)
+  function worldCell(o) {
+    const {what, who, label, min, max, step, value, init, was, changed, extra = ''} = o, id = `w-${what}-${who || 'both'}`;
+    return `<div class="cell narrow ${changed ? 'changed' : ''}"><label for="${id}">${esc(label)}</label><span class="with-unit"><input id="${id}" type="number" min="${min}" max="${max}" step="${step}"
+      value="${esc(value)}" data-world="${what}" ${who ? `data-who="${who}"` : ''} data-init="${esc(init)}" data-was="${esc(was)}">${extra}</span>
+      <span class="was">${changed ? 'was ' + esc(was) : ''}</span></div>`;
+  }
+
+  // the map's fog of war: every region Save Garage knows (fog.py)
+  function mapGroup(s) {
+    const F = S.world[s.file].fog, d = draftOf(s.file).world;
+    let help = 'This part of the save can’t be read yet.', ctl = '';
+    if (F?.problem) help = ERR['save_' + F.problem] || ERR.save_layout_changed;
+    else if (F) {
+      help = `Clears the fog of war from the regions Save Garage knows so far, about ${nf.format(F.known)} of the map’s ${nf.format(F.mapTotal)}; the others stay covered until you explore them. This save has ${nf.format(F.regions)} uncovered, and ${nf.format(F.missing)} of the known ones are still covered.`;
+      ctl = d.fog ? '<span class="note">Will be revealed. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="fog">Undo</button>'
+        : `<button class="btn small" data-act="world-fill" data-what="fog" ${F.missing ? '' : 'disabled'}>${F.missing ? 'Reveal the map' : 'All known regions revealed'}</button>`;
+    }
+    return `<div class="group"><div class="section-head"><h3>Map</h3></div><div class="fields">${worldField('Reveal the map', 'untested', help, ctl)}</div></div>`;
+  }
+
+  // Lucia and Jason: special meter, skills, criminal profile and a vest each, then their relationship (player.py)
+  function characterGroups(s) {
+    const P = S.world[s.file].player, d = draftOf(s.file).world;
+    if (!P) return '<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="callout">This part of the save can’t be read yet.</div></div>';
+    return P.characters.map(c => characterGroup(P, c, d[c.key] || {})).join('') + relationshipGroup(P, d);
+  }
+
+  function characterGroup(P, c, dc) {
+    const pending = (what, text) => `<span class="note">${text} Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="${what}" data-who="${c.key}">Undo</button>`;
+    let rows = '';
+    if (c.attributesProblem || !c.skills) rows += worldField('Special meter and skills', 'experimental', ERR['save_' + c.attributesProblem] || ERR.save_layout_changed, '');
+    else {
+      const full = c.meter >= P.meterFull, lo = Math.min(...c.skills), hi = Math.max(...c.skills), now = lo === hi ? String(lo) : `${lo} to ${hi}`;
+      rows += worldField('Special meter', 'untested', `Now ${c.meter}. Attribute slot ${P.meterSlot}, which other editors call the special ability meter; the game’s own name for it isn’t known. Filling it sets ${P.meterFull}, a value the game writes there itself.`,
+        dc.meter ? pending('meter', 'Will be filled.') : `<button class="btn small" data-act="world-fill" data-what="meter" data-who="${c.key}" ${full ? 'disabled' : ''}>${full ? 'Already full' : `Fill to ${P.meterFull}`}</button>`);
+      rows += worldField('Skills', 'experimental', `Now ${now}. Attribute slots ${P.skillSlots.slice(0, -1).join(', ')} and ${P.skillSlots.at(-1)}, which other editors call skills. Each is raised to the value you pick and never lowered. In the game’s own saves none is above ${P.skillChoices[0]}; GarlicSaves writes ${P.skillChoices[1]} and says it was tested in the game.`,
+        worldCell({what: 'skills', who: c.key, label: 'Raise to', min: P.skillMin, max: P.skillMax, step: 1, value: dc.skills ?? lo, init: lo, was: now, changed: dc.skills != null,
+          extra: P.skillChoices.map(v => `<button class="btn small" data-act="world-fill" data-what="skills" data-who="${c.key}" data-to="${v}">${v}</button>`).join('')}));
+    }
+    if (c.profile != null) {
+      const was = nf2.format(c.profile);
+      rows += worldField('Criminal profile', 'experimental', `Now ${was}. The game calls it the criminal profile: a temperament score behind the Professional, Hardened, Violent, Psycho and Irredeemable profiles in the Jason & Lucia menu. Which score gives which profile isn’t known yet. Lucia starts a new game at ${nf.format(P.profileNewGame)}; saves written by the game hold ${nf.format(P.profileMin)} to ${nf2.format(P.profileMax)}.`,
+        worldCell({what: 'profile', who: c.key, label: 'Score', min: P.profileMin, max: P.profileMax, step: 'any', value: dc.profile ?? Number(c.profile.toFixed(2)), init: Number(c.profile.toFixed(2)), was, changed: dc.profile != null}));
+    }
+    const V = c.vest || {};
+    const vhelp = {can_add: `Wears no armour, and a vest is in the wardrobe. Adding it puts it on the way the game records a worn vest: armour ${nf.format(P.vestArmour)} of ${nf.format(P.vestArmour)}.`,
+      worn: `Wears armour now, ${nf2.format(V.armour)} of ${nf2.format(V.max)}.` + (V.armour < V.max ? ' Fill armour above tops it up.' : ''), no_vest: ERR.save_no_vest}[V.state]
+      || 'The armour in this save doesn’t look the way Save Garage expects, so it is left alone.';
+    rows += worldField('Vest', 'experimental', vhelp, V.state !== 'can_add' ? '' : dc.vest ? pending('vest', 'Will be added.')
+      : `<button class="btn small" data-act="world-fill" data-what="vest" data-who="${c.key}">Add a vest</button>`);
+    return `<div class="group"><div class="section-head"><h3>${esc(c.name)}</h3></div><div class="fields">${rows}</div></div>`;
+  }
+
+  function relationshipGroup(P, d) {
+    const R = P.relationship || {};
+    let help, ctl = '';
+    if (R.problem) help = (R.value != null ? `Now ${R.value}. ` : '') + (ERR['save_' + R.problem] || ERR.save_layout_changed);
+    else {
+      help = `Now ${R.value}. At this point in the story the game keeps it from ${R.lowerCap} to ${R.cap}, so that is the range here. The relationship level the game shows is stored on its own and isn’t changed.`;
+      ctl = worldCell({what: 'relationship', label: 'Score', min: R.lowerCap, max: R.cap, step: 1, value: d.relationship ?? R.value, init: R.value, was: String(R.value), changed: d.relationship != null});
+    }
+    return `<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="fields">${worldField('Relationship', 'experimental', help, ctl)}</div></div>`;
   }
 
   function onWorld(el) {
@@ -966,6 +1046,19 @@
       const ok = el.value !== '' && v >= 1 && v <= w.healthMax;
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
       if (!ok || v === w.health) delete d.health; else d.health = v;
+    } else if ((what === 'skills' || what === 'profile' || what === 'relationship') && w.player) {
+      const who = el.dataset.who, c = w.player.characters.find(x => x.key === who);
+      const ok = el.value.trim() !== '' && Number.isFinite(v) && (what === 'profile' || Number.isInteger(v)) && v >= Number(el.min) && v <= Number(el.max);
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      // skills are only ever raised, so a value at or below the lowest one changes nothing; the profile is a float32 in the save
+      const same = what === 'skills' ? v <= Math.min(...c.skills) : what === 'profile' ? Math.fround(v) === Math.fround(c.profile) : v === w.player.relationship.value;
+      if (what === 'relationship') { if (!ok || same) delete d.relationship; else d.relationship = v; }
+      else {
+        const ch = d[who] || {};
+        if (!ok || same) delete ch[what]; else ch[what] = v;
+        if (Object.keys(ch).length) d[who] = ch; else delete d[who];
+      }
+      mark(el.closest('.cell'), ok && !same, el);
     }
     renderPending(); renderCounts();
   }
@@ -1029,7 +1122,7 @@
       const ok = el.value.trim() !== '' && Number.isFinite(nv) && (el.dataset.kind !== 'int' || Number.isInteger(nv))
         && (el.min === '' || nv >= Number(el.min)) && (el.max === '' || nv <= Number(el.max));
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
-      if (!ok) { delete d[k]; renderPending(); renderCounts(); if (el.max !== '') toast(`Health can be 1 to ${el.max}.`); return; }
+      if (!ok) { delete d[k]; renderPending(); renderCounts(); if (el.max !== '') toast(`This value can be ${el.min} to ${el.max}.`); return; }
     }
     const orig = el.dataset.orig;
     const same = el.type === 'checkbox' ? String(nv) === orig : Number(orig) === nv;
@@ -1099,7 +1192,7 @@
     const n = {money: Object.keys(d.money).length, ammo: Object.keys(d.ammo).length, stats: 0, all: 0};
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
     const stunt = S.stuntKeys[S.slot] || new Set();
-    n.completion = compCount(d.completion); n.world = Object.keys(d.world || {}).length; n.data = Object.keys(d.raw || {}).length;
+    n.completion = compCount(d.completion); n.world = worldCount(d.world); n.data = Object.keys(d.raw || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     for (const el of $$('[data-count]')) el.textContent = n[el.dataset.count] || '';
   }
@@ -1215,10 +1308,20 @@
     const isDirty = dirty(s);
     const busy = running();
     if (!n && !s.modified) { pendingEl.hidden = true; return; }
-    const w = d.world || {}, now = S.world[s.file];
+    const w = d.world || {}, now = S.world[s.file], P = now?.player, F = now?.fog;
+    const who = k => P?.characters?.find(x => x.key === k);
     const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
       w.health != null && {label: 'Health', value: now ? now.health : '', newValue: w.health},
-      w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'}].filter(Boolean);
+      w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'},
+      w.fog && {label: 'Map regions uncovered', value: F ? F.regions : '', newValue: F ? F.regions + F.missing : 'all known'},
+      ...['lucia', 'jason'].flatMap(k => {
+        const e = w[k], c = who(k), name = c?.name || (k === 'lucia' ? 'Lucia' : 'Jason');
+        return !e ? [] : [e.meter && {label: `Special meter (${name})`, value: c?.meter ?? '', newValue: P?.meterFull ?? 100},
+          e.skills != null && {label: `Skills (${name})`, value: c?.skills ? Math.min(...c.skills) : '', newValue: e.skills},
+          e.profile != null && {label: `Criminal profile (${name})`, value: c?.profile ?? '', newValue: e.profile},
+          e.vest && {label: `Vest (${name})`, value: c?.vest?.armour ?? '', newValue: P?.vestArmour ?? 150}];
+      }),
+      w.relationship != null && {label: 'Relationship', value: P?.relationship?.value ?? '', newValue: w.relationship}].filter(Boolean);
     const cp = d.completion || {};
     const compList = [cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
@@ -1418,8 +1521,15 @@
     if (a === 'sd-open') { sdOpen(S.slot, b.dataset.section, JSON.parse(b.dataset.path), b.dataset.label, false); return; }
     if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
     if (a === 'world-fill' || a === 'world-undo') {
-      const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world;
-      if (b.dataset.what === 'health') d.health = w.healthMax;
+      const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world, what = b.dataset.what, who = b.dataset.who;
+      if (who) {                                  // one character's special meter, skills or vest
+        const ch = d[who] || {}, c = w.player.characters.find(x => x.key === who);
+        if (a === 'world-undo') delete ch[what];
+        else if (what === 'skills') { const to = Number(b.dataset.to); if (to > Math.min(...c.skills)) ch.skills = to; else delete ch.skills; }
+        else ch[what] = what === 'meter' ? 'full' : true;
+        if (Object.keys(ch).length) d[who] = ch; else delete d[who];
+      } else if (what === 'fog') { if (a === 'world-fill') d.fog = 'known'; else delete d.fog; }
+      else if (what === 'health') d.health = w.healthMax;
       else if (a === 'world-fill') d.armour = 'full';
       else delete d.armour;
       S.mainKey = ''; renderMain(); renderPending(); renderCounts();

@@ -8,9 +8,11 @@ read-only here.
 import math
 import re
 
+import fog
 import hashnames
 import jsonedit as je
 import money
+import player
 import savekeys
 
 READ_ONLY = {
@@ -23,13 +25,17 @@ READ_ONLY = {
     money.SEC_STAT: 'use the Stats and All stats tabs',
     0x6296c122: 'the bank ledger is kept in step by the Money tab',
     0x46f14889: 'health, stamina and focus levels, which the game works out from play; a wrong value can leave a character weaker',
+    fog.SEC: 'use the World tab',
 }
-# Single fields with their own rule: (section, key) -> reason it can't be changed, or the (low, high) range allowed.
+# Single fields with their own rule: (section, key) -> reason it can't be changed, the (low, high) range allowed, or a
+# function of the section text and the field's path that returns one of those (a rule that depends on the save). A key
+# can also name a typed array ({"$data": [...]}), for a rule on each of its elements.
 PED = 0xe528fe31
 FIELD_RULES = {
     (PED, '$0x4802abf7'): 'the game keeps maximum health at 100 in every save',        # fMaxHealth
     (PED, '$0x0834e1d0'): (1.0, 250.0),                                                 # fHealth: the game itself goes up to 250
 }
+FIELD_RULES.update(player.raw_rules())   # the World tab's limits for the attributes, criminal profile, relationship and armour
 RISKY = {0x6df5d2cf, 0x7f587594, 0xe4fcc5fa, 0xba7a26ca, 0x8496351d, 0x22a87829, 0xdee848ca, 0x3a4cbf5d, 0x9653b39d, 0x96f1a1c3,
          0x86572177, 0x5299e475}
 _HEX = re.compile(r'^\$0x([0-9a-f]{8})$')
@@ -99,6 +105,16 @@ def _record_means(members):
     return None
 
 
+def _rule(sec_hash, txt, path):
+    """The rule for the field at path (see FIELD_RULES): a reason it is read-only, a (low, high) range, or None."""
+    if not path:
+        return None
+    rule = FIELD_RULES.get((sec_hash, path[-1]))
+    if rule is None and len(path) >= 3 and path[-2] == '$data':          # an element of a typed array
+        rule = FIELD_RULES.get((sec_hash, path[-3]))
+    return rule(txt, list(path)) if callable(rule) else rule
+
+
 def node(b, sec_hash, path, offset=0, limit=200):
     ents, secs, _, _, _ = money._load(b)
     txt = secs[money._sec(ents, sec_hash)]
@@ -115,7 +131,7 @@ def node(b, sec_hash, path, offset=0, limit=200):
                 item['means'] = means
         else:
             item['raw'] = raw.decode('utf-8', 'replace')[:200]
-            rule = FIELD_RULES.get((sec_hash, k))
+            rule = _rule(sec_hash, txt, list(path) + [k])
             if isinstance(rule, str):
                 item['readOnly'] = rule
             elif rule:
@@ -161,7 +177,7 @@ def apply(b, edits):
         cur = je.get(secs[i], path)
         if cur.decode('utf-8', 'replace') != str(e['value']):
             raise BrowseError('stale_item')
-        rule = FIELD_RULES.get((h, path[-1] if path else None))
+        rule = _rule(h, secs[i], path)
         if isinstance(rule, str):
             raise BrowseError('read_only')
         if rule and not (isinstance(e['newValue'], (int, float)) and not isinstance(e['newValue'], bool) and rule[0] <= e['newValue'] <= rule[1]):
