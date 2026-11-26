@@ -62,13 +62,9 @@ SHOOTING RANGE GOLD MEDALS 0/42 (shootingranges; gold encoding and unlock counte
               per range/venue; shootingrangecoursesunlocked per venue ('RANGES UNLOCKED 0 / 6') and story000;
               shootingrangelocationsunlocked and shootingrangechallengesunlocked (story000).
   checklist   shootingrangegoldmedals/story000; percent totalprogressmade.shootingrangegoldmedals = pct(n, 42).
-  evidence    never played. The Rodgers page showed 'MEDALS 0 / 72' = 24 courses x 3, and the rewards text says
-              'Win 25 bronze medals or higher', 'silver medals or higher', 'gold medals': medals count cumulatively,
-              so a course's highestmedal 0..3 = none/bronze/silver/gold and totalmedals = the sum of highestmedal.
-  writes      every course highestmedal = 3 and unlocked; timescompleted >= 1; every medal counter moved by the
-              change of its recount (bronze/silver/gold = courses at >= 1/2/3, total = sum of medals); unlock
-              counters raised to their full values (courses, ranges, venues). Scores, accuracy, hits, shots, times
-              are left at 0.
+  evidence    Three played courses with highestmedal=3 had three bronze, three silver and zero gold in the
+              venue and global counters. Read gold from the stored counter. Per-course gold encoding is unresolved.
+  writes      Counter mode updates the checklist. Full medal rewriting is unavailable.
 
 POOL OPPONENTS DEFEATED 0/5 (pool; per-venue flag meaning inferred)
   rows        <68ea5b9f>.pool<venue> (bool) and gameswon.pool<venue> (int32) at 7 venues (delights, kowaachobee,
@@ -169,7 +165,6 @@ RANGES = (('griffin', '3point', ('beginner', 'intermediate', 'advanced')), ('gri
           ('rodgers', 'alien', RANGE_TIERS), ('rodgers', 'copsandrobbers', RANGE_TIERS), ('rodgers', 'hunting', RANGE_TIERS),
           ('rodgers', 'market', RANGE_TIERS), ('rodgers', 'saloon', RANGE_TIERS), ('rodgers', 'undead', RANGE_TIERS))
 VENUES = (('griffin', 'Griffin Shooting Range'), ('rodgers', 'Rodgers Ranch & Shooting Range'))
-MEDAL_BASES = (('shootingrangebronzemedals', 1), ('shootingrangesilvermedals', 2), ('shootingrangegoldmedals', 3))
 TOTAL_MEDALS = 'shootingrangetotalmedals'
 
 POOL_VENUES = ('pooldelights', 'poolkowaachobee', 'poolrustyanchor', 'poolskeetersbar', 'poolthethirstywolf', 'poolzoticos', 0x02ee1e5a)
@@ -285,31 +280,11 @@ def _courses():
             yield venue, '%s%srange' % (venue, rng), tier
 
 
-def _medal_counts(medals):
-    """{(base, qual, owner): count} recount of every medal counter from {(range_owner, tier): highestmedal}."""
-    out = {}
-
-    def bump(k, v):
-        out[k] = out.get(k, 0) + v
-    for venue, rng, tier in _courses():
-        m = medals[(rng, tier)]
-        for base, need in MEDAL_BASES:
-            hit = 1 if m >= need else 0
-            for k in ((base, 0, rng), (base, tier, venue), (base, 0, venue), (base, 0, ST)):
-                bump(k, hit)
-        for k in ((TOTAL_MEDALS, 0, rng), (TOTAL_MEDALS, tier, venue), (TOTAL_MEDALS, 0, venue), (TOTAL_MEDALS, 0, ST)):
-            bump(k, min(m, GOLD))
-    return out
-
-
 def _read_shootingranges(st):
     courses = [{'venue': v, 'range': r, 'tier': t, 'medal': st.value('highestmedal', t, r), 'unlocked': st.value('unlocked', t, r),
                 'bestScore': st.value('bestscore', t, r)} for v, r, t in _courses()]
-    medals = {(c['range'], c['tier']): c['medal'] or 0 for c in courses}
-    rec = _medal_counts(medals)
-    mism = sorted('%s.%s/%s' % k for k, v in rec.items() if st.value(*k) != v)
-    gold = sum(1 for c in courses if (c['medal'] or 0) >= GOLD)
-    return {'items': courses, 'done': gold, 'itemsTotal': len(courses), 'consistent': not mism, 'counterMismatches': mism[:20],
+    gold = st.value('shootingrangegoldmedals', 0, ST)
+    return {'items': courses, 'done': gold, 'itemsTotal': len(courses),
             'venues': [{'id': v, 'label': lab, 'medals': st.value(TOTAL_MEDALS, 0, v), 'rangesUnlocked': st.value('shootingrangecoursesunlocked', 0, v)}
                        for v, lab in VENUES]}
 
@@ -362,12 +337,12 @@ def read(b):
         r = READERS[key](st)
         lines.append(dict(r, key=key, label=label, counter=cnt, of=total, shown=None if cnt is None else min(cnt, total),
                           percent=pct, percentConsistent=None if cnt is None or pct is None else abs(fl.pct32(cnt, total) - pct) <= 2e-6,
-                          confidence=conf, levels=['counter'] if key == 'bret' else list(LEVELS),
+                          confidence=conf, levels=['counter'] if key in ('bret', 'shootingranges') else list(LEVELS),
                           done_line=bool(pct is not None and pct >= 100.0)))
     return {'feature': FEATURE, 'lines': lines, 'overall': st.value(*checklist.OVERALL),
             'possible': [x['key'] for x in lines if not x['done_line']], 'risk': 'medium',
             'notes': ['Video games: the started flags and the games-played counter (verified in every save).',
-                      'Races, race challenges, shooting ranges, pool, mini golf and drones were never played in these saves: '
+                      'For races, race challenges, pool, mini golf and drones, '
                       "the counters are what the 100% screen reads; 'full' also writes the per-item rows with inferred "
                       "values (gold = 3, completed = 1) and needs unverified_ok.",
                       "Bret's target decks: only the counters; the deck progress is not in any save."]}
@@ -428,42 +403,7 @@ def _apply_shootingranges(ed, level):
     if level == 'counter':
         new = max(0, LINE['shootingranges'][4] - ed.get('shootingrangegoldmedals'))
         return _counter(ed, 'shootingranges', new), new
-    before = {(r, t): ed.get('highestmedal', t, r) for _, r, t in _courses()}
-    after = {}
-    for venue, rng, tier in _courses():
-        after[(rng, tier)] = max(before[(rng, tier)], GOLD)
-        if before[(rng, tier)] < GOLD:
-            ed.put('highestmedal', tier, rng, GOLD, '%s %s: gold medal' % (rng, tier))
-        if not ed.get('unlocked', tier, rng):
-            ed.put('unlocked', tier, rng, True, '%s %s: unlocked' % (rng, tier))
-        if ed.get('timescompleted', tier, rng) < 1:
-            ed.put('timescompleted', tier, rng, 1, '%s %s: times completed' % (rng, tier))
-    r0, r1 = _medal_counts(before), _medal_counts(after)
-    gold_new = r1[('shootingrangegoldmedals', 0, ST)] - r0[('shootingrangegoldmedals', 0, ST)]
-    for k in sorted(r1, key=str):
-        if k == ('shootingrangegoldmedals', 0, ST):
-            continue
-        ed.add(k[0], k[1], k[2], r1[k] - r0[k], '%s %s' % (k[0], k[2] if not k[1] else '%s/%s' % (k[1], k[2])))
-    # unlocks: every range and venue, all courses and ranges
-    n_courses = {}
-    for venue, rng, tier in _courses():
-        n_courses[rng] = n_courses.get(rng, 0) + 1
-        n_courses[venue] = n_courses.get(venue, 0) + 1
-    for owner, n in n_courses.items():
-        if not ed.get('unlocked', 0, owner):
-            ed.put('unlocked', 0, owner, True, owner + ': unlocked')
-        for base in ('challengesunlocked', 'uniquechallengescompleted'):
-            if ed.get(base, 0, owner) < n:
-                ed.put(base, 0, owner, n, '%s: %s' % (owner, base))
-    for venue, _ in VENUES:
-        ranges = sum(1 for v, _, _ in RANGES if v == venue)
-        if ed.get('shootingrangecoursesunlocked', 0, venue) < ranges:
-            ed.put('shootingrangecoursesunlocked', 0, venue, ranges, venue + ': ranges unlocked')
-    for base, n in (('shootingrangelocationsunlocked', len(VENUES)), ('shootingrangecoursesunlocked', len(RANGES)),
-                    ('shootingrangechallengesunlocked', sum(n_courses[v] for v, _ in VENUES))):
-        if ed.get(base) < n:
-            ed.put(base, 0, ST, n, 'Shooting ranges: ' + base)
-    return _counter(ed, 'shootingranges', gold_new), gold_new
+    raise fl.FeatureError('unverified')  # Per-course gold encoding is unresolved in played saves.
 
 
 def _apply_pool(ed, level):

@@ -32,6 +32,7 @@
     ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
   const ERR = {
+    range_score_order: 'Best score must be at least the latest score.',
     garlic_unreachable: 'The decryption service (garlicsaves.com) can’t be reached. Check your internet connection, then try again.',
     not_paired: 'This PS5 isn’t paired yet. Pair it first.',
     power_timeout: 'The power-button wait timed out, or the key service was too slow. Go back to the PS5 home screen and try again.',
@@ -65,7 +66,7 @@
 
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
-    slot: null, tab: 'money', detail: {}, stats: {}, comp: {}, world: {}, sd: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
+    slot: null, tab: 'money', known: {}, detail: {}, stats: {}, comp: {}, world: {}, sd: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
     preview: {}, compExp: {}, keep: {},
     find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
 
@@ -133,7 +134,7 @@
     const jobKey = job.id + ':' + job.status;
     const sig = slotsSig(st);
     if (sig !== S.sig) {                         // new download: forget per-save data
-      S.sig = sig; S.detail = {}; S.stats = {}; S.comp = {}; S.world = {}; S.sd = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
+      S.sig = sig; S.known = {}; S.detail = {}; S.stats = {}; S.comp = {}; S.world = {}; S.sd = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
       const slots = sortedSlots(st);
       S.slot = slots.length ? slots[0].file : null;
     }
@@ -327,14 +328,14 @@
     const st = S.state;
     const s = slotOf(S.slot);
     if (!s) return '<div class="empty">No story saves were found in this download.</div>';
-    const tabs = [['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
+    const tabs = [['known', 'Known save fields'], ['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1 data-no-i18n>${esc(missionName(s))}</h1>
         ${st.user?.name ? `<p>PS5 account: <strong>${esc(st.user.name)}</strong></p>` : ''}
         <p>${moneySummary(s) || 'No money balances in this save'}.${overallOf(s) != null ? ` 100% completion: <strong>${nf2.format(overallOf(s))}%</strong>${afterOf(s) != null ? `, <strong class="gold">${nf2.format(afterOf(s))}%</strong> after your edits` : ''}.` : ''}${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
       <div class="saves" role="group" aria-label="Choose a save">${sortedSlots(st).map(x => `
         <button class="save" data-act="slot" data-file="${esc(x.file)}" aria-pressed="${x.file === s.file}">
-          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span>${x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
+          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span>${x.savedAt ? `<small data-no-i18n>${esc(new Date(x.savedAt*1000).toLocaleString())}</small>` : ''}${x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
       <div class="editor">
         <div class="tabs" role="tablist" aria-label="What to edit">${tabs.map(([id, name]) => `
           <button role="tab" aria-selected="${S.tab === id}" data-act="tab" data-tab="${id}">${name}<span class="count" data-count="${id}"></span></button>`).join('')}</div>
@@ -349,6 +350,7 @@
     if (!d) return '<div class="empty">Reading this save…</div>';
     if (d.failed) return `<div class="callout danger">${esc(ERR[d.failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`;
     if (S.tab === 'all' && S.stats[s.file]?.failed) return `<div class="callout danger">${esc(ERR[S.stats[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`;
+    if (S.tab === 'known') return panelResearch(s);
     if (S.tab === 'ammo') return panelAmmo(s, d);
     if (S.tab === 'stats') return panelStats(s, d);
     if (S.tab === 'data') return S.sd[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.sd[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
@@ -472,6 +474,22 @@
   }
 
   // ---- featured stats
+  function rangeScores(d) {
+    if (!d.rangeScores?.length) return '';
+    const score = (row, label, course) => row ? cell({kind: 'stat', key: row.group + ':' + row.row,
+      label, value: row.value, display: String(row.value), unit: 'count', type: 'int', min: 0,
+      max: ({u32: 4294967295, int32: 2147483647, u16: 65535})[row.type],
+      attrs: `data-group="${esc(row.group)}" data-row="${row.row}" data-base="${row.base}" data-qual="${row.qual}" data-owner="${row.owner}" data-label="${esc(course + ' / ' + T(label))}"`}) : '';
+    const venues = ['griffin', 'rodgers'].map(venue => {
+      const courses = d.rangeScores.filter(x => x.venue === venue).sort((a, b) => Number(b.played > 0) - Number(a.played > 0));
+      return `<details class="group"><summary>${venue === 'griffin' ? 'Griffin' : 'Rodgers'} · ${courses.length}</summary>${courses.map(x => {
+        const title = venue[0].toUpperCase() + venue.slice(1) + ' / ' + x.course.slice(venue.length, -5) + ' / ' + T(x.tier);
+        return `<div class="field"><div class="name">${esc(title)}<span class="help">${T(x.unlocked ? 'Unlocked' : 'Locked')} · ${T('Completions')} ${x.played ?? '—'}</span></div><div class="inputs">${score(x.best, 'Best score', title)}${score(x.recent, 'Latest score', title)}</div></div>`;
+      }).join('')}</details>`;
+    }).join('');
+    return '<h2>Shooting range scores</h2><p>Editing scores leaves medals and unlocks as saved. Best score must be at least the latest score.</p>' + venues;
+  }
+
   function panelStats(s, d) {
     const unitOf = f => ({percent: ['percent', 'float', 0.01, '%'], ms: ['ms', null, 0.01, 'hours'], distance: ['distance', 'float', 0.01, 'km'],
                           money: ['count', null, 1, '$'], count: ['count', null, 1, ''], level: ['count', null, 1, ''], flag: ['flag', 'bool', 1, '']})[f.unit] || ['count', null, 1, ''];
@@ -481,7 +499,7 @@
       const own = f.risk === 'danger' && f.category !== 'trophies' ? riskTag('danger') : f.risk === 'tested' && !allSame(d.featured.filter(x => x.category === f.category)) ? riskTag('tested') : '';
       const limit = maxText(f);
       return `<div class="field"><div class="name">${esc(f.label)} ${own}<span class="help">${esc(f.help)}${limit ? ' ' + esc(limit) : ''}</span></div>
-        <div class="inputs" data-spec="${esc(f.id)}">${f.entries.filter(e => !(f.autoTotal && e.owner === 0)).map(e => {
+        <div class="inputs" data-spec="${esc(f.id)}">${f.max != null && f.entries.some(e=>e.type!=='bool') ? `<label><input type="checkbox" data-preset="${esc(f.category)}"> ${T('Include in preset')}</label>` : ''}${f.entries.filter(e => !(f.autoTotal && e.owner === 0)).map(e => {
           const type = forced || e.type;
           return cell({kind: 'stat', key: `${e.group}:${e.row}`, narrow: true, label: OWNER[e.owner] + (unitLabel ? `, ${unitLabel}` : ''),
             value: e.value, display: type === 'bool' ? '' : toDisplay(e.value, unit), unit, type: type === 'bool' ? 'bool' : (e.type === 'float' ? 'float' : 'int'),
@@ -495,9 +513,9 @@
       const list = d.featured.filter(f => f.category === id);
       if (!list.length) return '';
       const worst = list.every(f => f.risk === 'danger') ? 'danger' : list.every(f => f.risk === 'tested') ? 'tested' : 'caution';
-      return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
+      return `<div class="group"><div class="section-head"><h2>${name}</h2>${riskTag(worst)} ${list.some(f=>f.max!=null && f.entries.some(e=>e.type!=='bool')) ? `<button class="btn small" data-act="max-selected" data-category="${esc(id)}">Max selected fields</button>` : ''}<p>${esc(help)}</p></div><div class="fields">${list.map(rows).join('')}</div></div>`;
     }).join('');
-    return `<div class="callout" style="margin-bottom:24px">Almost every stat here has been tested on a PS5: the game showed the edited values on its stats screens, kept them when it saved, and went on counting from them. Labels follow the game’s own stats screens. The times, distances, story and styles percentages and two gadget flags haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
+    return `${rangeScores(d)}<div class="callout" style="margin-bottom:24px">Almost every stat here has been tested on a PS5: the game showed the edited values on its stats screens, kept them when it saved, and went on counting from them. Labels follow the game’s own stats screens. The times, distances, story and styles percentages and two gadget flags haven’t been tried yet: change a few, send the save, and check it loads before changing more.</div>${cats}`;
   }
 
   // ---- all stats browser
@@ -932,19 +950,29 @@
     const w = S.world[s.file], d = draftOf(s.file).world, c = w.clock;
     const t = d.time || {hour: c.hour, minute: c.minute};
     const hp = d.health ?? w.health;
+    const growth = ['lucia', 'jason'].map(player => {
+      const fields = Object.entries(w.capacities || {}).filter(([key]) => key.startsWith(player + '_'));
+      if (!fields.length) return '';
+      return `<div class="group"><h3>${player === 'lucia' ? 'Lucia' : 'Jason'}</h3>
+        ${fields.map(([key, x]) => `<div class="field"><label for="g-${key}">${T(x.label)} · ${x.value}</label>
+          <input id="g-${key}" type="number" min="0" max="100" step="1" data-world="${key}" value="${d[key] ?? x.value}">
+          <button class="btn small" data-act="growth-fill" data-growth="${key}">Max</button></div>`).join('')}
+        <button class="btn small" data-act="growth-fill" data-growth="${player}">Max available capacities</button></div>`;
+    }).join('');
     return `<div class="section-head"><h2>World</h2>${riskTag('caution')}
         <p>The time of day, health and armour the save was made with. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
       <div class="fields">
         <div class="field"><div class="name">Time of day<span class="help">Now ${two(c.hour)}:${two(c.minute)} on ${c.day} ${monthName(c.month)} ${c.year} in the game. The date stays the same.</span></div>
           <div class="inputs"><div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-hour">Hour</label><span class="with-unit"><input id="w-hour" type="number" min="0" max="23" step="1" value="${t.hour}" data-world="hour"></span></div>
             <div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-min">Minute</label><span class="with-unit"><input id="w-min" type="number" min="0" max="59" step="1" value="${two(t.minute)}" data-world="minute"></span></div></div></div>
+        <h3>Current condition</h3><button class="btn small" data-act="condition-fill">Fill health and armour</button>
         <div class="field"><div class="name">Health<span class="help">Now ${nf2.format(w.health)}. Up to ${nf.format(w.healthMax)}; above 100 is overpowered health.</span></div>
           <div class="inputs"><div class="cell ${d.health != null ? 'changed' : ''}"><label for="w-hp">Health</label><span class="with-unit"><input id="w-hp" type="number" min="1" max="${w.healthMax}" step="any" value="${hp}" data-world="health">
             <button class="btn small" data-act="world-fill" data-what="health">Max</button></span></div></div></div>
         <div class="field"><div class="name">Armour<span class="help">Now ${nf2.format(w.armour)} of ${nf2.format(w.armourMax)}, for both characters’ armour together.</span></div>
           <div class="inputs">${d.armour === 'full' ? '<span class="note">Will be filled. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="armour">Undo</button>'
             : `<button class="btn small" data-act="world-fill" data-what="armour" ${w.armour >= w.armourMax ? 'disabled' : ''}>${w.armour >= w.armourMax ? 'Already full' : 'Fill armour'}</button>`}</div></div>
-      </div>`;
+      </div><h2>Long-term capacities</h2><p>Editor target: 100 points. Only capacities with matching saved values are listed.</p>${growth}`;
   }
 
   function onWorld(el) {
@@ -960,6 +988,10 @@
       if (!ok) { delete d.time; }
       else if (t.hour === c.hour && t.minute === c.minute) delete d.time;
       else d.time = t;
+    } else if (Object.hasOwn(w.capacities || {}, what)) {
+      const ok = el.value !== '' && Number.isInteger(v) && v >= 0 && v <= 100;
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      if (!ok || v === w.capacities[what].value) delete d[what]; else d[what] = v;
     } else if (what === 'health') {
       const ok = el.value !== '' && v >= 1 && v <= w.healthMax;
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
@@ -969,6 +1001,76 @@
   }
 
   // ---- save data: every section, one number or true/false at a time
+  const researchTopics = {
+    stunts: 'Stunts', compendium: 'Compendium', discovery: 'Discovery', challenges: 'Challenges', gyms: 'Gyms',
+    activities: 'Meditation', checklist: 'Completion checklist', tasks: 'Tasks', gangs: 'Gangs', robberies: 'Robberies',
+    fencing: 'Fencing', activities2: 'Activities', hoops: 'Basketball hoops', vehicles: 'Vehicle compendium', collectibles: 'Collectibles'
+  };
+  const researchLinks = [['money','Money'],['ammo','Ammo'],['world','Current condition'],['stats','Stats'],
+    ['completion','Completion'],['all','All stats'],['data','Save data']];
+
+  function topicRows(file, topic) {
+    const known = S.known[file];
+    if (!Object.hasOwn(researchTopics, topic)) return known.rows.filter(x => x.group === topic);
+    if (known.topics[topic]) return known.topics[topic];
+    const rows = [];
+    function visit(v, path) {
+      if (Array.isArray(v)) {
+        v.forEach((item, i) => visit(item, [...path, item?.label || item?.name || item?.id || String(i)]));
+      } else if (v && typeof v === 'object') {
+        for (const [k, value] of Object.entries(v)) {
+          if (!['notes','possible','why','help','feature','risk'].includes(k)) visit(value, [...path, k]);
+        }
+      } else if (v != null) rows.push({label:path.join(' / '), value:v});
+    }
+    if (S.comp[file]?.[topic]) visit(S.comp[file][topic], []);
+    known.topics[topic] = rows;
+    return rows;
+  }
+
+  function researchTable(file) {
+    const k = S.known[file], topic = k.topic, d = draftOf(file);
+    const q = k.q.trim().toLowerCase();
+    const rows = topicRows(file, topic).filter(x => !q || [x.label,T(x.label),x.value].join(' ').toLowerCase().includes(q));
+    const at = Math.min(k.page * 60, Math.max(0, Math.floor((rows.length - 1) / 60) * 60));
+    function control(x) {
+      if (x.stat) {
+        const e=x.stat;
+        return cell({kind:'stat',key:e.group+':'+e.row,label:T('Value'),value:e.value,display:String(e.value),
+          unit:e.type==='bool'?'flag':'count',type:e.type==='bool'?'bool':e.type==='float'?'float':'int',
+          step:e.type==='float'?'any':1,min:0,max:x.cap ?? ({int32:2147483647,u32:4294967295,u16:65535,u8:255})[e.type] ?? Number.MAX_SAFE_INTEGER,attrs:`data-group="${esc(e.group)}" data-row="${e.row}" data-base="${e.base}" data-qual="${e.qual}" data-owner="${e.owner}" data-label="${esc(x.label)}"`});
+      }
+      if (!x.key) return esc(String(x.value));
+      const staged = d.world[x.key] ?? x.value;
+      return `<div class="inputs"><span>${esc(x.value)} →</span>
+        ${x.min !== x.max ? `<input style="max-width:8em" aria-label="${esc(x.label)}" type="number" min="${x.min}" max="${x.max}" step="1" data-research="${esc(x.key)}" value="${staged}">` : `<b>${staged}</b>`}
+        <button class="btn small" data-act="research-max" data-key="${esc(x.key)}">${T('Max')} · ${x.max}</button>
+        ${d.world[x.key] != null ? `<button class="btn small" data-act="research-reset" data-key="${esc(x.key)}">Undo</button>` : ''}</div>`;
+    }
+    const failure = S.comp[file]?.errors?.[topic] || (Object.hasOwn(researchTopics, topic) && S.comp[file]?.failed);
+    return `${failure ? '<p>'+T('This section could not be read.')+'</p>' : ''}
+      <div class="inputs"><button class="btn small" data-act="research-page" data-step="-1" ${at===0?'disabled':''}>Previous</button>
+      <span>${rows.length ? at+1 : 0}–${Math.min(rows.length,at+60)} / ${rows.length}</span>
+      <button class="btn small" data-act="research-page" data-step="1" ${at+60>=rows.length?'disabled':''}>Next</button></div>
+      <table class="raw"><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+      ${rows.slice(at,at+60).map(x=>`<tr><td>${esc(T(x.label))}</td><td>${control(x)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  function panelResearch(s) {
+    const k=S.known[s.file];
+    if (!k || !S.comp[s.file]) return '<div class="empty">Reading this save…</div>';
+    if (k.failed) return '<button class="btn" data-act="reload">Try again</button>';
+    const options=[...new Set(k.rows.map(x=>x.group)),...Object.keys(researchTopics)];
+    const notes={'Map fog':'Fill adds only region IDs observed in compatible saves.', 'Criminal profile':'Candidate field. The in-game label is unconfirmed.',
+                 'Trunk contents':'Quantities refer to existing stacks in a vehicle trunk.', 'Relationship':'The shared score uses the script limits saved in this slot.'};
+    return `<div class="section-head"><h2>Known save fields</h2></div>
+      <div class="inputs">${researchLinks.map(([tab,name])=>`<button class="btn small" data-act="tab" data-tab="${tab}">${T(name)}</button>`).join('')}</div>
+      <div class="inputs"><select id="research-topic" aria-label="Category">${options.map(x=>`<option value="${esc(x)}" ${x===k.topic?'selected':''}>${esc(T(researchTopics[x]||x))}</option>`).join('')}</select>
+      <input id="research-filter" aria-label="Search" placeholder="Search" value="${esc(k.q)}"></div>
+      ${notes[k.topic]?'<p>'+T(notes[k.topic])+'</p>':''}
+      <div id="research-table">${researchTable(s.file)}</div>`;
+  }
+
   function panelData(s) {
     const sd = S.sd[s.file], d = draftOf(s.file).raw;
     const head = `<div class="section-head"><h2>Save data</h2>${riskTag('danger')}
@@ -1085,7 +1187,15 @@
       try { S.world[file] = await api('/api/world?file=' + encodeURIComponent(file)); } catch (e) { S.world[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
-    if (S.tab === 'completion' && !S.comp[file]) {
+    if (S.tab === 'known' && !S.known[file]) {
+      const store = S.known;
+      try {
+        const rows = await api('/api/research?file='+encodeURIComponent(file));
+        store[file] = {rows, topic:'Relationship', topics:{}, q:'', page:0};
+      } catch (e) { store[file] = {failed:true, rows:[], topic:'Relationship',topics:{}}; }
+      S.mainKey=''; renderMain(); return;
+    }
+    if ((S.tab === 'known' || S.tab === 'completion') && !S.comp[file]) {
       try { S.comp[file] = await api('/api/completion?file=' + encodeURIComponent(file)); } catch (e) { S.comp[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
@@ -1099,6 +1209,9 @@
     const stunt = S.stuntKeys[S.slot] || new Set();
     n.completion = compCount(d.completion); n.world = Object.keys(d.world || {}).length; n.data = Object.keys(d.raw || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
+    const known = S.known[S.slot]?.rows || [];
+    n.known = Object.keys(d.world || {}).filter(k=>k.startsWith('research_')).length
+      + known.filter(x=>x.stat && d.stats[x.stat.group + ':' + x.stat.row]).reduce((set,x)=>set.add(x.stat.group+':'+x.stat.row),new Set()).size;
     for (const el of $$('[data-count]')) el.textContent = n[el.dataset.count] || '';
   }
 
@@ -1216,7 +1329,13 @@
     const w = d.world || {}, now = S.world[s.file];
     const worldList = [w.time && {label: 'Time of day', value: now ? `${two(now.clock.hour)}:${two(now.clock.minute)}` : '', newValue: `${two(w.time.hour)}:${two(w.time.minute)}`},
       w.health != null && {label: 'Health', value: now ? now.health : '', newValue: w.health},
-      w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'}].filter(Boolean);
+      w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'},
+      ...Object.entries(w).filter(([k]) => /^(jason|lucia)_/.test(k)).map(([k,v]) => ({
+        label: k.split('_')[0] + ' / ' + T(now?.capacities?.[k]?.label || k), value: now?.capacities?.[k]?.value ?? '', newValue: v}))].filter(Boolean);
+    for (const [key,v] of Object.entries(w).filter(([key])=>key.startsWith('research_'))) {
+      const row=S.known[s.file]?.rows?.find(x=>x.key===key);
+      worldList.push({label:row?T(row.label):key, value:row?.value??'',newValue:v});
+    }
     const cp = d.completion || {};
     const compList = [cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
@@ -1415,6 +1534,29 @@
     if (a === 'sd-home') { S.sd[S.slot].cur = null; S.sd[S.slot].node = null; S.mainKey = ''; renderMain(); return; }
     if (a === 'sd-open') { sdOpen(S.slot, b.dataset.section, JSON.parse(b.dataset.path), b.dataset.label, false); return; }
     if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
+    if (a === 'growth-fill' || a === 'condition-fill') {
+      const w = S.world[S.slot], draft = draftOf(S.slot).world;
+      if (a === 'condition-fill') {
+        if (w.health < w.healthMax) draft.health = w.healthMax; else delete draft.health;
+        if (w.armour < w.armourMax) draft.armour = 'full';
+      } else {
+        const target = b.dataset.growth;
+        for (const [key, cap] of Object.entries(w.capacities || {})) {
+          if (key !== target && !key.startsWith(target + '_')) continue;
+          if (cap.value < 100) draft[key] = 100; else delete draft[key];
+        }
+      }
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts(); return;
+    }
+    if (a === 'research-page' || a === 'research-max' || a === 'research-reset') {
+      const k=S.known[S.slot], draft=draftOf(S.slot).world;
+      if (a === 'research-page') k.page=Math.max(0,k.page+Number(b.dataset.step));
+      else {
+        const x=k.rows.find(row=>row.key===b.dataset.key);
+        if (a==='research-reset' || x.value===x.max) delete draft[x.key]; else draft[x.key]=x.max;
+      }
+      S.mainKey='';renderMain();renderPending();renderCounts();return;
+    }
     if (a === 'world-fill' || a === 'world-undo') {
       const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world;
       if (b.dataset.what === 'health') d.health = w.healthMax;
@@ -1432,6 +1574,14 @@
       setStunts(file, [...sel]);
       return;
     }
+    if (a === 'max-selected') {
+      const boxes=$$('input[data-preset]:checked').filter(el=>el.dataset.preset===b.dataset.category);
+      if (!boxes.length) { toast(T('Select the fields to include first.')); return; }
+      for (const box of boxes) for (const el of $$('input[data-edit="stat"][max]',box.closest('[data-spec]'))) {
+        el.value=el.max; onEdit(el);
+      }
+      return;
+    }
     if (a === 'fillall' || a === 'maxall') {
       for (const w of $$(`.inputs[data-scope="${b.dataset.scope}"]`)) {
         const input = w.querySelector('input[type="number"]');
@@ -1440,7 +1590,7 @@
       }
       return;
     }
-    if (a === 'reload') { const f = S.slot; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; delete S.sd[f]; delete S.preview[f]; S.mainKey = ''; renderMain(); return; }
+    if (a === 'reload') { const f = S.slot; delete S.known[f]; delete S.detail[f]; delete S.stats[f]; delete S.comp[f]; delete S.world[f]; delete S.sd[f]; delete S.preview[f]; S.mainKey = ''; renderMain(); return; }
     if (a === 'more') { S.find.limit += 300; $('#allrows').innerHTML = allRows(slotOf(S.slot)); return; }
     if (a === 'review') { S.reviewOpen = !S.reviewOpen; renderPending(); return; }
     if (a === 'discard') {
@@ -1473,6 +1623,19 @@
   document.addEventListener('input', e => {
     const el = e.target;
     if (el.dataset.edit && el.type !== 'checkbox') onEdit(el);
+    if (el.id === 'research-filter') {
+      const k=S.known[S.slot]; k.q=el.value;k.page=0;$('#research-table').innerHTML=researchTable(S.slot);
+    }
+    if (el.id === 'research-topic') {
+      const k=S.known[S.slot];k.topic=el.value;k.q='';k.page=0;S.mainKey='';renderMain();
+    }
+    if (el.dataset.research) {
+      const x=S.known[S.slot].rows.find(r=>r.key===el.dataset.research), v=el.valueAsNumber, d=draftOf(S.slot).world;
+      const ok=Number.isInteger(v) && v>=x.min && v<=x.max;
+      el.setAttribute('aria-invalid',String(!ok));
+      if (ok && v!==x.value) d[x.key]=v; else delete d[x.key];
+      renderPending();renderCounts();
+    }
     if (el.dataset.world) onWorld(el);
     if (el.dataset.raw && el.type !== 'checkbox') onRaw(el);
     if (el.dataset.find === 'q') {

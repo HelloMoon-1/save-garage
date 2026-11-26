@@ -188,6 +188,22 @@ def _apply_stats(txt, changes):
     for g, G in groups.items():
         for r in range(len(G['value'])):
             where[(g, G['base'][r], G['qual'][r], G['owner'][r])] = r
+    best_hash, recent_hash = joaat('bestscore'), joaat('recentscore')
+    changed_scores = [(g, r) for g, r in final if tables['base'][groups[g]['base'][r]] in (best_hash, recent_hash)]
+    if changed_scores:
+        import activities2
+        course_keys = {(joaat(tier), joaat(course)) for _, course, tier in activities2._courses()}
+        bases = {h: i for i, h in enumerate(tables['base'])}
+        for g, r in changed_scores:
+            G = groups[g]
+            q, o = G['qual'][r], G['owner'][r]
+            if (tables['qual'][q], tables['owner'][o]) not in course_keys:
+                continue
+            pair = [where.get((g, bases.get(h), q, o)) for h in (best_hash, recent_hash)]
+            if None not in pair:
+                best, recent = (final.get((g, i), G['value'][i]) for i in pair)
+                if recent > best:
+                    raise SaveError('range_score_order')
     for (g, r) in list(final):
         G = groups[g]
         if G['type'] == 'bool' or G['owner'][r] not in (1, 2):
@@ -336,6 +352,11 @@ def apply(b, edits):
     if edits.get('world'):
         import world
         try:
+            known = {k: v for k, v in edits['world'].items() if k.startswith('research_')}
+            if known:
+                import research
+                b, rlog = research.apply(b, known)
+                log += rlog
             b, wlog = world.apply(b, edits['world'])
         except (world.WorldError, KeyError, ValueError, TypeError) as e:
             raise SaveError(str(e) if isinstance(e, world.WorldError) else 'bad_request') from e

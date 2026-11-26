@@ -10,6 +10,9 @@ fMaxHealth stays 100 (overpowered health), so edits stay within 1..250. Armour i
 characters' saved outfits, up to that part's fMaxArmour.
 """
 import calendar
+import json
+
+import featurelib as fl
 
 import jsonedit as je
 import money
@@ -40,6 +43,33 @@ def _num(raw):
     return float(raw) if b'.' in raw else int(raw)
 
 
+CAPACITY = {'healthmax': (0, 'Health capacity'), 'staminamax': (1, 'Stamina capacity'),
+            'meleestaminamax': (2, 'Melee stamina capacity'), 'specialabilitymax': (3, 'Focus capacity')}
+CHARACTER = 0x22a87829
+OWNERS = {'lucia': 0xb3634b85, 'jason': 0x25350e5c}
+
+
+def growth_rows(character, stats):
+    """Expose a capacity only when both player-array copies agree with points and rank."""
+    rows = {}
+    prefix = _code(CHARACTER) + [fl.key('attributeSet')]
+    players = json.loads(character)[CODE][fl.key(CHARACTER)].get(fl.key('attributeSet'), [])
+    for i, player in enumerate(players):
+        for name, owner in OWNERS.items():
+            if player.get(fl.key('Name'), {}).get('$data') != fl.key(name)[1:]:
+                continue
+            values = player.get(fl.key('attributes'), {}).get('$data', [])
+            for qual, (index, label) in CAPACITY.items():
+                if len(values) <= index + 30:
+                    continue
+                value = values[index]
+                if not (type(value) is int and 0 <= value <= 100 and value == values[index + 30]
+                        and all(stats.value(k, qual, owner) == value for k in ('points', 'rank'))):
+                    continue
+                rows[name + '_' + qual] = (value, label, prefix + [i, fl.key('attributes'), '$data'], index, qual, owner)
+    return rows
+
+
 def read(b):
     ents, secs, gaps, head, tail = money._load(b)
     sec = lambda h: secs[money._sec(ents, h)]
@@ -54,7 +84,9 @@ def read(b):
             base = _code(LOOKS) + [OUTFITS, c, ARMOUR_PARTS, p]
             parts.append({'character': c, 'part': p, 'armour': _num(je.get(looks, base + [ARMOUR])),
                           'max': _num(je.get(looks, base + [MAX_ARMOUR]))})
-    return {'clock': clock, 'health': health, 'healthMax': HEALTH_MAX,
+    stats = fl.Stats(sec(fl.STATS))
+    capacities = growth_rows(sec(CHARACTER), stats)
+    return {'capacities': {k: {'value': v[0], 'label': v[1]} for k, v in capacities.items()}, 'clock': clock, 'health': health, 'healthMax': HEALTH_MAX,
             'armour': sum(x['armour'] for x in parts), 'armourMax': sum(x['max'] for x in parts)}
 
 
@@ -98,6 +130,23 @@ def apply(b, edit):
                     t = je.put(t, base + [ARMOUR], je.fmt_float(mx))
         secs[i] = t
         log.append({'what': 'world', 'label': 'Armour', 'from': before, 'to': after})
+    wanted = {k: v for k, v in edit.items() if k.partition('_')[0] in OWNERS}
+    if wanted:
+        ci, si = money._sec(ents, CHARACTER), money._sec(ents, fl.STATS)
+        stats = fl.Stats(secs[si])
+        available = growth_rows(secs[ci], stats)
+        for key, value in wanted.items():
+            if key not in available or type(value) is not int or not 0 <= value <= 100:
+                raise WorldError('bad_request')
+            old, label, path, index, qual, owner = available[key]
+            if value == old:
+                continue
+            for offset in (index, index + 30):
+                secs[ci] = je.put(secs[ci], path + [offset], je.fmt_int(value))
+            for field in ('points', 'rank'):
+                stats.set(field, qual, value, label, owner)
+            log.append({'what': 'world', 'label': key.split('_')[0].title() + ' / ' + label, 'from': old, 'to': value})
+        secs[si], _ = stats.apply()
     if not log:
         return b, log
     return money._rebuild(head, ents, secs, gaps, tail, len(b)), log

@@ -13,7 +13,7 @@ DESKTOP = FROZEN or os.environ.get('SAVEGARAGE_DESKTOP') == '1'
 ROOT = Path(getattr(sys, '_MEIPASS', None) or Path(__file__).resolve().parent.parent)
 VENDOR, UI = ROOT / 'vendor', ROOT / 'ui'
 MAC = sys.platform == 'darwin'
-# A packaged build runs from a read-only folder, so runtime data goes to the user's folder.
+# Desktop settings and pairing files live in the per-user application folder.
 if MAC:
     APP_SUPPORT = Path.home() / 'Library' / 'Application Support'
 elif os.name == 'nt':
@@ -23,7 +23,7 @@ else:
 DATA = APP_SUPPORT / 'SaveGarage' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.25.0'
+VERSION = '1.25.0-zh.2'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -78,6 +78,18 @@ def vendor_env(extra=None):
 
 def console_dir():
     return DATA / 'consoles' / STATE['console']['hostId']
+
+
+def session_dir():
+    if not DESKTOP:
+        return console_dir() / 'sessions'
+    if FROZEN:
+        package = Path(sys.executable).resolve().parent
+        if MAC and package.parts[-2:] == ('Contents', 'MacOS'):
+            package = package.parents[2]     # beside the .app bundle
+    else:
+        package = ROOT.parent if ROOT.name == 'app' else ROOT
+    return package / 'saves' / 'consoles' / STATE['console']['hostId'] / 'sessions'
 
 
 def prefix_path():
@@ -298,11 +310,16 @@ def read_slot(name, top):
     sfo = sfo_fields(top / 'sce_sys' / 'param.sfo')
     data = f.read_bytes()
     info = money.scan(data)
+    import collectibles2, featurelib
+    try:
+        saved_at = collectibles2._save_time(featurelib.Save(data))
+    except (KeyError, ValueError, IndexError, money.SaveError):
+        saved_at = None
     try:                                        # ammo each protagonist carries
         ammo = savedit.ammo(savedit.section(data, money.SEC_INV))
     except Exception:
         ammo = []
-    return {'file': name, 'inner': inner, 'subtitle': sfo.get('SUBTITLE', ''), 'revision': sfo.get('SAVEDATA_REVISION', b'').hex() if isinstance(sfo.get('SAVEDATA_REVISION'), bytes) else '',
+    return {'file': name, 'inner': inner, 'savedAt': saved_at, 'subtitle': sfo.get('SUBTITLE', ''), 'revision': sfo.get('SAVEDATA_REVISION', b'').hex() if isinstance(sfo.get('SAVEDATA_REVISION'), bytes) else '',
             'dir': str(top), 'account': sfo['_account'], 'items': info['items'], 'ledger': info['ledger'], 'ammo': ammo,
             'modified': False, 'changes': [], 'applied': None}
 
@@ -388,7 +405,15 @@ def slot_weapons(slot):
 
 
 def slot_detail(slot):
-    return {'file': slot['file'], 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
+    def range_scores():
+        import activities2, featurelib
+        stats = featurelib.Stats(savedit.section(slot_bytes(slot), money.SEC_STAT))
+        return [{'venue': venue, 'course': course, 'tier': tier,
+                 'best': stats.row('bestscore', tier, course), 'recent': stats.row('recentscore', tier, course),
+                 'played': stats.value('timescompleted', tier, course), 'unlocked': stats.value('unlocked', tier, course)}
+                for venue, course, tier in activities2._courses()]
+
+    return {'file': slot['file'], 'rangeScores': cached(('rangeScores', slot['file']), range_scores), 'featured': slot_featured(slot), 'ammo': slot.get('ammo') or [], 'weapons': slot_weapons(slot),
             'applied': slot.get('applied'), 'modified': slot['modified']}
 
 
@@ -448,10 +473,13 @@ RESTORE_HOURS = float(os.environ.get('SAVEGARAGE_RESTORE_HOURS', 6))
 def restore_session():
     """After a restart, pick up the latest download so the power button doesn't have to be pressed again. Reads local files only.
     Skips downloads already sent back or older than RESTORE_HOURS: the player may have saved new progress since."""
-    sessions = sorted(p for p in (console_dir() / 'sessions').glob('*') if p.is_dir())
-    if not sessions:
+    # Search both locations after upgrading. Prefer the portable copy on a timestamp tie.
+    roots = dict.fromkeys([session_dir(), console_dir() / 'sessions'])
+    sessions = (p for root in roots for p in root.glob('*')
+                if re.fullmatch(r'[0-9]{8}-[0-9]{6}', p.name) and p.is_dir())
+    sess = max(sessions, key=lambda p: p.name, default=None)
+    if sess is None:
         return
-    sess = sessions[-1]
     try:
         age = time.time() - time.mktime(time.strptime(sess.name, '%Y%m%d-%H%M%S'))
     except ValueError:
@@ -500,7 +528,9 @@ def job_download():
         raise Fail('not_paired')
     if not G.reachable():
         raise Fail('garlic_unreachable')
-    sess = console_dir() / 'sessions' / time.strftime('%Y%m%d-%H%M%S'); lib = sess / 'lib'; lib.mkdir(parents=True)
+    sess = session_dir() / time.strftime('%Y%m%d-%H%M%S')
+    lib = sess / 'lib'
+    lib.mkdir(parents=True)
     opts = {'oracleHost': '127.0.0.1', 'oraclePort': relay().port, 'clientHost': c['host'], 'output': str(lib), 'interface': '',
             'hostId': c['hostId'], 'systemVersion': c['firmware'], 'hardware': 0, 'approvalPrefixPath': str(prefix_path()),
             'waitForSelection': True, 'titles': GTA_TITLES}
@@ -793,11 +823,17 @@ class H(BaseHTTPRequestHandler):
                     out[key], errors[key] = None, repr(e)[:200]
             out['errors'] = errors
             return self._send(200, out)
-        if path in ('/api/slot', '/api/stats'):       # detail data for the editor
+        if path in ('/api/slot', '/api/stats', '/api/research'):       # detail data for the editor
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
+                if path == '/api/research':
+                    import research
+                    def known_fields():
+                        b = slot_bytes(slot)
+                        return research.read(b) + research.stats_rows(b)
+                    return self._send(200, cached(('research', slot['file']), known_fields))
                 if path == '/api/slot':
                     return self._send(200, slot_detail(slot))
                 return self._send(200, raw=slot_stats(slot))
@@ -886,7 +922,10 @@ class H(BaseHTTPRequestHandler):
                 if body.get('world'):
                     if not isinstance(body['world'], dict):
                         raise ValueError('world must be an object')
-                    edits['world'] = {k: body['world'][k] for k in ('time', 'health', 'armour') if body['world'].get(k) is not None}
+                    import world
+                    keys = ['time', 'health', 'armour'] + [n + '_' + q for n in world.OWNERS for q in world.CAPACITY]
+                    keys.extend(k for k in body['world'] if k.startswith('research_'))
+                    edits['world'] = {k: body['world'][k] for k in keys if body['world'].get(k) is not None}
                 return self._send(200, {'job': start_job('patch', lambda: job_patch(slot, edits))})
             if path == '/api/restore':
                 return self._send(200, {'job': start_job('restore', job_restore)})

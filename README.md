@@ -76,8 +76,8 @@ That upload includes your PSN account ID, which is stored in the save. GarlicSav
 its own. Its consoles also work out the keys for each Data Transfer session.
 
 Nothing else is uploaded. The editor runs only on your computer, and by default only your computer can open it.
-Originals and backups stay in `%LOCALAPPDATA%\SaveGarage` on Windows, `~/Library/Application Support/SaveGarage`
-on a Mac, `~/.local/share/SaveGarage` with the Linux build, and the `data` folder when you run from source.
+In packaged builds, downloads and their original backups are stored in the `saves` folder beside the launcher.
+Extract the package to a writable folder. Source runs keep saves in `data`.
 
 ## Related
 

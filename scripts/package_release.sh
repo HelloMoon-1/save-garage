@@ -67,7 +67,7 @@ printf '%s\r\n' 'Save Garage for Windows 10 and 11' '' \
   '1. Double-click "Start Save Garage.bat". If Windows SmartScreen appears, click More info, then Run anyway.' \
   '2. When Windows Firewall asks about Python, allow it on private networks. Your PS5 needs to reach this PC.' \
   '3. Your browser opens Save Garage. Follow the steps on screen.' '' \
-  'Saves and backups are kept in %LOCALAPPDATA%\SaveGarage.' \
+  'Saves and backups are kept in the saves folder beside the launcher.' \
   'Full guide: see app\README.md or the project page.' > "$WIN/README.txt"
 zip_dir "$STAGE/win" SaveGarage "$OUT/SaveGarage-$VERSION-windows-x64.zip"
 
@@ -106,7 +106,7 @@ Save Garage for macOS
 3. Allow access to devices on your local network when asked. Your PS5 needs to reach this Mac.
 4. Your browser opens Save Garage. Follow the steps on screen.
 
-Saves and backups are kept in ~/Library/Application Support/SaveGarage.
+Saves and backups are kept in the saves folder beside the launcher.
 TXT
 zip_dir "$STAGE/mac" SaveGarage "$OUT/SaveGarage-$VERSION-macos.zip"
 
@@ -119,7 +119,7 @@ Save Garage for Linux
 Run ./SaveGarage --open (or ./SaveGarage --help for options). curl must be installed.
 The PS5 protocol uses ports 1004 to 1006, which Linux keeps for root. Allow them while you use Save Garage:
   sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1004
-and set it back afterwards with ...=1024. Saves and backups are kept in ~/.local/share/SaveGarage.
+and set it back afterwards with ...=1024. Saves and backups are kept in the saves folder beside the launcher.
 TXT
 tar -C build_out/dist -czf "$OUT/SaveGarage-$VERSION-linux-x64.tar.gz" SaveGarage
 
