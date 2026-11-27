@@ -1,4 +1,8 @@
 {
+"Received {0} of {1} MiB": "Odebrano {0} z {1} MiB",
+"Received {0} MiB": "Odebrano {0} MiB",
+"{0} files so far": "Zapisane pliki: {0}",
+"Decrypted {0} of {1} slots in this operation": "Odszyfrowane miejsca zapisu w tej operacji: {0} z {1}",
 "Register with GarlicSaves": "Zarejestruj się w GarlicSaves",
 "Create your account on GarlicSaves, then come back here to sign in.": "Utwórz konto w serwisie GarlicSaves, a następnie wróć tutaj, aby się zalogować.",
 "I already have an account": "Mam już konto",

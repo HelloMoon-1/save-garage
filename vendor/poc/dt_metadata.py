@@ -452,7 +452,7 @@ def load_selected_manifest(assets, entry_id, source_metadata, user_id):
 
 def create_filtered_metadata(
     output, source_metadata, user_id, user_name, entry_ids, assets, manifest_output=None,
-    server_url=None, worker_key=None,
+    server_url=None, worker_key=None, exclude_slots=(),
 ):
     """Build selected upload catalogue."""
     user_id = validate_user(user_id, user_name)
@@ -469,7 +469,18 @@ def create_filtered_metadata(
             except Exception as exc:
                 raise ValueError(f"auto-resign to {user_id} failed: {exc}") from exc
         actual_id, entry = load_selected_manifest(assets, entry_id, source_metadata, user_id)
-        persist_manifest_entry(assets, actual_id, entry)
+        if exclude_slots:
+            if len(entry_ids) != 1 or any(not re.fullmatch(r"sdimg_(SAVEDATASARC[0-9]+|sce_sdmemory)", n) for n in exclude_slots):
+                raise ValueError("invalid slot selection")
+            files = entry["files"]
+            names = {f["file"] for f in files}
+            if not set(exclude_slots) <= names:
+                raise ValueError("selected save slot missing from the transfer manifest")
+            entry = dict(entry, files=[f for f in files if f["file"] not in exclude_slots])
+            if not any(re.fullmatch(r"sdimg_(SAVEDATASARC[0-9]+|sce_sdmemory)", f["file"]) for f in entry["files"]):
+                raise ValueError("at least one story save must remain")
+        else:
+            persist_manifest_entry(assets, actual_id, entry)
         upload_entries[actual_id] = entry
     output = Path(output).expanduser()
     source_metadata = Path(source_metadata).expanduser()
@@ -590,6 +601,7 @@ def main():
     parser.add_argument("--assets", required=True)
     parser.add_argument("--user-name", default="user")
     parser.add_argument("--manifest-output")
+    parser.add_argument("--exclude-slot", action="append", default=[])
     parser.add_argument("--other", action="store_true", help="preserve non-savedata transfer entries")
     parser.add_argument("--external-image", type=Path, help="encrypted save container to import")
     parser.add_argument("--server-url", default=None, help="GarlicSaves server URL, for auto-resign on upload")
@@ -609,7 +621,7 @@ def main():
     elif args.source:
         path = create_filtered_metadata(
             args.output, args.source, args.user_id, args.user_name,
-            args.entry_id, args.assets, args.manifest_output,
+            args.entry_id, args.assets, args.manifest_output, exclude_slots=args.exclude_slot,
             server_url=args.server_url, worker_key=args.worker_key,
         )
     else:

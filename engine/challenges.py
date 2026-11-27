@@ -10,7 +10,7 @@ THE 212 SAVED CHALLENGES (section 3000010d Challenges: codeVersion + savedChalle
     and the linked progress stats fit the categories (holdups -> CRIMINAL, vehicle mods -> SHOPPING, a hoop row ->
     SPORTS, fish and animals -> SURVIVAL, wheelies and top speed -> VEHICLE).
   * 348d4be2 (54): profile-wide awards. A fresh playthrough (B7as_a) starts with exactly the 23 completions of the
-    other playthrough, so these follow the console profile (very likely the trophy mirror). Not edited.
+    other playthrough, so these follow the console profile. These local records can be edited separately in awards.py.
   * e7c89bfd (16): per-save goals with per-character progress (swim/run distances since a baseline). Not edited.
   * d6d53427 (62): the cheat unlock trackers, one per cheat ('Spawns a Bravado Banshee. To unlock: Complete all combat
     challenges.' and so on: 5-of-10 and all-10 per category, one for all challenges, plus others linked to stunt,
@@ -288,7 +288,7 @@ def read(b):
             'otherSets': other, 'records': len(recs), 'risk': 'medium-high',
             'notes': ['Completes menu challenges the way the game records them and keeps the counters and the 100% row in step.',
                       'Category rewards (vehicle spawns) are granted by the game when it completes a challenge itself; they may not unlock.',
-                      'Only the eight menu categories are completed here; the cheat trackers are completed on their own (apply_cheats), and the profile awards and goals are read-only.']}
+                      'Only the eight menu categories are completed here; the cheat trackers are completed on their own (apply_cheats), profile awards have their own editor, and goals are read-only.']}
 
 
 def apply(b, choice):

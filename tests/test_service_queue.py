@@ -20,6 +20,29 @@ class ServiceQueueTests(unittest.TestCase):
         stack.enter_context(patch.object(app, 'JOB_STARTED', 0))
         self.clock = stack.enter_context(patch.object(app.time, 'monotonic', return_value=100))
 
+    def test_download_counts_bytes_and_completed_files_across_entries(self):
+        lines = [
+            '{"type":"downloadProgress","received":0,"totalBytes":300}',
+            '{"type":"status","step":4}',
+            '{"type":"downloadProgress","received":120,"totalBytes":300}',
+            '[file] saved first',
+            '{"type":"status","step":4}',
+            '{"type":"downloadProgress","received":300,"totalBytes":300}',
+            '[file] saved second',
+        ]
+        worker = SimpleNamespace(stdout=lines, wait=lambda: None)
+        with patch.object(app, 'spawn', return_value=worker):
+            result = app.download_try({})
+        self.assertEqual(result['files'], 2)
+        self.assertEqual(app.JOB['progress'], {'bytes': 300, 'totalBytes': 300, 'files': 2})
+
+    def test_new_download_attempt_clears_previous_progress(self):
+        app.JOB['progress'] = {'files': 8}
+        worker = SimpleNamespace(stdout=[], wait=lambda: None)
+        with patch.object(app, 'spawn', return_value=worker):
+            app.download_try({})
+        self.assertIsNone(app.JOB['progress'])
+
     def rows(self):
         return app.public_state()['job']['serviceQueue']
 

@@ -303,9 +303,21 @@ def download(options):
             return selected_rows
 
         def download_rows(selected_rows):
+            received = 0
+            sizes = [row[2] for row in selected_rows]
+            total = sum(sizes) if all(isinstance(s, int) and s >= 0 for s in sizes) else None
+
+            def report_bytes(delta):
+                nonlocal received
+                received += delta
+                emit("downloadProgress", received=received, totalBytes=total)
+
+            progress = report_bytes if options.get("reportProgress") else None
+            if progress:
+                progress(0)
             for index, (entry_id, path, _, _) in enumerate(selected_rows, 1):
                 emit("status", step=4, message=f"Downloading entry {entry_id} ({index}/{len(selected_rows)}).")
-                download_entry(data, entry_id, output, package_only=path.startswith("/user/app/"))
+                download_entry(data, entry_id, output, package_only=path.startswith("/user/app/"), on_bytes=progress)
             index_downloaded_manifests(output)
 
         if options.get("waitForSelection"):

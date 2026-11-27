@@ -1,4 +1,8 @@
 {
+"Received {0} of {1} MiB": "Получено {0} из {1} МиБ",
+"Received {0} MiB": "Получено {0} МиБ",
+"{0} files so far": "Сохранено файлов: {0}",
+"Decrypted {0} of {1} slots in this operation": "В этой операции расшифровано слотов: {0} из {1}",
 "Register with GarlicSaves": "Регистрация в GarlicSaves",
 "Create your account on GarlicSaves, then come back here to sign in.": "Создайте аккаунт на сайте GarlicSaves, затем вернитесь сюда, чтобы войти.",
 "I already have an account": "У меня уже есть аккаунт",

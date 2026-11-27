@@ -26,7 +26,7 @@ else:
 DATA = APP_SUPPORT / 'MoonSlot' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.30.4'
+VERSION = '1.30.5'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -698,12 +698,39 @@ def completion_readers(b):
     """(key, reader) for every part of the Completion tab."""
     import compendium, discovery, challenges, gyms, activities, checklist, tasks, gangs, robberies, fencing, activities2, hoops, vehicles_compendium
     import collectibles2 as collectibles
+    import awards
     return [('stunts', lambda: savedit.stunts(savedit.section(b, money.SEC_STAT))), ('compendium', lambda: compendium.read(b)),
             ('discovery', lambda: discovery.read(b)), ('challenges', lambda: challenges.read(b)), ('gyms', lambda: gyms.read(b)),
             ('activities', lambda: activities.read(b)), ('checklist', lambda: checklist.read(b)), ('tasks', lambda: tasks.read(b)),
             ('gangs', lambda: gangs.read(b)), ('robberies', lambda: robberies.read(b)), ('fencing', lambda: fencing.read(b)),
             ('activities2', lambda: activities2.read(b)), ('hoops', lambda: hoops.read(b)), ('vehicles', lambda: vehicles_compendium.read(b)),
-            ('collectibles', lambda: collectibles.read(b)), ('cheats', lambda: challenges.read_cheats(b))]
+            ('collectibles', lambda: collectibles.read(b)), ('cheats', lambda: challenges.read_cheats(b)),
+            ('awards', lambda: awards.read(b))]
+
+
+def task_sources(slot):
+    import taskskip
+    def phase(other):
+        try:
+            return cached(('task_phase', other['file']), lambda: taskskip.status(slot_bytes(other)))
+        except (OSError, ValueError, KeyError, TypeError, IndexError, money.SaveError):
+            return 'unavailable'
+    current = phase(slot)
+    sources = [other['file'] for other in STATE['slots']
+               if current == 'active' and other['file'] != slot['file']
+               and other.get('account') == slot.get('account') and phase(other) == 'done']
+    return {'phase': current, 'sources': sources}
+
+
+def apply_slot_edits(slot, data, edits):
+    choice = (edits.get('completion') or {}).get('skipTask')
+    if not choice:
+        return savedit.apply(data, edits)
+    import taskskip
+    if (not isinstance(choice, dict) or set(choice) != {'id', 'source'} or choice['id'] != taskskip.KEY
+            or choice['source'] not in task_sources(slot)['sources']):
+        raise savedit.SaveError('task_layout')
+    return savedit.apply(data, edits, task_reference=slot_bytes(slot_by_file(choice['source'])))
 
 
 def completion_preview(slot, body):
@@ -718,12 +745,12 @@ def completion_preview(slot, body):
         edits['guns'] = body['guns']
     b = slot_bytes(slot)
     try:
-        nb, _ = savedit.apply(b, edits)
+        nb, _ = apply_slot_edits(slot, b, edits)
     except Exception as e:                      # find which parts fail on their own, so the page can say which
         failed = []
         for k, v in edits['completion'].items():
             try:
-                savedit.apply(b, {'completion': {k: v}})
+                apply_slot_edits(slot, b, {'completion': {k: v}})
             except Exception:
                 failed.append(k)
         if edits.get('guns'):
@@ -910,8 +937,16 @@ def restore_session(resume=False):
             slots.append(s)
     if not slots:
         return
+    marker = sess / 'excluded-slots.json'
+    if marker.is_file():
+        excluded = json.loads(marker.read_text('utf-8'))
+        names = {s['file'] for s in slots}
+        if not isinstance(excluded, list) or not set(excluded) < names:
+            raise ValueError('invalid saved slot selection')
+        for s in slots:
+            s['excluded'] = s['file'] in excluded
     with LOCK:
-        STATE.update(session=str(sess), resumeDownload=None, user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
+        STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
                      slots=slots, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
@@ -930,18 +965,18 @@ KEY_REFUSED = {'key_disabled': 'key_disabled', 'rate_limited': 'key_rate_limited
 
 def download_try(opts):
     """Run the download worker once. Returns what it reported, with the last stage it reached."""
-    p = spawn(['dl_worker', json.dumps(opts)])
+    p = spawn(['dl_worker', json.dumps(dict(opts, reportProgress=True))])
     r = {'entries': [], 'users': [], 'nosave': False, 'err': None, 'files': 0, 'chosen': None, 'stage': None}
 
     def at(s, **kw):
         r['stage'] = s; stage(s, **kw)
-    at('connecting')
+    at('connecting', progress=None)
     for line in p.stdout:
         line = line.rstrip()
         if line.startswith('[file] saved'):
             r['files'] += 1
             with LOCK:
-                JOB['progress'] = {'files': r['files']}
+                JOB['progress'] = dict(JOB['progress'] or {}, files=r['files'])
             log('saved file %d' % r['files']); continue
         try:
             ev = json.loads(line)
@@ -950,7 +985,10 @@ def download_try(opts):
                 log(line)
             continue
         t = ev.get('type')
-        if t == 'powerRequired':
+        if t == 'downloadProgress':
+            with LOCK:
+                JOB['progress'] = {'files': r['files'], 'bytes': ev['received'], 'totalBytes': ev['totalBytes']}
+        elif t == 'powerRequired':
             at('need_power', needPower=True)
         elif t == 'status' and ev.get('step') == 3:
             at('reading_list', needPower=False)
@@ -1085,7 +1123,7 @@ def job_download():
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
+        STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
     stage('ready')
 
 
@@ -1119,7 +1157,7 @@ def job_patch(slot_file, edits):
     stage('patching')
     src = Path(slot['dir']) / slot['inner']
     try:
-        data, plog = savedit.apply(src.read_bytes(), edits)
+        data, plog = apply_slot_edits(slot, src.read_bytes(), edits)
     except money.SaveError as e:
         raise Fail('save_' + str(e))
     if not plog:
@@ -1152,6 +1190,40 @@ def job_patch(slot_file, edits):
     stage('ready_to_upload')
 
 
+def pending_slot_changes():
+    return any(bool(s.get('excluded')) != bool(s.get('sentExcluded')) for s in STATE['slots'])
+
+
+def set_slot_excluded(name, excluded, selection_id):
+    with LOCK:
+        if JOB['status'] == 'running' or RESTART.is_set():
+            raise Fail('busy')
+        if not STATE['session'] or selection_id != STATE.get('selectionId'):
+            raise Fail('no_session')
+        slot = slot_by_file(name)
+        if not slot or type(excluded) is not bool or not SLOT_RE.fullmatch(name):
+            raise Fail('no_slot')
+        sess = Path(STATE['session'])
+        selected = {s['file'] for s in STATE['slots'] if s.get('excluded')}
+        if excluded:
+            check_slot_backup(sess, name)
+            selected.add(name)
+            if len(selected) >= len(STATE['slots']):
+                raise Fail('last_story_slot')
+        else:
+            selected.discard(name)
+        tmp = sess / 'excluded-slots.tmp'
+        tmp.write_text(json.dumps(sorted(selected)), 'utf-8')
+        os.replace(tmp, sess / 'excluded-slots.json')
+        slot['excluded'] = excluded
+
+
+def check_slot_backup(sess, name):
+    backup = sess / 'orig' / name
+    if not backup.is_file() or backup.stat().st_size == 0:
+        raise Fail('missing_slot_backup')
+
+
 def job_restore():
     """Put the original saves back into the transfer library (then send as usual to restore)."""
     sess = Path(STATE['session']); stage('importing')
@@ -1162,6 +1234,9 @@ def job_restore():
             with LOCK:
                 s['modified'] = False; s['changes'] = []; s['applied'] = None
     with LOCK:
+        (sess / 'excluded-slots.json').unlink(missing_ok=True)
+        for slot in STATE['slots']:
+            slot['excluded'] = False
         STATE['readyToUpload'] = True
     stage('ready_to_upload')
 
@@ -1169,10 +1244,16 @@ def job_restore():
 def job_upload():
     c = STATE['console']; sess = Path(STATE['session']); lib = sess / 'lib'; up = sess / 'upload'; up.mkdir(exist_ok=True)
     stage('preparing')
+    excludes = []
+    for slot in STATE['slots']:
+        if slot.get('excluded'):
+            check_slot_backup(sess, slot['file'])
+            excludes.extend(['--exclude-slot', slot['file']])
     run_tool(['poc.dt_metadata', '--output', str(up / 'generated-metadata.db'), '--user-id', STATE['user']['id'], '--assets', str(lib),
               '--user-name', STATE['user']['name'], '--manifest-output', str(up / 'generated-upload-manifest.json'),
-              '--source', str(lib / 'Transfer-Metadata' / 'metadata.db'), '--entry-id', str(STATE['entryId'])])
-    total = len(list((lib / 'Saves' / STATE['user']['id'] / STATE['title']).glob('sdimg_*')))
+              '--source', str(lib / 'Transfer-Metadata' / 'metadata.db'), '--entry-id', str(STATE['entryId']), *excludes])
+    manifest = json.loads((up / 'generated-upload-manifest.json').read_text('utf-8'))
+    total = sum(len(entry['files']) for entry in manifest.values())
     env = {'DT_METADATA': str(up / 'generated-metadata.db'), 'DT_ASSETS': str(lib), 'DT_MANIFEST': str(up / 'generated-upload-manifest.json'),
            'DT_UPLOAD_KIND': 'save', 'DT_LOG': str(up / 'dt-source.log'), 'DT_PAIRING_PREFIX': str(prefix_path()), 'DT_EXPECTED_HOST_ID': c['hostId'],
            'DT_AUTO_POWER': '1', 'DT_PORT': '1004', 'DT_DATA_PORT': '1005', 'DT_DISCOVERY_PORT': '1006', "DT_HOST_NAME": "Save Garage",
@@ -1218,6 +1299,8 @@ def job_upload():
     (sess / 'uploaded').touch()                 # a download that was sent back is not picked up again
     stage('uploaded')
     with LOCK:
+        for slot in STATE['slots']:
+            slot['sentExcluded'] = bool(slot.get('excluded'))
         STATE['readyToUpload'] = False
 
 
@@ -1240,6 +1323,7 @@ def public_state():
             sl.pop('dir', None); sl.pop('account', None)
             for it in sl['items']:
                 it.pop('type', None)
+        s['readyToUpload'] = s['readyToUpload'] or pending_slot_changes()
         s.pop('session', None)
         s['hasSession'] = bool(STATE['session'])
         if s['console']:
@@ -1342,6 +1426,8 @@ class H(BaseHTTPRequestHandler):
                     out[key] = fn()
                 except Exception as e:
                     out[key], errors[key] = None, repr(e)[:200]
+            if out.get('tasks'):
+                out['tasks']['skip'] = task_sources(slot)
             out['errors'] = errors
             return self._send(200, out)
         if path in ('/api/slot', '/api/stats', '/api/research'):       # detail data for the editor
@@ -1450,12 +1536,25 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {'ok': True})
             if not STATE['session']:
                 raise Fail('no_session')
+            if path == '/api/slot-exclusion':
+                set_slot_excluded(body.get('file'), body.get('excluded'), body.get('selectionId'))
+                return self._send(200, public_state())
             if path == '/api/stunt-edits':             # stat edits that mark whole stunt types done
                 slot = slot_by_file(body.get('file') or '') if STATE['session'] else None
                 if not slot:
                     raise Fail('no_slot')
                 ids = [i for i in (body.get('groups') or []) if i in {g[0] for g in savedit.STUNT_GROUPS}]
                 return self._send(200, {'edits': savedit.stunt_edits(savedit.section(slot_bytes(slot), money.SEC_STAT), ids)})
+            if path == '/api/fog-reference':
+                import fog
+                slot = slot_by_file(body.get('file') or '')
+                if not slot:
+                    raise Fail('no_slot')
+                try:
+                    choice = fog.reference_choice(body.get('section'), slot_bytes(slot))
+                except (savedit.SaveError, ValueError, KeyError, IndexError):
+                    raise Fail('save_fog_reference')
+                return self._send(200, choice)
             if path == '/api/preview':                 # the 100% checklist after the edits picked so far (nothing is written)
                 slot = slot_by_file(body.get('file') or '')
                 if not slot:
@@ -1493,7 +1592,7 @@ class H(BaseHTTPRequestHandler):
             if path == '/api/restore':
                 return self._send(200, {'job': start_job('restore', job_restore)})
             if path == '/api/upload':
-                if not STATE['readyToUpload']:
+                if not (STATE['readyToUpload'] or pending_slot_changes()):
                     raise Fail('nothing_to_upload')
                 return self._send(200, {'job': start_job('upload', job_upload)})
             self._send(404, {'error': 'not_found'})

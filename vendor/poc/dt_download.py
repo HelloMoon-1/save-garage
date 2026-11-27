@@ -137,7 +137,7 @@ def download_metadata(channel, output):
     print(f"[metadata] {len(metadata)} bytes -> {destination}")
 
 
-def download_entry(channel, entry_id, output, package_only=False):
+def download_entry(channel, entry_id, output, package_only=False, on_bytes=None):
     """Download one entry."""
     sub = channel.request(0xB2, struct.pack("<II", 2, entry_id))
     result, _ = channel.response(0xB2, sub)
@@ -168,6 +168,8 @@ def download_entry(channel, entry_id, output, package_only=False):
         partial = destination.with_suffix(destination.suffix + ".part")
         digest = hashlib.sha256()
         remaining = size
+        unreported = 0
+        last_report = time.monotonic()
         print(f"[file] {source_path} ({size} bytes)")
         with (partial.open("wb") if keep else open(os.devnull, "wb")) as stream:
             while remaining:
@@ -179,6 +181,13 @@ def download_entry(channel, entry_id, output, package_only=False):
                 if keep:
                     digest.update(chunk)
                 remaining -= len(chunk)
+                if on_bytes:
+                    unreported += len(chunk)
+                    now = time.monotonic()
+                    if not remaining or now - last_report >= 0.25:
+                        on_bytes(unreported)
+                        unreported = 0
+                        last_report = now
         if not keep:
             print(f"[file] ignored non-PKG payload {source_path}")
             continue

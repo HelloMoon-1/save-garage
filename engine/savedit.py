@@ -313,7 +313,7 @@ def _apply_ammo(txt, changes):
 
 
 # ---------------------------------------------------------------- whole-file
-def apply(b, edits):
+def apply(b, edits, *, task_reference=None):
     """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'guns': {...}, 'completion': {...}, 'world': {...}} applied to
     the original file -> (bytes, log). 'guns' is guns.py's choice ({'lucia': [...], 'jason': [...]}); 'completion' holds
     one choice per Completion part, 'cheats' (challenges.apply_cheats) among them; 'world' holds world.py's time, health
@@ -343,11 +343,18 @@ def apply(b, edits):
     if comp:
         import compendium, discovery, challenges, gyms, activities, checklist, robberies, fencing, activities2, hoops, vehicles_compendium
         import collectibles2 as collectibles
+        import awards
         steps = [(compendium.apply, comp.get('compendium')), (discovery.apply, comp.get('discovery')), (challenges.apply, comp.get('challenges')),
                  (challenges.apply_cheats, comp.get('cheats')), (gyms.apply, comp.get('gyms')),
                  (activities.apply, comp.get('activities')), (robberies.apply, comp.get('robberies')), (fencing.apply, comp.get('fencing')),
                  (activities2.apply, comp.get('activities2')), (hoops.apply, comp.get('hoops')), (vehicles_compendium.apply, comp.get('vehicles')),
-                 (collectibles.apply, comp.get('collectibles'))]
+                 (collectibles.apply, comp.get('collectibles')), (awards.apply, comp.get('awards'))]
+        if comp.get('skipTask'):
+            import taskskip
+            if not isinstance(comp['skipTask'], dict) or comp['skipTask'].get('id') != taskskip.KEY:
+                raise SaveError('bad_request')
+            b, task_log = taskskip.apply(b, task_reference)
+            log += [dict(item, what='completion', step=item['what']) for item in task_log]
         if comp.get('stuntDiscovery'):         # the stunt categories in the map's Discovery section follow the stunts
             steps.append((discovery.apply, {'categories': [STUNT_DISCOVERY[i] for g in comp['stuntDiscovery'] for i in STUNT_DISCOVERY_IDS.get(g, ())],
                                             'allow_stunt': True}))
@@ -673,10 +680,10 @@ STUNT_GROUPS = (
     ('bridges', 'Under the bridge and knife flights', completiondata.BRIDGES_AND_KNIFE_FLIGHTS, (('underthebridge', 202), ('knifeflights', 40)), 242),
 )
 STUNTS_FOR_100 = 300            # the 100% checklist asks for any 300 of the game's 397 stunts
-COMPLETION_PARTS = ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles')
+COMPLETION_PARTS = ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'skipTask')
 # Every key a Completion edit may hold. The cheat trackers are counted by no 100% line, so 'cheats' alone doesn't make
 # the 100% figure be worked out again (COMPLETION_PARTS and the stunts do).
-COMPLETION_KEYS = COMPLETION_PARTS + ('stuntDiscovery', 'cheats')
+COMPLETION_KEYS = COMPLETION_PARTS + ('stuntDiscovery', 'cheats', 'awards')
 # Discovery section categories for each stunt type (their found bits mirror numfound.<type> in every game save)
 STUNT_DISCOVERY = {'jumps': 0x07b59c95, 'base': 0xec841e35, 'bridges': 0x0f25b442, 'knife': 0xc8c1866f}
 STUNT_DISCOVERY_IDS = {'jumps': ('jumps',), 'base': ('base',), 'bridges': ('bridges', 'knife')}

@@ -1,4 +1,8 @@
 {
+"Received {0} of {1} MiB": "{1} MiB 中 {0} MiB 受信済み",
+"Received {0} MiB": "{0} MiB 受信済み",
+"{0} files so far": "{0} ファイル保存済み",
+"Decrypted {0} of {1} slots in this operation": "今回の復号状況：{1} スロット中 {0} スロット完了",
 "Register with GarlicSaves": "GarlicSaves に登録",
 "Create your account on GarlicSaves, then come back here to sign in.": "GarlicSaves のサイトでアカウントを作成したら、ここに戻ってログインしてください。",
 "I already have an account": "アカウントをお持ちの方はこちら",

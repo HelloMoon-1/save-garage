@@ -1,4 +1,8 @@
 {
+"Received {0} of {1} MiB": "{0} van {1} MiB ontvangen",
+"Received {0} MiB": "{0} MiB ontvangen",
+"{0} files so far": "{0} bestanden opgeslagen",
+"Decrypted {0} of {1} slots in this operation": "{0} van {1} opslagvakken ontsleuteld in deze bewerking",
 "Register with GarlicSaves": "Registreren bij GarlicSaves",
 "Create your account on GarlicSaves, then come back here to sign in.": "Maak je account aan op GarlicSaves en kom hier terug om in te loggen.",
 "I already have an account": "Ik heb al een account",

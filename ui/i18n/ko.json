@@ -1,4 +1,8 @@
 {
+"Received {0} of {1} MiB": "{1} MiB 중 {0} MiB 수신",
+"Received {0} MiB": "{0} MiB 수신",
+"{0} files so far": "파일 {0}개 저장됨",
+"Decrypted {0} of {1} slots in this operation": "이번 작업에서 슬롯 {1}개 중 {0}개 복호화 완료",
 "Register with GarlicSaves": "GarlicSaves 가입",
 "Create your account on GarlicSaves, then come back here to sign in.": "GarlicSaves에서 계정을 만든 후 여기로 돌아와 로그인하세요.",
 "I already have an account": "이미 계정이 있어요",
