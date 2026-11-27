@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """The game's stunt list, by type, for the Completion tab. Each stunt is a stats qualifier with its own rows (found,
 completionstate, numtimescompleted, best-run records). Types come from the stats each stunt uses: stunt jumps also record
 flips, rolls and height; base jumps record a par time; under-the-bridge flights and knife flights share the same set, so

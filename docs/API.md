@@ -22,7 +22,8 @@ The whole app state, polled about once a second by the UI.
   "slots": [{
     "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
     "subtitle": "Mission name",
-    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "spendable": 85000, "stuck": 0}],
+    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 231933844, "spendable": 85000,
+               "stuck": 0, "boxMax": 223844, "stacks": 0}],
     "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 9999}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
@@ -31,18 +32,31 @@ The whole app state, polled about once a second by the UI.
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": [], "serviceQueue": []},
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
-  "version": "1.29.1",
-  "canQuit": false                                    // true in the desktop builds
+  "version": "1.30.1",
+  "canQuit": false,                                   // true in the desktop builds
+  "update": {"auto": true, "mode": "install", "why": null, "flavour": "windows", "status": "ready", "current": "1.30.0",
+             "latest": "1.30.1", "error": null, "progress": null, "total": null, "checked": 1795651200, "installed": null,
+             "notes": "https://github.com/NotHGM/save-garage/releases/tag/v1.30.1", "canRestart": true, "restarting": false},
+  "garlic": {"signedIn": true, "username": "name", "stored": true, "devKey": false, "refused": false,
+             "signin": {"status": "idle", "code": null, "link": null, "expiresIn": null, "error": null, "http": null}}
 }
 ```
+
+`update` is the updater's state; see [Updates](#updates) below. `garlic` is the GarlicSaves sign-in; see
+[Signing in to GarlicSaves](#signing-in-to-garlicsaves).
 
 ## GET /api/slot?file=…
 
 Editor data for one save: featured stats with the exact rows to edit, ammo and the weapons each character carries.
-For the bank, `boxMax` is what the bank's own money boxes hold, and `max` adds a $85,000 stack for every inventory slot left
-above the 300 kept free (at most $999,999,999; equal to `boxMax` when the save has no $85,000 box yet). `stacks` counts
-the extra stacks the bank already has, `spendable` is the money the game can spend, and `stuck` is money an older version
-left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it).
+For the bank, `max` is what the bank's own money boxes hold at this point in the story, which shops spend from; an edit
+goes no higher unless it asks for the extra stacks (`stacks`, under `/api/patch` below). `maxStacks` is the limit with
+them: a $85,000 stack under the bank's $85,000 box for every inventory slot left above the 300 kept free, at most
+$999,999,999, and equal to `max` when the save has no $85,000 box yet. The stacks are experimental and may not be
+spendable (issue #8). `stacks` counts the extra stacks the bank already has, and `boxMax`, kept for compatibility, is
+where new stacks would start: `max` plus $85,000 for each of them (equal to `max` without any). `stuck` is money an older
+version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it), and
+`spendable` is the rest of `value`, extra stacks included. Without `stuck` money, a `value` above `max` is money in extra
+stacks, as versions 1.26.0 to 1.30.0 wrote it.
 For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes.
 Each weapon is
 `{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:
@@ -127,20 +141,33 @@ slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmo
 | `/api/upload` | none | Starts sending the save back to the PS5 |
 | `/api/cancel` | none | Stops the current task |
 | `/api/quit` | none | Closes Save Garage (refused while a transfer is running) |
+| `/api/update/check` | none | Checks GitHub for a new version now, in the background (a check less than 10 s after the last one, or while one runs, is skipped). Answers `state.update` |
+| `/api/update/settings` | `{"auto": false}` | Turns automatic updates on or off, saved as `autoUpdate` in `config.json` in the data folder (its other settings are kept). Turning them off ends a download in progress and drops a staged update. Answers `state.update` |
+| `/api/update/restart` | none | Starts Save Garage again, so the staged update installs; answers `{"ok": true}` first. Refused with `busy` while a task runs and `no_update` when nothing is staged |
+| `/api/signin` | none | Starts signing in to GarlicSaves, in the background, or goes on with the sign-in under way. Answers `state.garlic` |
+| `/api/signin/cancel` | none | Stops the sign-in under way; a key GarlicSaves gives after that isn't kept. Answers `state.garlic` |
+| `/api/signout` | none | Forgets the GarlicSaves sign-in on this computer: its entry in `config.json` and its key. Refused with `busy` while a task runs. Answers `state.garlic` |
 
 Each edit names the value it replaces (`value`) and the new one (`newValue`); an edit whose `value` no longer matches
-the save is refused. Errors come back as HTTP 409 `{"error": "<code>", "detail": "…"}`.
+the save is refused. A money edit is `{"inv": 0, "idx": 384, "value": 85000, "newValue": 223844}`, and a value above the
+item's `max` is written as `max`. A bank edit with `"stacks": true` goes up to `maxStacks` instead, putting what is past
+the bank's own boxes in extra $85,000 stacks (experimental: the game may not let you spend them); `stacks` must be `true`
+or `false` (HTTP 400 otherwise). A lower bank balance is always written and empties the stacks it no longer needs, so an
+edit without `stacks` brings a bank that is in stacks back within its own boxes. Errors come back as HTTP 409
+`{"error": "<code>", "detail": "…"}`. `/api/pair`, `/api/download`, `/api/patch` and `/api/upload` go through
+GarlicSaves and are refused with `not_signed_in` until Save Garage is signed in.
 
 ### Download errors
 
 A download that fails ends with `job.status` `error` and `job.error` `{"code": "…", "detail": "…"}`, where `detail` is
-the transfer code's own error, such as `TimeoutError: timed out`. Every copy of Save Garage sends its GarlicSaves jobs
-with the same worker key, and GarlicSaves takes only so many jobs a minute from one key. A transfer-key request it turns
-down decides the code, since the transfer code can't go on without those keys: `key_rate_limited` when it answered 429
-(rate limited) and `key_disabled` when its API answered 403 (or 401) because key requests are turned off for that key
-(a Cloudflare 403 page doesn't count). Their `detail` is the derivation's line below rather than the closed connection
-the transfer code saw. Once a request is refused no more go out for that derivation, and while a rate limit is known
-(its Retry-After, else 60 s) no hedged request does.
+the transfer code's own error, such as `TimeoutError: timed out`. Save Garage sends its GarlicSaves jobs with the
+worker key of its GarlicSaves sign-in, and GarlicSaves takes only so many jobs a minute from one key. A transfer-key
+request it turns down decides the code, since the transfer code can't go on without those keys: `key_rate_limited` when
+it answered 429 (rate limited) and `key_disabled` when it answered 401, or 403 from its API (a Cloudflare 403 page
+doesn't count): the sign-in was turned off or has expired, or key requests are turned off for its key. Their `detail` is
+the derivation's line below rather than the closed connection the transfer code saw. Pairing and sending back end the
+same way when one of their key requests is turned down. Once a request is refused no more go out for that derivation,
+and while a rate limit is known (its Retry-After, else 60 s) no hedged request does.
 
 Otherwise a timeout gets its code from when it came and from what GarlicSaves' key service did: `power_timeout` while
 the power prompt was up (stage `need_power`), `key_timeout` when a transfer-key derivation didn't give the transfer code
@@ -152,9 +179,11 @@ Before the power prompt, with nothing downloaded yet, the download starts once m
 when it gave none, 75 s at most; stage `key_rate_wait`). Meanwhile `job.wait` holds the seconds left and `/api/cancel`
 ends the download. A second failure, a `key_disabled` and any failure after the power prompt end it. Decrypting the
 saves at the end of a download, and encrypting edits (`/api/patch`), use the same key: a decrypt or encrypt job
-GarlicSaves turns down ends with `garlic_rate_limited` (429) or `garlic_key_disabled` (403 or 401), without an automatic
-retry, and a `detail` such as `GarlicSaves is limiting requests (HTTP 429, retry after 60 s)`. The other codes are
-`not_paired`, `garlic_unreachable`, `console_rejected`, `download_failed`, `no_gta_save` and `no_story_slot`.
+GarlicSaves turns down ends with `garlic_rate_limited` (429) or `garlic_key_disabled` (401, or 403 from its API),
+without an automatic retry, and a `detail` such as `GarlicSaves is limiting requests (HTTP 429, retry after 60 s)`. A 401
+or 403 also sets `state.garlic.refused`, so the page says the sign-in was refused and offers to sign in again. The other
+codes are `not_paired`, `not_signed_in`, `garlic_unreachable`, `console_rejected`, `download_failed`, `no_gta_save` and
+`no_story_slot`.
 
 The job's `log` has a line for each derivation, saying why it gave no keys when it didn't: `Key service: answered in
 4.2 s (1 request)`, `answered too late, after 31.0 s (2 requests)`, `rate limited by GarlicSaves (retry after 60 s)` (or
@@ -233,3 +262,76 @@ touched. Whether the cheat then shows in the game's Progress menu isn't known ye
 trophies and saving for the rest of that session. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
 record isn't shaped as the game writes it), `not_editable` (a record of another challenge set), `unknown_challenge`,
 `bad_request`, `verify_failed`. Errors carry the `save_` prefix in the job's error.
+
+## Signing in to GarlicSaves
+
+GarlicSaves authorises each installation with the user's own GarlicSaves account (device authorisation, as GarlicTransfer
+0.4.0 does it), and every GarlicSaves job carries the worker key it gives, in the `X-Worker-Key` header. There is no
+built-in key. `state.garlic` says where things are:
+
+- `signedIn`: Save Garage has a worker key: the stored sign-in's, or `SAVEGARAGE_DEV_WORKER_KEY`'s (`devKey` true;
+  for development and tests only, it comes before a stored sign-in and is never passed on to the transfer tools).
+- `username`: the GarlicSaves account of the stored sign-in, for the page to show (`null` when GarlicSaves named none,
+  or with a development key). The key itself is never in the state, the job log, a job's details or an error.
+- `stored`: a sign-in is stored (Sign out forgets it).
+- `refused`: GarlicSaves turned the key in use down in its latest answer (HTTP 401, or 403 from its API): the sign-in
+  was turned off or has expired. Cleared by an answer that goes through, or by signing in again.
+- `signin`: the sign-in under way. `status` is `idle`, `starting` (asking GarlicSaves for a code), `waiting` (with the
+  `code` to enter on GarlicSaves, the `link` to open, always an `http` or `https` address, and `expiresIn`, the seconds
+  left), `done`, or `error`, with `error` saying why and `http` the HTTP status of the answer it stopped at:
+  `unreachable` (no answer to the first request, or to three checks in a row), `rate_limited` (429 to the first
+  request), `unavailable` (a 5xx to the first request, or to three checks in a row), `expired` (the code ran out,
+  after `expires_in` or 10 minutes, or GarlicSaves said so), `refused` (GarlicSaves turned the sign-in down),
+  `bad_link` (a sign-in link that isn't an http or https address), `bad_answer` (an answer Save Garage doesn't
+  understand), `not_saved` (`config.json` couldn't be written) or `internal`.
+
+`POST /api/signin` runs the flow in the background: `POST <server>/api/v1/device/code` with `{"name": "Save Garage"}`
+(nothing about the computer), which must answer a `device_code`, a `user_code` (letters, digits, spaces and hyphens, at
+most 32), a `verification_uri` (an `http` or `https` address, ASCII, with a host and no user name) and, optionally, the
+numbers `expires_in` (1 to 86,400 s) and `interval` (0 to 3,600 s). Then `POST <server>/api/v1/device/token` with
+`{"device_code": "…"}`, every `interval` seconds but never more often than every 3 s: `authorization_pending` (HTTP 202,
+or as RFC 8628's 400 error) waits on, a 429 or `slow_down` adds 5 s to the interval (or waits what `Retry-After` asks),
+up to two missing answers or 5xx in a row are tried again, and an HTTP 2xx with `"status": "authorized"` must carry a
+`worker_key` (16 to 512 printable characters without spaces, quotes or backslashes) and an `installation_id`, and may
+carry a `username`. Anything else ends the sign-in with the error above. Only those three fields are kept; nothing else
+GarlicSaves answers is logged or shown. These requests go without a worker key, through the same curl, proxy and
+User-Agent as every other GarlicSaves request; the key and the request bodies go to curl on its standard input, not on
+its command line.
+
+The sign-in is stored as `"garlicSaves": {"workerKey", "installationId", "username"}` in `config.json` in the data
+folder, written with mode 600 (a `config.json` holding a sign-in that others can read is set back to 600 at start-up);
+`POST /api/signout` takes it out again and keeps the other settings. The update install and rollback
+(engine/bootstrap.py) never write to the data folder's `config.json`. The `workerKey` setting of versions before 1.30.0
+is no longer read.
+
+## Updates
+
+`state.update` is what engine/updater.py reports (README.md, "Updates", tells users the same):
+
+- `auto`: the "Update automatically" setting (`autoUpdate` in `config.json` in the data folder, on unless it is
+  `false`). While it is on, Save Garage checks `https://api.github.com/repos/NotHGM/save-garage/releases/latest` at
+  start-up and every 6 hours; while it is off, only `POST /api/update/check` does, and nothing is downloaded or
+  installed.
+- `mode`: `install` for a release build the updater may update, `notify` for anything else, which only shows that a
+  new version is out; then `why` says why: `checkout` (a `.git` in the app's folder or one above it), `not_desktop`
+  (not started by the build's launcher), `read_only` (a folder it can't write to) or `unknown` (another layout, or a
+  `build.json` that doesn't match the running version). `flavour` is `windows`, `macos` or `linux` from `build.json`.
+- `status`: `idle` (no check yet), `checking`, `current` (up to date), `downloading` (`progress` bytes of `total`),
+  `ready` (staged: installs at the next start or with `/api/update/restart`), `available` (a newer version that this
+  copy doesn't install: notify mode, automatic updates off, or a version needing a new Python runtime, `error`
+  `runtime`, not downloaded again), `failed` (`error` says why) or `check_failed` (GitHub couldn't be read; `error`
+  `check_failed`).
+- `current` is this version, `latest` the newest one found. `notes` is the GitHub release page of `latest` (or of this
+  version), for the release notes and the downloads. `installed` is set in the first run of a version the updater
+  just installed. `canRestart` is true while an update is staged and no task runs; `restarting` once it restarts.
+
+A newer version is installed only when `SHA256SUMS.txt.sig` is a valid Ed25519 signature of `SHA256SUMS.txt` by the
+release key pinned in engine/updater.py, the build's file matches its SHA-256 there, every name in the list carries
+that version, and the archive passes the unpacking checks. Otherwise `status` is `failed` with `error`: `unsigned`
+(no signature or no list), `bad_signature`, `bad_version` (a list for another version, or a malformed one),
+`no_asset` (no file for this build), `bad_checksum`, `too_large` (over 100 MB, or unpacking to more than 400 MB),
+`bad_archive` (a link, device, absolute path, `..` or a file outside its `SaveGarage` folder), `bad_package` (not
+this build, or files missing), `network` (the download didn't finish), `disk`, `install_failed` (cut short twice),
+`start_failed` (the new version didn't answer `/api/state` within 90 s, or stopped before it did, so the old version
+was put back) or `internal`. A version that didn't start or couldn't be installed (`start_failed`, `install_failed`)
+is not tried again; the other failures are retried at the next check.

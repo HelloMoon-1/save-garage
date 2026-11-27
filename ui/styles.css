@@ -1,3 +1,4 @@
+/* Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE. */
 /* Save Garage. Leonida at dusk: deep plum surfaces, one flamingo accent for actions, cash green only for money,
    and road-sign shapes for risk. Display type is Anton (SIL OFL, bundled in fonts/). */
 @font-face {
@@ -154,6 +155,14 @@ p { margin: 0; }
 .power svg { width: 44px; height: 44px; }
 .power svg path, .power svg line { stroke: var(--edit); stroke-width: 4; fill: none; stroke-linecap: round; }
 .power strong { display: block; font: 400 24px var(--display); color: #ffd395; letter-spacing: .01em; }
+/* ---------- GarlicSaves sign-in: the code to enter on GarlicSaves (codes and addresses read left to right) ---------- */
+.signin-code { display: grid; gap: 12px; justify-items: start; }
+.signin-code .lbl { color: var(--text-2); font-size: 14px; }
+.signin-code .code { font: 600 clamp(30px, 6vw, 44px)/1.1 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; letter-spacing: .12em; color: #ffd36b; user-select: all; direction: ltr; unicode-bidi: isolate; }
+.signin-code .addr { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; color: var(--text); overflow-wrap: anywhere; direction: ltr; unicode-bidi: isolate; }
+.signin-code a.btn { text-decoration: none; }
+.callout.signin-first { align-items: center; }
+.callout.signin-first .btn { flex: none; margin-inline-start: auto; }
 details.log { margin-top: 10px; }
 details.log summary { cursor: pointer; color: var(--text-2); font-size: 14px; }
 details.log pre { max-height: 220px; overflow: auto; background: var(--field); padding: 10px; border-radius: var(--r-input); font-size: 12px; white-space: pre-wrap; color: var(--text-2); }
@@ -193,7 +202,11 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 .field { display: grid; grid-template-columns: minmax(200px, 1.25fr) 2fr; gap: 10px 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
 .field .name { font-weight: 600; }
 .field .help { display: block; color: var(--text-2); font-size: 13px; font-weight: 400; margin-top: 2px; }
+.field .help.warn { color: #ffd395; }
 .field .inputs { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+/* the bank's experimental extra stacks, under its amount */
+.stacks-opt { flex-basis: 100%; max-width: 62ch; }
+.stacks-opt .row { gap: 4px 14px; }
 .cell { display: grid; gap: 4px; }
 .cell label, .cell .lbl { font-size: 12px; color: var(--text-3); }
 .cell .with-unit { display: flex; gap: 8px; align-items: center; }
@@ -276,6 +289,17 @@ details.log pre { max-height: 220px; overflow: auto; background: var(--field); p
 
 .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 18px clamp(16px, 4vw, 44px) 96px; border-top: 1px solid var(--hairline); color: var(--text-3); font-size: 13px; }
 .foot-actions { display: inline-flex; gap: 16px; align-items: center; }
+/* ---------- updates: a row of the footer, under the version ---------- */
+.update { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 18px; }
+.upd-status { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
+.upd-status:empty { display: none; }
+.upd-status .pct { font-variant-numeric: tabular-nums; color: var(--text-3); }
+.upd-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.upd-actions .link { font-size: 13px; }
+.upd-actions .btn.small { min-height: 30px; padding: 3px 12px; font-size: 13px; }
+.upd-actions .toggle { min-height: 0; gap: 7px; font-size: 13px; color: var(--text-2); }
+.upd-actions .toggle input { width: 16px; height: 16px; margin: 0; }
+.link:disabled { opacity: .5; cursor: default; }
 
 @media (max-width: 860px) {
   .field.cheat { grid-template-columns: 1fr; }
@@ -409,3 +433,11 @@ details.more-opts > .callout { margin-bottom: 24px; }
 [dir="rtl"] .weapons li { unicode-bidi: plaintext; }
 [dir="rtl"] .field.cheat .cheat-name[data-no-i18n] { text-align: right; }
 [dir="rtl"] .title-card strong, [dir="rtl"] .comp-summary .big, [dir="rtl"] .raw td small.after { direction: ltr; unicode-bidi: isolate; }
+[dir="rtl"] .upd-status .pct { direction: ltr; unicode-bidi: isolate; }
+.foot .legal { display: inline-block; margin-top: 6px; font-size: 0.92em; }
+.foot .legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+.upstream-credit { max-width: 60rem; margin: 1rem auto; padding: .85rem 1.25rem; border-inline-start: 3px solid var(--edit); }
+.upstream-credit[hidden] { display: none; }
+.upstream-credit p { margin: .35rem 0 .6rem; }
+.upstream-credit .link { margin-inline-start: .8rem; }

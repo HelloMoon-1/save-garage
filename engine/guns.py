@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Add the guns a character doesn't have yet, built the way the game writes a gun it gives you (Save Garage feature
 module, shown on the Ammo tab).
 

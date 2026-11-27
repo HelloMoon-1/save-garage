@@ -73,7 +73,7 @@ class ServiceQueueTests(unittest.TestCase):
         self.assertEqual(self.rows(), [])
 
     def test_submission_only_reports_an_explicit_service_status(self):
-        client = garlic.Garlic(server='http://localhost', key='test', proxy='')
+        client = garlic.Garlic(server='http://localhost', key='a' * 64, proxy='')
         responses = [{'job_id': 'one'}, {'job_id': 'two', 'status': 'queued'}]
         observed = []
         with patch.object(client, '_json', side_effect=responses):
@@ -85,7 +85,7 @@ class ServiceQueueTests(unittest.TestCase):
 
 class SaveJobWaitTests(unittest.TestCase):
     def setUp(self):
-        self.client = garlic.Garlic(server='http://localhost', key='test', proxy='')
+        self.client = garlic.Garlic(server='http://localhost', key='a' * 64, proxy='')
         self.elapsed = 0.0
         stack = ExitStack()
         self.addCleanup(stack.close)

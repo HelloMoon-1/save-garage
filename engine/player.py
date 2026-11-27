@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Lucia's and Jason's attributes, criminal profile and relationship, and a vest for a character who wears no armour
 (Save Garage feature module, shown on the World tab).
 

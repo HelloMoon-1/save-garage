@@ -1,4 +1,4 @@
-# Save Garage 简体中文指南
+# MoonSlot 简体中文指南
 
 [English](README.md) · [下载最新版](../../releases/latest) · [GPL-3.0 许可证](LICENSE)
 
@@ -6,7 +6,7 @@
 
 Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的“数据传输”功能将存档下载到电脑，在浏览器中编辑，再传回主机。浏览器使用简体中文时会自动显示中文，也可以在编辑器右上方手动切换语言。
 
-本版同步原作者的 `1.29.1`，支持游戏编号 `PPSA01547`、`PPSA38500` 和 `PPSA29660`。[查看 1.29.1 中文更新日志](docs/releases/v1.29.1.md)
+本版同步原作者的 `1.30.1`，支持游戏编号 `PPSA01547`、`PPSA38500` 和 `PPSA29660`。[查看 1.30.1 中文更新日志](docs/releases/v1.30.1.md)
 
 ## 可以修改什么
 
@@ -24,13 +24,18 @@ Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的�
 
 发行包请解压到可写目录。每次下载会在启动器旁的 `saves/consoles/<主机编号>/sessions/<下载时间>/` 生成一个目录，`orig` 存放原始备份，`dec` 存放解密后的槽位。
 
+Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)
+
 ## 使用步骤
+
+首次使用时点击「登录 GarlicSaves」，在官网登录自己的账号，核对页面显示的设备码后批准 MoonSlot，再回到编辑器。可以在账号菜单退出或切换账号。官网队列详情所需的浏览器会话与设备授权分别管理。
+
 
 点击「下载存档」后，多个剧情槽位会分批解密。同一批共享一个服务器排位，最多 64 个槽位、通常不超过 64 MiB。返回结果会按槽位核对。保存修改仍按当前选中的槽位加密。编辑页的「存档时间」来自游戏写入的时间戳，按电脑时区显示，精确到秒。
 
 排队时可以点「在 GarlicSaves 官网查看排位」。请先在同一浏览器登录官网，再点这个链接。官网的 `position` 是当前任务的排位，`total` 是全站排队任务数。若要在编辑器内自动显示数字，可将仅含 GarlicSaves 登录会话的 Netscape 格式 Cookie 文件保存在本机，在启动前将环境变量 `GARLIC_QUEUE_COOKIE_FILE` 设为该文件的完整路径。Windows PowerShell 示例为 `$env:GARLIC_QUEUE_COOKIE_FILE = 'C:\Private\garlicsaves-cookies.txt'`，然后在同一窗口运行启动脚本。请将该文件保存在私人目录。编辑器约每 15 秒向官网查询一次；未登录或数字不可用时会显示提示。
 
-1. 在与 PS5 连接同一家庭网络的电脑上启动 Save Garage。编辑器默认打开在 `http://127.0.0.1:7283`，使用期间请保持启动窗口打开。
+1. 在与 PS5 连接同一家庭网络的电脑上启动 MoonSlot。编辑器默认打开在 `http://127.0.0.1:7283`，使用期间请保持启动窗口打开。
 2. 点“查找我的 PS5”，或手动输入主机的 IP 地址。
 3. 每台主机首次使用时点击“开始配对”。在 PS5 打开“设置 → 系统 → 系统软件 → 数据传输”，选择 **Save Garage Pairing**。出现无法传输的提示后，可返回编辑器查看配对状态。
 4. 在游戏中保存进度，返回 PS5 主界面。点击“下载存档”，根据提示按一次 PS5 电源键，听到提示音后松开。主机会为传输重启。
@@ -41,8 +46,8 @@ Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的�
 
 ## 启动与常见问题
 
-- Windows 版解压后运行 `Start Save Garage.bat`。如系统防火墙询问，允许它通过家庭网络所用的专用网络。
-- macOS 版解压后运行 `Start Save Garage.command`。Linux 版解压后运行 `./SaveGarage --open`。从源码启动需要 Python 3.10 或更高版本和 curl，详见[英文启动说明](README.md#run-from-source)。
+- Windows 版解压后运行 `Start MoonSlot.bat`。如系统防火墙询问，允许它通过家庭网络所用的专用网络。
+- macOS 版解压后运行 `Start MoonSlot.command`。Linux 版解压后运行 `./MoonSlot --open`。从源码启动需要 Python 3.10 或更高版本和 curl，详见[英文启动说明](README.md#run-from-source)。
 - 找不到主机时，确认电脑和 PS5 在同一网络，使用的端口为 TCP 1004–1005 和 UDP 1006。Linux 低端口权限见[原项目 Linux 说明](README.md#linux-notes)。
 - 金钱余额为 0 或角色尚未持有某弹种时，存档通常没有对应的可编辑条目。可以在游戏中取得少量对应物品后重新保存并下载。
 - 加解密依赖 [GarlicSaves](https://garlicsaves.com)。该服务会接收处理存档所需的数据，其中包含存档关联的 PSN 账号 ID。本地备份路径可查阅[英文隐私与备份说明](README.md#what-leaves-your-computer)。

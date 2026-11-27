@@ -1,3 +1,4 @@
+// Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 'use strict';
 // Save Garage: redesigned UI for the local save editor service (same /api as the original UI, plus /api/slot and /api/stats).
 (() => {
@@ -9,7 +10,7 @@
   const nf2 = new Intl.NumberFormat('en-US', {maximumFractionDigits: 2});
   const main = $('#main'), routeEl = $('#route'), statusEl = $('#status'), pendingEl = $('#pending'), toastEl = $('#toast');
 
-  const STEPS = [['connect', 'Connect'], ['pair', 'Pair'], ['download', 'Download'], ['edit', 'Edit'], ['send', 'Send back']];
+  const STEPS = [['connect', 'Connect'], ['signin', 'Sign in'], ['pair', 'Pair'], ['download', 'Download'], ['edit', 'Edit'], ['send', 'Send back']];
   const OWNER = {0: 'Total', 1: 'Lucia', 2: 'Jason'};
   const MONEY_GROUP = '$0x97232209';
   const PS5_TRANSFER = 'Settings, then System, then System Software, then Data Transfer';
@@ -32,8 +33,8 @@
     patching: 'Applying your edits', encrypting: 'Encrypting the edited save', importing: 'Getting the save ready to send',
     ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
-  // GarlicSaves limits the jobs it takes from the one key every copy of Save Garage shares: in a download's key requests
-  // (key_rate_limited) or in decrypting and encrypting a save (garlic_rate_limited)
+  // GarlicSaves limits the jobs it takes from each sign-in's key: in a download's key requests (key_rate_limited) or in
+  // decrypting and encrypting a save (garlic_rate_limited)
   const RATE_LIMITED = 'GarlicSaves is getting too many requests right now, so it is briefly limiting them. Wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.';
   const ERR = {
     range_score_order: 'Best score must be at least the latest score.',
@@ -42,9 +43,11 @@
     power_timeout: 'The power-button wait timed out. Go back to the PS5 home screen and try again.',
     key_timeout: 'GarlicSaves’ key service didn’t answer in time. Its worker consoles are busy, so wait a minute and try again. Nothing is wrong with your PS5 or Save Garage.',
     key_rate_limited: RATE_LIMITED,
-    key_disabled: 'GarlicSaves isn’t accepting key requests from Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.',
+    // GarlicSaves turned down the key of this computer's sign-in (HTTP 401, or 403 from its API): the job box offers Sign in again
+    key_disabled: 'GarlicSaves refused your sign-in for key requests. It may have been turned off, or it may have expired. Sign in again, then try once more.',
     garlic_rate_limited: RATE_LIMITED,
-    garlic_key_disabled: 'GarlicSaves isn’t decrypting or encrypting saves for Save Garage’s shared key at the moment. All you can do is update Save Garage or wait and try again later.',
+    garlic_key_disabled: 'GarlicSaves refused your sign-in for decrypting and encrypting saves. It may have been turned off, or it may have expired. Sign in again, then try once more.',
+    not_signed_in: 'Sign in to GarlicSaves first. Save Garage needs your sign-in to pair, download, save edits and send saves back.',
     console_timeout: 'The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.',
     console_rejected: 'The PS5 refused the request. Sign in with the account you paired with, or pair again.',
     no_gta_save: 'No GTA VI save was found on the PS5. Save once in the game, then try again.',
@@ -84,13 +87,39 @@
     no_session: 'No save downloaded yet.',
     nothing_to_upload: 'There are no saved edits to send.',
     console_not_found: 'No PS5 answered at that address. Check the IP address and that the PS5 is on.',
+    no_update: 'There’s no update ready to install.',
     request_failed: 'Save Garage didn’t answer. Check that it is still running.'};
+  // why an update was refused or rolled back (state.update.error), after "Update failed:"
+  const UPD_WHY = {
+    network: 'the download didn’t finish', unsigned: 'the release isn’t signed', bad_signature: 'the release signature isn’t valid',
+    bad_version: 'the release files carry the wrong version', no_asset: 'the release has no download for this computer',
+    bad_checksum: 'the download doesn’t match its signed checksum', too_large: 'the download is larger than allowed',
+    bad_archive: 'the download holds unsafe files', bad_package: 'the download isn’t a Save Garage build for this computer',
+    disk: 'the update couldn’t be saved on this computer', install_failed: 'the new version couldn’t be put in place',
+    start_failed: 'the new version didn’t start', internal: 'something went wrong'};
+  const RELEASES = 'https://github.com/HelloMoon-1/save-garage/releases';
+  // why a GarlicSaves sign-in stopped (state.garlic.signin.error; {0} is the HTTP status of GarlicSaves' answer)
+  const SIGNIN_ERR = {
+    unreachable: ERR.garlic_unreachable, rate_limited: RATE_LIMITED,
+    expired: 'The code expired before the sign-in was approved. Start again for a new code.',
+    refused: 'GarlicSaves refused the sign-in. If you didn’t mean to turn it down, start again.',
+    unavailable: 'GarlicSaves couldn’t handle the sign-in just now (HTTP {0}). Try again in a few minutes.',
+    bad_answer: 'GarlicSaves sent an answer Save Garage doesn’t understand (HTTP {0}). Try again later. If it keeps happening, Save Garage may need an update.',
+    bad_link: 'GarlicSaves sent a sign-in link that isn’t a web address, so Save Garage won’t open it. Try again later. If it keeps happening, Save Garage may need an update.',
+    not_saved: 'Save Garage couldn’t save the sign-in in its data folder. Check that the folder can be written to, then sign in again.',
+    internal: 'Something went wrong while signing in. Try again.'};
+  const signinError = s => (SIGNIN_ERR[s.error] || SIGNIN_ERR.internal).replace('{0}', Number.isInteger(s.http) ? s.http : '?');
+  // the step to come back to after signing in, for a job that needs the sign-in
+  const SIGNIN_BACK = {pair: 'pair', download: 'download', patch: 'edit', upload: 'send', restore: 'send'};
+  // a sign-in link GarlicSaves gave (the server only passes on http and https addresses; checked again here)
+  const webLink = v => typeof v === 'string' && /^https?:\/\/[!-~]+$/i.test(v) ? v : null;
 
   const S = {
     state: null, failures: 0, offline: false, manualView: null, consoles: null, searching: false, mainKey: '',
     slot: null, tab: 'money', known: {}, detail: {}, stats: {}, comp: {}, world: {}, sd: {}, stuntSel: {}, stuntKeys: {}, drafts: {}, sig: '', deleted: false, reviewOpen: false,
     preview: {}, compExp: {}, keep: {},
-    find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null};
+    find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null,
+    restarting: null, updAuto: null, signinFor: null, lastSignin: null};
 
   // ------------------------------------------------------------ api
   async function api(path, body) {
@@ -133,6 +162,11 @@
   const running = () => S.state?.job?.status === 'running';
   const label = s => s.file === 'sdimg_sce_sdmemory' ? 'Autosave' : 'Manual save';
   const missionName = s => String(s.subtitle || s.file).replace(/^\(Autosave\)\s*/, '');
+  // the steps: a Save Garage from before 1.30.0 has no GarlicSaves sign-in (no state.garlic), so no Sign in step either
+  const stepsOf = st => st?.garlic ? STEPS : STEPS.filter(([id]) => id !== 'signin');
+  const stepNo = (id, st) => stepsOf(st).findIndex(([x]) => x === id) + 1;
+  // pairing, downloads, saving edits and sending go through GarlicSaves: without a sign-in the page asks for one first
+  const mustSignIn = st => !!(st?.garlic && !st.garlic.signedIn);
 
   function viewFor(st) {
     const job = st.job || {};
@@ -140,6 +174,7 @@
     const ok = id => available(id, st);
     if (S.manualView && ok(S.manualView)) return S.manualView;
     if (!st.console) return 'connect';
+    if (mustSignIn(st)) return 'signin';
     if (!st.paired) return 'pair';
     if (!st.hasSession) return 'download';
     if (job.kind === 'upload' && job.stage === 'uploaded') return 'send';
@@ -147,10 +182,16 @@
   }
 
   function available(id, st) {
-    return {connect: true, pair: !!st.console, download: !!(st.console && st.paired), edit: !!st.hasSession, send: !!st.hasSession}[id];
+    return {connect: true, signin: !!st.garlic, pair: !!st.console, download: !!(st.console && st.paired), edit: !!st.hasSession, send: !!st.hasSession}[id];
   }
 
   function onState(st) {
+    if (S.restarting && (S.restarting.down || st.version !== S.restarting.from) && !st.update?.restarting) {
+      const host = S.restarting.host;           // Save Garage is back after Restart now: check the service, pick the PS5 again
+      S.restarting = null;
+      api('/api/network', {}).catch(() => {});
+      if (host && !st.console) api('/api/console', {host}).then(s => { S.manualView = null; onState(s); }).catch(() => {});
+    }
     const prevJob = S.lastJob;
     const job = st.job || {};
     const jobKey = job.id + ':' + job.status;
@@ -164,13 +205,33 @@
     if (prevJob && prevJob !== jobKey && job.status === 'done') jobDone(job);
     if (prevJob && prevJob !== jobKey && job.status === 'error') S.localError = null;
     S.lastJob = jobKey;
+    const signin = st.garlic?.signin?.status;
+    if (S.lastSignin && S.lastSignin !== 'done' && signin === 'done') signedIn();
+    S.lastSignin = signin || null;
     for (const s of st.slots || []) seedDraft(s);
     renderStatus();
     renderFoot();
     renderRoute();
     renderMain();
+    renderSigninLeft();
     renderJob();
     renderPending();
+  }
+
+  // a sign-in just went through: say so, then go back to what needed it (or on to the next step)
+  function signedIn() {
+    passed('Signed in', 'GarlicSaves approved Save Garage on this computer.');
+    S.manualView = S.signinFor || null;
+    S.signinFor = null; S.localError = null; S.mainKey = '';
+  }
+
+  // show the sign-in step; back: the step that needed the sign-in, to return to once signed in; start: begin at once
+  function goSignIn(back, start) {
+    S.localError = null; S.signinFor = back || S.signinFor || null; S.manualView = 'signin'; S.mainKey = '';
+    renderRoute(); renderMain(); renderSigninLeft(); renderJob(); renderPending(); main.focus();
+    if (start) {
+      act('/api/signin', {}, g => { if (S.state) S.state.garlic = g; S.mainKey = ''; renderStatus(); renderMain(); renderSigninLeft(); });
+    }
   }
 
   function jobDone(job) {
@@ -191,6 +252,10 @@
       S.failures = 0; S.offline = false;
       onState(st);
     } catch {
+      if (S.restarting) {
+        S.restarting.down = true;
+        if (Date.now() - S.restarting.at > 180000) S.restarting = null;
+      }
       if (++S.failures >= 3) { S.offline = true; renderStatus(); }
     } finally {
       setTimeout(poll, 1000);
@@ -202,6 +267,36 @@
     const st = S.state || {};
     $('#version').textContent = st.version ? 'Version ' + st.version : '';
     $('#quit').hidden = !st.canQuit;
+    renderUpdate();
+  }
+
+  // the update row of the footer: what the updater is doing (state.update, see docs/API.md) and its controls
+  function renderUpdate() {
+    const box = $('#update'), u = S.state?.update;
+    if (!u) { box.hidden = true; return; }       // a Save Garage from before 1.30.0
+    const link = typeof u.notes === 'string' && u.notes.startsWith(RELEASES + '/') ? u.notes : RELEASES;
+    const pct = u.status === 'downloading' && u.total > 0 && u.progress >= 0 ? Math.min(100, Math.floor(100 * u.progress / u.total)) : null;
+    const [dot, text] = S.restarting || u.restarting ? ['wait', 'Restarting Save Garage…']
+      : u.status === 'checking' ? ['wait', 'Checking for updates…']
+      : u.status === 'downloading' ? ['wait', `Downloading Save Garage ${u.latest}`]
+      : u.status === 'ready' ? ['ok', `${u.latest} will install next time you start Save Garage.`]
+      : u.status === 'failed' ? ['bad', `Update failed: ${UPD_WHY[u.error] || UPD_WHY.internal}, Save Garage stays on ${u.current}.`]
+      : u.status === 'available' ? ['wait', `A new version is out: ${u.latest}.`]
+      : u.status === 'check_failed' ? ['bad', 'Couldn’t reach GitHub to check for updates.']
+      : u.installed ? ['ok', `Save Garage was updated to ${u.installed}.`]
+      : u.status === 'current' ? ['ok', 'Up to date'] : ['', ''];
+    const status = text ? `<span class="dot ${dot}"></span><span>${esc(text)}</span>${pct != null ? `<span class="pct" data-no-i18n>${pct}%</span>` : ''}` : '';
+    const auto = S.updAuto ?? u.auto, busy = running(), restarting = !!(S.restarting || u.restarting);
+    const actions = [
+      u.status === 'ready' && !restarting ? `<button class="btn small primary" type="button" data-act="update-restart" ${u.canRestart && !busy ? '' : 'disabled'}${busy ? ` title="${esc(ERR.busy)}"` : ''}>Restart now</button>` : '',
+      u.status === 'available' ? `<a class="link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Download it</a>`
+        : `<a class="link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Release notes</a>`,
+      `<button class="link" type="button" data-act="update-check" ${['checking', 'downloading'].includes(u.status) || restarting ? 'disabled' : ''}>Check for updates</button>`,
+      `<label class="toggle"><input type="checkbox" data-act="update-auto" ${auto ? 'checked' : ''}> Update automatically</label>`].join('');
+    const sEl = $('#update-status'), aEl = $('#update-actions');
+    if (sEl.dataset.html !== status) { sEl.innerHTML = status; sEl.dataset.html = status; }
+    if (aEl.dataset.html !== actions) { aEl.innerHTML = actions; aEl.dataset.html = actions; }
+    box.hidden = false;
   }
 
   function passed(big, small) {
@@ -216,20 +311,26 @@
     const st = S.state || {};
     const c = st.console;
     const net = st.network;
-    statusEl.innerHTML = [
-      S.offline ? '<span class="pill"><span class="dot bad"></span><b>Editor service not answering</b></span>' : '',
+    const g = st.garlic;
+    const sign = !g ? null : !g.signedIn ? ['wait', 'Not signed in to GarlicSaves'] : g.refused ? ['bad', 'GarlicSaves sign-in refused'] : ['ok', 'Signed in to GarlicSaves'];
+    const html = [
+      S.offline && !S.restarting ? '<span class="pill"><span class="dot bad"></span><b>Editor service not answering</b></span>' : '',
       c ? `<span class="pill"><span class="dot ${st.paired ? 'ok' : 'wait'}"></span><b>${esc(c.name)}</b>${st.paired ? 'paired' : 'not paired'}</span>` : '<span class="pill"><span class="dot"></span>No PS5 selected</span>',
-      `<span class="pill"><span class="dot ${net ? (net.ok ? 'ok' : 'bad') : 'wait'}"></span>${net ? (net.ok ? 'Decryption service online' : 'Decryption service offline') : 'Checking the decryption service'}</span>`
+      `<span class="pill"><span class="dot ${net ? (net.ok ? 'ok' : 'bad') : 'wait'}"></span>${net ? (net.ok ? 'Decryption service online' : 'Decryption service offline') : 'Checking the decryption service'}</span>`,
+      sign ? `<span class="pill"><span class="dot ${sign[0]}"></span>${sign[1]}</span>` : ''
     ].join('');
+    if (statusEl.dataset.html !== html) { statusEl.innerHTML = html; statusEl.dataset.html = html; }   // a live region: only real changes
   }
 
   function renderRoute() {
     const st = S.state;
     if (!st) return;
     const view = viewFor(st);
-    const idx = STEPS.findIndex(x => x[0] === view);
-    routeEl.innerHTML = STEPS.map(([id, name], i) => {
-      const done = i < idx || (id === 'pair' && st.paired) || (id === 'connect' && st.console) || (id === 'download' && st.hasSession);
+    const steps = stepsOf(st);
+    const idx = steps.findIndex(x => x[0] === view);
+    routeEl.innerHTML = steps.map(([id, name], i) => {
+      const done = id === 'signin' ? !!(st.garlic?.signedIn && !st.garlic.refused)
+        : i < idx || (id === 'pair' && st.paired) || (id === 'connect' && st.console) || (id === 'download' && st.hasSession);
       return `<button class="step ${id === view ? 'current' : done ? 'done' : ''}" data-act="go" data-view="${id}" ${available(id, st) && !running() ? '' : 'disabled'} aria-current="${id === view ? 'step' : 'false'}"><span class="n">${i + 1}</span>${name}</button>`;
     }).join('');
   }
@@ -243,13 +344,22 @@
     const key = [view, st.console?.host, st.paired, st.hasSession, S.sig, st.readyToUpload, st.resumeDownload, running(),
       view === 'edit' ? [S.slot, S.tab, S.detail[S.slot] ? 1 : 0, S.stats[S.slot] ? 1 : 0, s?.modified, JSON.stringify(s?.applied || null)].join(',') : '',
       view === 'connect' ? [S.searching, JSON.stringify(S.consoles)].join(',') : '',
-      view === 'send' ? [job.kind === 'upload' && job.stage === 'uploaded', (st.slots || []).map(x => x.modified).join('')].join(',') : ''].join('|');
+      view === 'send' ? [job.kind === 'upload' && job.stage === 'uploaded', (st.slots || []).map(x => x.modified).join('')].join(',') : '',
+      ['signin', 'pair', 'download'].includes(view) ? signinKey(st) : ''].join('|');
     if (key === S.mainKey) return;
+    const codeShown = !!main.querySelector('[data-signin-code]');
     S.mainKey = key;
     const scroll = window.scrollY;
-    main.innerHTML = ({connect: viewConnect, pair: viewPair, download: viewDownload, edit: viewEdit, send: viewSend})[view]();
+    main.innerHTML = ({connect: viewConnect, signin: viewSignin, pair: viewPair, download: viewDownload, edit: viewEdit, send: viewSend})[view]();
     if (view === 'edit') { afterEdit(); window.scrollTo(0, scroll); }
+    if (!codeShown && main.querySelector('[data-signin-code]')) main.querySelector('[data-signin-open]')?.focus();   // the code came: next, open GarlicSaves
   }
+
+  // what the sign-in step (and the callouts on Pair and Download) show; the countdown is renderSigninLeft's
+  const signinKey = st => {
+    const g = st.garlic || {}, s = g.signin || {};
+    return [g.signedIn, g.username, g.stored, g.devKey, g.refused, s.status, s.code, s.link, s.error, s.http, S.signinFor, st.console?.host, st.paired, st.hasSession].join(',');
+  };
 
   const jobBox = kinds => `<div data-job="${kinds}"></div>`;
 
@@ -287,11 +397,74 @@
 
   const fw = f => /^[0-9a-f]{8}$/i.test(f || '') ? `${Number(f.slice(0, 2))}.${f.slice(2, 4)}` : (f || 'unknown');
 
+  // ---- signing in to GarlicSaves (state.garlic): the code to enter on GarlicSaves, the wait, the result
+  function viewSignin() {
+    const st = S.state, g = st.garlic || {}, s = g.signin || {};
+    const chip = `<span class="chip">Step ${stepNo('signin', st)}</span>`;
+    const busy = s.status === 'starting' || s.status === 'waiting';
+    const err = s.status === 'error' ? `<div class="callout danger" role="alert">${esc(signinError(s))}</div>` : '';
+    if (g.signedIn && !busy) {
+      return `
+      <section class="title-card">${chip}<h1>Signed in to GarlicSaves</h1>
+        ${g.username ? `<p>GarlicSaves account: <strong data-no-i18n>${esc(g.username)}</strong></p>` : ''}
+        <p>Save Garage needs your sign-in to pair, download, save edits and send saves back.</p></section>
+      <div class="stack">
+        ${g.refused ? '<div class="callout danger" role="alert">GarlicSaves refused this sign-in. It may have been turned off, or it may have expired. Sign in again to go on.</div>' : ''}
+        ${err}
+        <div class="row">${g.refused ? '<button class="btn primary" data-act="signin">Sign in again</button>' : '<button class="btn primary" data-act="signin-done">Continue</button>'}
+          ${g.stored ? `<button class="btn" data-act="signout" ${running() ? 'disabled' : ''}>Sign out</button>` : ''}</div>
+        ${g.stored ? '<p class="note">Signing out only forgets the key on this computer.</p>' : ''}
+        ${jobBox('signin')}
+      </div>`;
+    }
+    const link = webLink(s.link);
+    const waiting = s.status === 'waiting' && s.code ? `
+        <div class="panel signin-code" data-signin-code>
+          <div class="lbl">Enter this code on GarlicSaves</div>
+          <div class="code" data-no-i18n>${esc(s.code)}</div>
+          ${link ? `<a class="btn primary" data-signin-open href="${esc(link)}" target="_blank" rel="noopener noreferrer">Open GarlicSaves</a>
+          <p class="note">To use another device, open this address there: <span class="addr" data-no-i18n>${esc(link)}</span></p>` : ''}
+        </div>` : '';
+    return `
+      <section class="title-card">${chip}<h1>Sign in to GarlicSaves</h1>
+        <p>Save Garage decrypts and encrypts saves through GarlicSaves, which now asks each app that uses it to sign in with your own GarlicSaves account. You do this once on this computer.</p></section>
+      <div class="stack">
+        ${S.signinFor && !busy ? `<div class="callout">${esc(ERR.not_signed_in)}</div>` : ''}
+        ${err}
+        ${busy ? `${waiting}
+        <div class="job" role="status"><div class="stage">${s.status === 'waiting' ? 'Waiting for you to approve the sign-in on GarlicSaves' : 'Asking GarlicSaves for a sign-in code…'}</div>
+          ${s.status === 'waiting' ? '<div class="detail" data-signin-left></div>' : ''}
+          <div class="bar"><span></span></div>
+          <div class="row" style="margin-top:10px"><button class="link" data-act="signin-cancel">Cancel</button></div></div>` : `
+        <ol class="how">
+          <li><strong>Click Sign in to GarlicSaves below.</strong><span class="path">Save Garage asks GarlicSaves for a code.</span></li>
+          <li><strong>Open the GarlicSaves page, sign in and enter the code.</strong><span class="path">You can open it on this computer or on your phone.</span></li>
+          <li><strong>Come back here.</strong><span class="path">Save Garage carries on by itself once you have approved the sign-in.</span></li>
+        </ol>
+        <div class="row"><button class="btn primary" data-act="signin">Sign in to GarlicSaves</button></div>`}
+        <p class="note">GarlicSaves gives Save Garage on this computer a key of its own. Save Garage keeps it in its data folder, readable only by you, and sends it only to GarlicSaves. It never appears on this page.</p>
+        ${jobBox('signin')}
+      </div>`;
+  }
+
+  // the minutes left to enter the code, updated in place (the page polls every second)
+  function renderSigninLeft() {
+    const el = $('[data-signin-left]'), s = S.state?.garlic?.signin;
+    if (!el || !s) return;
+    const t = s.expiresIn != null ? `The code expires in ${Math.max(1, Math.ceil(s.expiresIn / 60))} min.` : '';
+    if (el.dataset.en !== t) { el.textContent = t; el.dataset.en = t; }
+  }
+
+  // on a step whose task goes through GarlicSaves, while not signed in: why, and the way to sign in
+  const signinFirst = back => mustSignIn(S.state)
+    ? `<div class="callout signin-first"><span>${esc(ERR.not_signed_in)}</span><button class="btn small primary" data-act="signin" data-back="${back}">Sign in to GarlicSaves</button></div>` : '';
+
   function viewPair() {
     return `
-      <section class="title-card"><span class="chip">Step 2</span><h1>Pair your PS5</h1>
+      <section class="title-card"><span class="chip">Step ${stepNo('pair', S.state)}</span><h1>Pair your PS5</h1>
         <p>You only do this once for each PS5. Pairing waits up to 5 minutes for you.</p></section>
       <div class="stack">
+        ${signinFirst('pair')}
         <ol class="how">
           <li><strong>Click Start pairing below.</strong></li>
           <li><strong>On the PS5, open Data Transfer.</strong><span class="path">${PS5_TRANSFER}.</span></li>
@@ -305,9 +478,10 @@
   function viewDownload() {
     const again = S.state.hasSession;
     return `
-      <section class="title-card"><span class="chip">Step 3</span><h1>Download your save</h1>
+      <section class="title-card"><span class="chip">Step ${stepNo('download', S.state)}</span><h1>Download your save</h1>
         <p>The PS5 restarts into transfer mode during the download and restarts again when it’s done.</p></section>
       <div class="stack">
+        ${signinFirst('download')}
         ${again ? '<div class="callout">You already have a save downloaded. Downloading again replaces it here, and edits you haven’t sent are lost.</div>' : ''}
         <ol class="how">
           <li><strong>In GTA VI, save your game, then go back to the PS5 home screen.</strong></li>
@@ -400,25 +574,31 @@
 
   const riskTag = r => ({tested: '<span class="risk tested">Tested on PS5</span>', caution: '<span class="risk caution">Not tested yet</span>',
                          danger: '<span class="risk danger">Can break your save</span>', untested: '<span class="risk caution">Not tested on a PS5 yet</span>',
-                         experimental: '<span class="risk caution">Experimental, not tested on a PS5 yet</span>'})[r] || '';
+                         experimental: '<span class="risk caution">Experimental, not tested on a PS5 yet</span>',
+                         stacks: '<span class="risk caution">May not be spendable</span>'})[r] || '';
 
   // ---- drafts: what the user wants each save to look like, always relative to the original save
   function seedDraft(s) {
     if (S.drafts[s.file]) return;
-    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}};
+    const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}, stacksOn: {}};
     const a = s.applied || {};
     if (a.world) d.world = JSON.parse(JSON.stringify(a.world));
     if (a.completion) d.completion = JSON.parse(JSON.stringify(a.completion));
     if (a.guns) d.guns = JSON.parse(JSON.stringify(a.guns));
     for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
-    for (const c of a.money || []) d.money[`${c.inv}:${c.idx}`] = c;
+    for (const c of a.money || []) {
+      d.money[`${c.inv}:${c.idx}`] = c;
+      if (c.stacks) d.stacksOn[`${c.inv}:${c.idx}`] = true;       // saved with the bank's extra stacks: the box stays ticked
+    }
     for (const c of a.ammo || []) d.ammo[`${c.inv}:${c.idx}`] = c;
     for (const c of a.stats || []) d.stats[`${c.group}:${c.row}`] = c;
     S.drafts[s.file] = d;
   }
 
   const rawKey = (sec, path) => sec + ':' + JSON.stringify(path);
-  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}});
+  const draftOf = file => S.drafts[file] || (S.drafts[file] = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}, stacksOn: {}});
+  // the bank's experimental extra stacks, ticked for this bank field ("inv:idx"); its changes then carry stacks: true
+  const stacksOn = (file, key) => !!draftOf(file).stacksOn?.[key];
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {})), guns: JSON.parse(JSON.stringify(d.guns || {}))});
   const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'cheats'].filter(k => c && c[k]).length;
@@ -474,24 +654,54 @@
   }
 
   // ---- money
+  // The bank goes up to what its own money boxes hold (max), which shops spend from. Past them it can take extra $85,000
+  // stacks (maxStacks), but only when the user ticks the experimental option: a player couldn't spend them (issue #8).
   function panelMoney(s) {
     const items = (s.items || []).filter(x => x.kind !== 'other');
     const name = x => ({bank: 'Bank account', savings: 'Family Savings', cash: 'Cash, ' + (x.inv === 0 ? 'Lucia' : 'Jason')})[x.kind];
+    // a bank already past its own boxes (versions 1.26 to 1.30 put the rest in extra stacks); stuck money has its own fix
+    const over = x => x.kind === 'bank' && !(x.stuck > 0) && x.value > x.max;
     const help = x => ({bank: x.stuck > 0
                           ? `BuckMe shows $${nf.format(x.value)}, but $${nf.format(x.stuck)} of it sits in Family Savings boxes that an older version of Save Garage put under the bank, and the game can’t spend it. Moving it puts as much as fits, up to $${nf.format(x.max)}, in the bank’s own money boxes.`
-                          : x.max > x.boxMax
-                          ? `Up to $${nf.format(x.max)}. The bank’s money boxes hold $${nf.format(x.boxMax)} at this point in the story. Above that, Save Garage adds stacks of up to $${nf.format(85000)} under the bank’s $${nf.format(85000)} box, as the game does when the bank fills up. Each stack takes an inventory slot, and ${nf.format(300)} slots are always left free. Stacks aren’t tested on a PS5 yet.`
-                          : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops only spend money from these boxes, so the editor doesn’t go past them. The limit grows as the story goes on.`,
+                          : over(x)
+                          ? `$${nf.format(x.value - x.max)} of the $${nf.format(x.value)} in the bank sits in extra stacks the game may not let you spend. Setting the bank to $${nf.format(x.max)} or less keeps everything spendable.`
+                          : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.`,
                         savings: `Up to $${nf.format(x.max)}.`, cash: `Up to $${nf.format(x.max)}, the size of the wallet.`})[x.kind];
+    const stacksOpt = (x, key, on) => `<div class="stacks-opt">
+        <div class="row"><label class="toggle small"><input type="checkbox" data-stacks="${key}" data-max="${x.max}" data-max-stacks="${x.maxStacks}" ${on ? 'checked' : ''}> Allow more than $${nf.format(x.max)} (experimental)</label>${riskTag('stacks')}</div>
+        <span class="help">Up to $${nf.format(x.maxStacks)}. Amounts above $${nf.format(x.max)} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.</span></div>`;
     return `
       <div class="group"><div class="section-head"><h2>Money</h2>${riskTag('tested')}
         <p>Balances of 0 aren’t stored in the save, so they don’t show here. Get a little money in the game, save, and download again to edit them.</p></div>
-      ${items.length ? `<div class="fields">${items.map(x => `
-        <div class="field"><div class="name">${esc(name(x))}<span class="help">${esc(help(x))}</span></div>
-          <div class="inputs">${cell({kind: 'money', key: `${x.inv}:${x.idx}`, label: 'Amount in dollars', value: x.value, display: String(x.value), unit: 'money', type: 'int', max: x.max, wide: true, money: true,
-            attrs: `data-inv="${x.inv}" data-idx="${x.idx}" data-label="${esc(name(x))}"`, extra: `<button class="btn small" data-act="fill" data-to="${x.max}">Max</button>`
-              + (x.stuck > 0 ? ` <button class="btn small primary" data-act="unstick" data-inv="${x.inv}" data-idx="${x.idx}" data-value="${x.value}" data-to="${Math.min(x.value, x.max)}">Make it spendable</button>` : '')})}</div></div>`).join('')}</div>`
+      ${items.length ? `<div class="fields">${items.map(x => {
+        const key = `${x.inv}:${x.idx}`, exp = x.kind === 'bank' && x.maxStacks > x.max, on = exp && stacksOn(s.file, key), lim = on ? x.maxStacks : x.max;
+        return `
+        <div class="field"><div class="name">${esc(name(x))}<span class="help${over(x) ? ' warn' : ''}">${esc(help(x))}</span></div>
+          <div class="inputs">${cell({kind: 'money', key, label: 'Amount in dollars', value: x.value, display: String(x.value), unit: 'money', type: 'int', max: lim, wide: true, money: true,
+            attrs: `data-inv="${x.inv}" data-idx="${x.idx}" data-label="${esc(name(x))}"`, extra: `<button class="btn small" data-act="fill" data-to="${lim}">Max</button>`
+              + (x.stuck > 0 ? ` <button class="btn small primary" data-act="unstick" data-inv="${x.inv}" data-idx="${x.idx}" data-value="${x.value}" data-to="${Math.min(x.value, x.max)}">Make it spendable</button>` : '')
+              + (over(x) ? ` <button class="btn small primary" data-act="unstack" data-to="${x.max}">Make it spendable</button>` : '')})}
+          ${exp ? stacksOpt(x, key, on) : ''}</div></div>`;
+      }).join('')}</div>`
         : '<div class="empty">This save has no money balances to edit.</div>'}</div>`;
+  }
+
+  // ticking the bank's extra stacks raises its field and Max to maxStacks, and its change asks for stacks; unticking
+  // brings an amount typed above the boxes back down to them
+  function onStacks(el) {
+    const s = slotOf(S.slot);
+    if (!s) return;
+    const d = draftOf(s.file), key = el.dataset.stacks, field = el.closest('.field');
+    d.stacksOn ??= {};
+    if (el.checked) d.stacksOn[key] = true; else delete d.stacksOn[key];
+    const input = field?.querySelector('input[data-edit="money"]'), fill = field?.querySelector('[data-act="fill"]');
+    const lim = el.checked ? el.dataset.maxStacks : el.dataset.max;
+    if (fill) fill.dataset.to = lim;
+    if (!input) return;
+    input.max = lim;
+    const v = fromDisplay(input.value, 'money', 'int');
+    if (!el.checked && input.value.trim() !== input.dataset.init && v != null && v > +el.dataset.max) input.value = el.dataset.max;
+    onEdit(input);
   }
 
   // ---- ammo
@@ -1450,11 +1660,11 @@
         </div>`;
     }
     if (!st.readyToUpload) {
-      return `<section class="title-card"><span class="chip">Step 5</span><h1>Nothing to send yet</h1><p>Save some edits first. They’ll wait here until you send them.</p></section>
+      return `<section class="title-card"><span class="chip">Step ${stepNo('send', st)}</span><h1>Nothing to send yet</h1><p>Save some edits first. They’ll wait here until you send them.</p></section>
         <div class="row"><button class="btn primary" data-act="go" data-view="edit">Edit a save</button></div>${jobBox('restore')}`;
     }
     return `
-      <section class="title-card"><span class="chip">Step 5</span><h1>Send your save back</h1>
+      <section class="title-card"><span class="chip">Step ${stepNo('send', st)}</span><h1>Send your save back</h1>
         <p>Your edits are encrypted and waiting. The PS5 won’t overwrite a save, so the old ones have to be deleted first. Every save of this account comes back, and the originals stay backed up on this computer.</p></section>
       <div class="stack">
         ${summary}
@@ -1529,7 +1739,7 @@
       const err = S.localError;
       let html = '';
       if (err) {
-        html = `<div class="job err"><div class="stage">${esc(ERR[err.code] || ERR.internal)}</div>${err.detail ? `<div class="detail">${esc(err.detail)}</div>` : ''}</div>`;
+        html = `<div class="job err"><div class="stage">${esc(ERR[err.code] || ERR.internal)}</div>${err.detail ? `<div class="detail">${esc(err.detail)}</div>` : ''}${signinFix(err.code, kinds[0])}</div>`;
       } else if (kinds.includes(job.kind) && job.status !== 'idle') {
         const stage = STAGE[job.stage] || job.stage || '';
         if (job.status === 'running') {
@@ -1553,17 +1763,27 @@
           const perm = /PermissionError/.test(detail);
           html = `<div class="job err"><div class="stage">${esc(ERR[code] || ERR.internal)}</div>
             ${perm ? '<div class="detail">This computer isn’t allowed to use ports 1004 to 1006. On Linux, run sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1004 in a terminal, then try again.</div>' : ''}
-            ${detail && !perm ? `<div class="detail">${esc(detail)}</div>` : ''}${serviceQueue(job)}${logBlock(job)}</div>`;
+            ${detail && !perm ? `<div class="detail">${esc(detail)}</div>` : ''}${signinFix(code, job.kind)}${serviceQueue(job)}${logBlock(job)}</div>`;
         } else if (job.status === 'done') {
           html = `<div class="job ok"><div class="stage">${esc(stage)}</div>${serviceQueue(job)}</div>`;
         }
       }
-      if (box.innerHTML !== html) {
+      if (box.dataset.html !== html) {           // only real changes: the page translates what it shows, and keeps focus
         const open = box.querySelector('details')?.open;
-        box.innerHTML = html;
+        box.innerHTML = html; box.dataset.html = html;
         if (open && box.querySelector('details')) box.querySelector('details').open = true;
       }
     }
+  }
+
+  // for an error a sign-in fixes: GarlicSaves refused the sign-in (Sign in again), or there is none yet; kind: the job's
+  // kind or the step's job box, to come back to that step once signed in
+  function signinFix(code, kind) {
+    if (!S.state?.garlic) return '';
+    const back = SIGNIN_BACK[kind] || '';
+    if (['key_disabled', 'garlic_key_disabled'].includes(code)) return `<div class="row" style="margin-top:10px"><button class="btn small primary" data-act="signin" data-back="${back}">Sign in again</button></div>`;
+    if (code === 'not_signed_in') return `<div class="row" style="margin-top:10px"><button class="btn small primary" data-act="signin" data-back="${back}">Sign in to GarlicSaves</button></div>`;
+    return '';
   }
 
   const logBlock = job => (job.log || []).length ? `<details class="log"><summary>Show details</summary><pre>${esc(job.log.map(l => l.m).join('\n'))}</pre></details>` : '';
@@ -1629,7 +1849,7 @@
            <button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`;
     const review = S.reviewOpen ? `<ul class="review">${list.map(c => `<li><span>${esc(c.label || 'Change')}</span><span>${esc(fmtChange(c.value))} to ${esc(fmtChange(c.newValue))}</span></li>`).join('')}</ul>` : '';
     const jobLine = job.kind === 'patch' && job.status !== 'idle' && !(job.status === 'done' && !isDirty)
-      ? `<div style="flex-basis:100%">${job.status === 'error' ? `<span class="risk danger">${esc(ERR[job.error?.code] || ERR.internal)}</span>` : `<span class="risk caution">${esc(STAGE[job.stage] || job.stage)}</span>`}${serviceQueue(job)}</div>` : '';
+      ? `<div style="flex-basis:100%">${job.status === 'error' ? `<span class="risk danger">${esc(ERR[job.error?.code] || ERR.internal)}</span>${signinFix(job.error?.code, 'patch')}` : `<span class="risk caution">${esc(STAGE[job.stage] || job.stage)}</span>`}${serviceQueue(job)}</div>` : '';
     const full = html + jobLine + review;
     if (pendingEl.dataset.html !== full) { pendingEl.innerHTML = full; pendingEl.dataset.html = full; }
     pendingEl.hidden = false;
@@ -1664,7 +1884,7 @@
       const base = {value: orig, newValue, label: el.dataset.label || ''};
       d[bucket][key] = kind === 'stat'
         ? {group: el.dataset.group, row: +el.dataset.row, base: +el.dataset.base, qual: +el.dataset.qual, owner: +el.dataset.owner, ...base}
-        : {inv: +el.dataset.inv, idx: +el.dataset.idx, ...base};
+        : {inv: +el.dataset.inv, idx: +el.dataset.idx, ...base, ...(kind === 'money' && stacksOn(s.file, key) ? {stacks: true} : {})};
     }
     mark(cellEl, !same, el);
     if (kind === 'stat') updateTotal(el);
@@ -1697,20 +1917,53 @@
     const a = b.dataset.act;
     if (a === 'deleted') { S.deleted = b.checked; const up = $('[data-act="upload"]'); if (up) up.disabled = !(S.deleted && !running()); return; }
     if (a === 'pick-exp') { S.compExp[S.slot] = b.checked; return; }
+    if (a === 'update-auto') {                  // saved in data/config.json as autoUpdate
+      const on = b.checked;
+      S.updAuto = on;
+      api('/api/update/settings', {auto: on}).then(u => { if (S.state) S.state.update = u; })
+        .catch(e => toast(ERR[e.code] || ERR.internal)).finally(() => { S.updAuto = null; renderUpdate(); });
+      return;
+    }
     if (b.tagName === 'A') return;
     e.preventDefault();
-    if (a === 'go') { S.localError = null; S.manualView = b.dataset.view; S.mainKey = ''; renderRoute(); renderMain(); renderJob(); renderPending(); main.focus(); return; }
+    if (a === 'go') { S.localError = null; S.manualView = b.dataset.view; if (b.dataset.view !== 'signin') S.signinFor = null; S.mainKey = ''; renderRoute(); renderMain(); renderSigninLeft(); renderJob(); renderPending(); main.focus(); return; }
     if (a === 'discover') {
       S.searching = true; S.consoles = null; renderMain();
       act('/api/discover', {}, out => { S.consoles = out.consoles || []; }).finally(() => { S.searching = false; S.mainKey = ''; renderMain(); renderJob(); });
       return;
     }
     if (a === 'pick') { act('/api/console', {host: b.dataset.host}, st => { S.manualView = null; onState(st); }); return; }
+    if (a === 'signin') { goSignIn(b.dataset.back, true); return; }
+    if (a === 'signin-cancel') {
+      act('/api/signin/cancel', {}, g => { if (S.state) S.state.garlic = g; S.mainKey = ''; renderMain(); renderSigninLeft(); });
+      return;
+    }
+    if (a === 'signin-done') { S.manualView = null; S.signinFor = null; S.mainKey = ''; renderRoute(); renderMain(); renderJob(); renderPending(); main.focus(); return; }
+    if (a === 'signout') {                      // forgets the key on this computer (config.json); refused while a task runs
+      if (!confirm(T('Sign out of GarlicSaves? Save Garage forgets its key on this computer, and you’ll need to sign in again to pair, download, save edits or send saves back.'))) return;
+      act('/api/signout', {}, g => { if (S.state) S.state.garlic = g; S.signinFor = null; S.mainKey = ''; renderStatus(); renderRoute(); renderMain(); });
+      return;
+    }
+    // pairing, downloading, saving edits and sending need the GarlicSaves sign-in: without it, the sign-in step comes first
+    if (['pair', 'download', 'upload'].includes(a) && mustSignIn(S.state)) { goSignIn(SIGNIN_BACK[a]); return; }
     if (a === 'pair') { act('/api/pair'); return; }
     if (a === 'download') { act('/api/download'); return; }
-    if (a === 'resume-download') { act('/api/resume-download'); return; }
+    if (a === 'resume-download') { if (mustSignIn(S.state)) goSignIn('download'); else act('/api/resume-download'); return; }
     if (a === 'choose-account') { act('/api/choose-account', {owner: b.dataset.owner}); return; }
     if (a === 'cancel') { act('/api/cancel'); return; }
+    if (a === 'update-check') {
+      api('/api/update/check', {}).then(u => { if (S.state) { S.state.update = u; renderUpdate(); } }).catch(e => toast(ERR[e.code] || ERR.internal));
+      return;
+    }
+    if (a === 'update-restart') {               // Save Garage starts again and installs the update; refused while a task runs
+      if (running()) return;
+      const unsaved = (S.state?.slots || []).some(x => editCount(draftOf(x.file)) && dirty(x));
+      if (unsaved && !confirm(T('Restart Save Garage now? Edits you haven’t saved here are lost.'))) return;
+      const from = S.state?.version, host = S.state?.console?.host || null;
+      api('/api/update/restart', {}).then(() => { S.restarting = {from, host, down: false, at: Date.now()}; renderUpdate(); renderStatus(); })
+        .catch(e => toast(ERR[e.code] || ERR.internal));
+      return;
+    }
     if (a === 'upload') { act('/api/upload'); return; }
     if (a === 'restore') {
       if (confirm(T('Put the original saves back? Every edit you saved here is undone. You still need to send the save to the PS5 afterwards.'))) act('/api/restore', {}, () => { S.drafts = {}; });
@@ -1723,6 +1976,16 @@
       d.money[`${b.dataset.inv}:${b.dataset.idx}`] = {inv: +b.dataset.inv, idx: +b.dataset.idx, value: +b.dataset.value, newValue: +b.dataset.to, label: 'Bank account (made spendable)'};
       toast('The bank money will be moved into the bank’s own boxes when you save edits.');
       renderPending(); renderCounts();
+      return;
+    }
+    if (a === 'unstack') {      // a bank past its own boxes, the rest in extra stacks: set it to what the boxes hold, stacks emptied
+      const field = b.closest('.field'), input = field?.querySelector('input[data-edit="money"]'), box = field?.querySelector('[data-stacks]');
+      if (!input) return;
+      if (box?.checked) { box.checked = false; onStacks(box); }
+      input.value = b.dataset.to; onEdit(input);
+      const c = draftOf(S.slot).money[input.dataset.key];
+      if (c) c.label = 'Bank account (made spendable)';
+      toast(`The bank will be set to $${nf.format(+b.dataset.to)}, all in its own money boxes, when you save edits.`);
       return;
     }
     if (a === 'fill') {
@@ -1897,6 +2160,7 @@
         if (confirm(T('You removed every edit for this save. Put its original back instead?'))) act('/api/restore', {}, () => { S.drafts = {}; });
         return;
       }
+      if (mustSignIn(S.state)) { goSignIn('edit'); return; }   // the drafts stay here while signing in
       const stuntKeys = S.stuntKeys[s.file] || new Set();
       const risky = d.stats.some(c => !stuntKeys.has(`${c.group}:${c.row}`) && !(S.detail[s.file]?.featured || []).some(f => f.entries.some(e => e.group === c.group && e.row === c.row)));
       if (risky && !confirm(T('Some of these edits come from All stats, where most values have unknown meanings and can break the save. Keep the originals backed up and check the save loads. Continue?'))) return;
@@ -1939,6 +2203,7 @@
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.dataset.gun && el.type === 'checkbox') onGun(el);
+    if (el.dataset.stacks && el.type === 'checkbox') onStacks(el);
     if (el.dataset.edit && el.type === 'checkbox') onEdit(el);
     if (el.dataset.raw && el.type === 'checkbox') onRaw(el);
     if (el.dataset.find === 'varies' || el.dataset.find === 'named' || el.dataset.find === 'game') {
@@ -1963,5 +2228,14 @@
 
   // ------------------------------------------------------------ start
   api('/api/network', {}).catch(() => {});
+  const credit = $('#upstream-credit');
+  const creditKey = 'moonslot-upstream-credit-shown';
+  try {
+    if (!localStorage.getItem(creditKey)) {
+      credit.hidden = false;
+      localStorage.setItem(creditKey, '1');
+    }
+  } catch { credit.hidden = false; }
+  $('#dismiss-credit').addEventListener('click', () => { credit.hidden = true; });
   poll();
 })();

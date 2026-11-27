@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Names for the save's sections and JSON keys, where known (exact-case joaat of the name; confirmed or likely only)."""
 
 SECTION_NAMES = {

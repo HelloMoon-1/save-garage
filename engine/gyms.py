@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Gym memberships (Save Garage feature module).
 
 WHAT IT CHANGES

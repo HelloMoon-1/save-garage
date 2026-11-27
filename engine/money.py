@@ -1,3 +1,5 @@
+# Save Garage - Copyright (C) 2026 CoreyLyu76 (gta6-save-editor) and NotHGM - GNU GPL v3; NotHGM's parts also carry
+# the additional terms in NOTICE. See LICENSE.
 """Read and edit money in decrypted GTA VI JSAV saves.
 
 How money is stored (each part checked on a real PS5, November 2026):
@@ -20,8 +22,9 @@ How money is stored (each part checked on a real PS5, November 2026):
   0x26457c8e (15,000), 0x33894998 (85,000), 0x00fc0216 and 0xdb44180c. The game fills them in that order when money
   comes in and empties them in that order when money goes out. Only money in these boxes counts as BuckMe funds:
   the balance the game spends from (and writes to stat 262) leaves out any other box under checking, while the BuckMe
-  app still shows it. So checking cannot go past the capacity of its own boxes, with one exception: the 85,000 box takes
-  any number of 85,000 stacks (money rows under it), and the game counts every one (see STACK_BOX). The large 400,000 / 500,000 / 1,000,000
+  app still shows it. So checking stays within the capacity of its own boxes. The 85,000 box can also take extra 85,000
+  stacks (money rows under it), which BuckMe shows in the balance, but they may not be spendable (see STACK_BOX), so
+  they are only written when a change asks for them. The large 400,000 / 500,000 / 1,000,000
   boxes belong to Family Savings, and earlier versions that put them under checking made money that shows but cannot
   be spent (GitHub issue #3). Editing the bank now empties such boxes and puts the money in checking's own boxes.
 
@@ -58,11 +61,13 @@ CHECKING_BOXES = ((0x26457c8e, 0x006854cf, 15000),
                   (0x33894998, 0x81cc2559, 85000),
                   (0x00fc0216, 0x9e5f7b71, 123844))
 # Checking's 85,000 box takes any number of stacks: every money row under it holds up to 85,000 and the game counts them
-# all, in the balance and in the limit. The game adds such stacks itself once the bank goes past its other boxes, and
-# GarlicSaves' GTA VI editor fills a bank this way (reported tested in game); Save Garage's stacks are not yet tested on
-# a PS5. Every new row needs an Items entry, and an inventory's Items array holds at most 4,095, so ITEM_RESERVE entries
-# are always left free for items the game adds later. BANK_CEILING keeps the signed 32-bit ledger and stats far from
-# overflowing. Rows emptied by a lower balance stay in place (at 0) and are filled again first.
+# all, in the balance and in the limit. GarlicSaves' GTA VI editor fills a bank this way (reported tested in game), but
+# no game-written save seen so far has a second row under the box, and Save Garage's stacks were never tested on a PS5:
+# a player on 1.30.0 with about $2,000,000 in the bank couldn't make a phone payment with them (GitHub issue #8). So they
+# may not be spendable: scan's 'max' is the own boxes, and patch only goes past them, up to 'maxStacks', for a change
+# that asks with 'stacks': True. Every new row needs an Items entry, and an inventory's Items array holds at most 4,095,
+# so ITEM_RESERVE entries are always left free for items the game adds later. BANK_CEILING keeps the signed 32-bit
+# ledger and stats far from overflowing. Rows emptied by a lower balance stay in place (at 0) and are filled again first.
 STACK_BOX, STACK_SLOT, STACK_MAX = 0x33894998, 0x81cc2559, 85000
 ITEM_LIMIT, ITEM_RESERVE = 4095, 300
 BANK_CEILING = 999999999
@@ -228,11 +233,15 @@ def _checking_caps(boxes):
     return caps
 
 
+def _own_limit(boxes):
+    """Checking within its own boxes, what shops spend from: their first rows and any other box as it is, no extra stacks."""
+    return sum(_checking_caps(boxes).values()) + sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
+
+
 def _box_limit(boxes):
-    """Checking without new stacks: its own boxes' first rows, the stacks it already has, and any other box as it is."""
+    """Checking without new stacks: its own boxes and the stacks it already has."""
     stack = next((x for x in boxes if x['box'] == STACK_BOX), None)
-    return (sum(_checking_caps(boxes).values()) + sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
-            + (STACK_MAX * len(stack['rows'][1:]) if stack else 0))
+    return _own_limit(boxes) + (STACK_MAX * len(stack['rows'][1:]) if stack else 0)
 
 
 def _new_stacks(boxes, items_n):
@@ -245,9 +254,9 @@ def _new_stacks(boxes, items_n):
 
 
 def _limit(kind, boxes, items_n=0):
-    """The most an account can hold. Checking: the capacity of the own boxes the save has (it gets no new boxes), plus
-    85,000 for every stack that still fits under its 85,000 box, at most BANK_CEILING. Savings: every box it can have,
-    since missing ones are added."""
+    """The most an account can hold. Checking with stacks (scan's 'maxStacks'): the capacity of the own boxes the save has
+    (it gets no new boxes) and of the stacks it has, plus 85,000 for every stack that still fits under its 85,000 box, at
+    most BANK_CEILING. Savings: every box it can have, since missing ones are added."""
     if kind == 'bank':
         lim = _box_limit(boxes)
         n = _new_stacks(boxes, items_n)
@@ -274,8 +283,9 @@ def scan(b):
                 continue
             seen |= {r for x in boxes for r in x['rows']}
             item = {'inv': n, 'idx': rows[0], 'type': v['slot'][rows[0]], 'kind': kind, 'value': sum(x['qty'] for x in boxes),
-                    'max': _limit(kind, boxes, v['items_n'])}
-            if kind == 'bank':      # value is what the BuckMe app shows; spendable is what the game can spend; stuck is the rest
+                    'max': _own_limit(boxes) if kind == 'bank' else _limit(kind, boxes, v['items_n'])}
+            if kind == 'bank':      # value is what the BuckMe app shows; spendable is all but stuck, the Family Savings boxes
+                item['maxStacks'] = _limit(kind, boxes, v['items_n'])     # with extra 85,000 stacks, for a change that asks
                 item['spendable'] = sum(x['qty'] for x in boxes if not x['foreign'])
                 item['stuck'] = item['value'] - item['spendable']
                 item['boxMax'] = _box_limit(boxes)        # above this, the balance goes into new 85,000 stacks
@@ -433,7 +443,9 @@ def _fill_stacks(txt, nth, left):
 
 
 def patch(b, changes):
-    """changes: [{inv, idx, value (old), newValue}] -> (new file bytes, log). Values above the limit are written as the limit."""
+    """changes: [{inv, idx, value (old), newValue, stacks (optional, true or false)}] -> (new file bytes, log). Values
+    above the limit are written as the limit: 'max', or for the bank with 'stacks': True, 'maxStacks', its extra 85,000
+    stacks included. A lower bank balance is always allowed, and empties the extra stacks it no longer needs."""
     ents, secs, gaps, head, tail = _load(b)
     info = scan(b); log = []
     i_inv, i_stat = _sec(ents, SEC_INV), _sec(ents, SEC_STAT)
@@ -445,10 +457,16 @@ def patch(b, changes):
         it = next((x for x in info['items'] if same_item(x, ch)), None)
         if not it or it['value'] != ch['value']:
             raise SaveError('stale_item')
+        stacks = ch.get('stacks', False)
+        if not isinstance(stacks, bool):
+            raise SaveError('bad_request')
         nv = int(round(ch['newValue']))
         if not 0 <= nv <= 2147483647:
             raise SaveError('out_of_range')
-        nv = min(nv, it.get('max', nv)); old = it['value']
+        lim = it.get('max', nv)
+        if stacks:                  # the bank's extra stacks, asked for (other kinds have no maxStacks)
+            lim = it.get('maxStacks', lim)
+        nv = min(nv, lim); old = it['value']
         if nv == old and not it.get('stuck'):      # same total, but money the game cannot spend still has to be moved
             continue
         if it['kind'] in ACCOUNTS:

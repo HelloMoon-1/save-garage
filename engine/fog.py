@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Reveal the map: clear the fog of war from every map region Save Garage knows (Save Garage feature module).
 
 WHAT IT CHANGES

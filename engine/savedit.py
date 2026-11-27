@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Editing for decrypted GTA VI story saves beyond money: ammo and stats.
 
 Works the same way as money.py: values are replaced in place inside a section's JSON text, so everything else

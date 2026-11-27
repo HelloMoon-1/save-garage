@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#15111d">
   <meta name="referrer" content="no-referrer">
-  <title>Save Garage</title>
-  <link rel="icon" href="art/icon.svg" type="image/svg+xml">
+  <title>MoonSlot</title>
+  <link rel="icon" href="art/moonslot.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script defer src="i18n.js"></script>
   <script defer src="app.js"></script>
@@ -17,9 +17,9 @@
   <header class="masthead">
     <img class="scene" src="art/leonida.svg" alt="" aria-hidden="true">
     <div class="masthead-row">
-      <a class="brand" href="./" aria-label="Save Garage home">
-        <img src="art/icon.svg" alt="" width="40" height="40">
-        <span><span class="brand-name">Save Garage</span><span class="brand-sub">Story saves for GTA VI on PS5</span></span>
+      <a class="brand" href="./" aria-label="MoonSlot home">
+        <img src="art/moonslot.svg" alt="" width="40" height="40">
+        <span><span class="brand-name" data-no-i18n>MoonSlot</span><span class="brand-sub">Story saves for GTA VI on PS5</span></span>
       </a>
       <div class="masthead-side">
         <div class="status" id="status" aria-live="polite"></div>
@@ -28,13 +28,20 @@
     </div>
     <nav class="steps-nav" id="route" aria-label="Steps"></nav>
   </header>
+  <aside id="upstream-credit" class="upstream-credit" hidden aria-labelledby="upstream-title">
+    <strong id="upstream-title">Support the original author</strong>
+    <p>NotHGM created Save Garage. If it helped you, give the original project a star on GitHub.</p>
+    <a class="btn small" href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener noreferrer">Star the original project</a>
+    <button class="link" type="button" id="dismiss-credit">Dismiss</button>
+  </aside>
   <main id="main" tabindex="-1"></main>
   <div class="pending" id="pending" hidden></div>
   <div class="passed" id="passed" hidden role="status" aria-live="assertive"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <footer class="foot">
-    <span>Runs on your own computer. Your PS5 talks to it over your home network.</span>
-    <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden>Quit Save Garage</button></span>
+    <span>Runs on your own computer. Your PS5 talks to it over your home network.<br><span class="legal"><span>MoonSlot is an unofficial modified build.</span><br><a data-no-i18n href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener noreferrer">Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)</a><br><span data-no-i18n>Save Garage © 2026 NotHGM.</span> Free software under the GNU GPL v3, with no warranty. <a href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener">Source and official releases</a></span></span>
+    <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden>Quit MoonSlot</button></span>
+    <div class="update" id="update" role="group" aria-label="Updates" hidden><span class="upd-status" id="update-status" role="status"></span><span class="upd-actions" id="update-actions"></span></div>
   </footer>
   <noscript>Save Garage needs JavaScript.</noscript>
 </body>

@@ -1,3 +1,4 @@
+# Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 """Gang operations: the 100% checklist line 'GANG OPERATIONS CLEARED x / 39' and the PROGRESS / GANGS pages
 (Save Garage feature module, READ-ONLY).
 

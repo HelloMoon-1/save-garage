@@ -1,3 +1,4 @@
+// Save Garage - Copyright (C) 2026 NotHGM - GNU GPL v3 with the additional terms in NOTICE; see LICENSE.
 'use strict';
 // Save Garage translations. The page is written in English; this swaps the text people read for the chosen language,
 // as it appears (the page re-renders often), sentence by sentence where a whole text has no translation. Game names
@@ -135,7 +136,7 @@
     document.documentElement.dir = RTL.has(code) ? 'rtl' : 'ltr';
     const sel = document.getElementById('lang');
     if (sel && sel.value !== code) sel.value = code;
-    busy = true; try { walk(document.body); document.title = 'Save Garage'; } finally { obs.takeRecords(); busy = false; }
+    busy = true; try { walk(document.body); document.title = 'MoonSlot'; } finally { obs.takeRecords(); busy = false; }
   }
 
   function start() {
@@ -144,8 +145,8 @@
       sel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}" lang="${c}">${n}</option>`).join('');
       sel.addEventListener('change', () => setLang(sel.value, true));
     }
-    let saved = 'en';
-    try { saved = localStorage.getItem(KEY) || 'en'; } catch { /* private mode */ }
+    let saved = navigator.language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+    try { saved = localStorage.getItem(KEY) || saved; } catch { /* private mode */ }
     obs.observe(document.body, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS});
     setLang(saved, false);
   }

@@ -1,4 +1,4 @@
-name: Build and publish Save Garage
+name: Build and publish MoonSlot
 
 on:
   workflow_dispatch:
@@ -42,29 +42,20 @@ jobs:
             if [ "$status" -ne 2 ]; then exit "$status"; fi
           fi
 
-      - name: Configure release worker key
-        env:
-          RELEASE_WORKER_KEY: ${{ secrets.SAVEGARAGE_RELEASE_WORKER_KEY }}
-        run: |
-          python - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          path = Path('engine/garlic.py')
-          source = path.read_text(encoding='utf-8')
-          pattern = r"^DEFAULT_KEY = '([0-9a-fA-F]{64})'$"
-          bundled = re.findall(pattern, source, flags=re.M)
-          if len(bundled) != 1:
-              raise SystemExit('Expected one valid distribution worker key')
-          key = os.environ.get('RELEASE_WORKER_KEY') or bundled[0]
-          if not re.fullmatch(r'[0-9a-fA-F]{64}', key):
-              raise SystemExit('Invalid release worker key')
-          path.write_text(re.sub(pattern, 'DEFAULT_KEY = ' + repr(key), source, flags=re.M), encoding='utf-8')
-          PY
-
       - name: Build Windows, macOS and Linux packages
         run: ./scripts/package_release.sh
+
+      - name: Sign MoonSlot packages
+        env:
+          MOONSLOT_RELEASE_SIGNING_KEY: ${{ secrets.MOONSLOT_RELEASE_SIGNING_KEY }}
+        run: |
+          umask 077
+          signing_file="$RUNNER_TEMP/moonslot-signing.pem"
+          trap 'rm -f "$signing_file"' EXIT
+          printf '%s' "$MOONSLOT_RELEASE_SIGNING_KEY" > "$signing_file"
+          unset MOONSLOT_RELEASE_SIGNING_KEY
+          python scripts/sign_release.py sign build_out/release --key "$signing_file"
+          python scripts/sign_release.py verify build_out/release
 
       - name: Verify release files
         run: |
@@ -72,21 +63,21 @@ jobs:
           for archive in build_out/release/*.zip; do
             python -m zipfile -t "$archive"
           done
-          tar -tzf build_out/release/SaveGarage-*-linux-x64.tar.gz > "$RUNNER_TEMP/linux-archive.txt"
-          grep -Fx 'SaveGarage/LICENSE' "$RUNNER_TEMP/linux-archive.txt"
-          grep -Fx 'SaveGarage/README.zh-CN.md' "$RUNNER_TEMP/linux-archive.txt"
-          build_out/dist/SaveGarage/SaveGarage --help
+          tar -tzf build_out/release/MoonSlot-*-linux-x64.tar.gz > "$RUNNER_TEMP/linux-archive.txt"
+          grep -Fx 'MoonSlot/LICENSE' "$RUNNER_TEMP/linux-archive.txt"
+          grep -Fx 'MoonSlot/README.zh-CN.md' "$RUNNER_TEMP/linux-archive.txt"
+          build_out/dist/MoonSlot/MoonSlot --help
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          Save Garage 简体中文构建，包含中英文界面和中文使用指南。
+          MoonSlot 简体中文构建，包含中英文界面和中文使用指南。
 
-          - Windows x64：解压后运行 `Start Save Garage.bat`。
-          - macOS：解压后运行 `Start Save Garage.command`，首次启动会安装 Python 依赖。
-          - Linux x64：解压后运行 `./SaveGarage --open`。
+          - Windows x64：解压后运行 `Start MoonSlot.bat`。
+          - macOS：解压后运行 `Start MoonSlot.command`，首次启动会安装 Python 依赖。
+          - Linux x64：解压后运行 `./MoonSlot --open`。
           - `SHA256SUMS.txt` 提供三个发行包的校验值。
 
           GPL-3.0 许可证和贡献者署名随发行包提供。
@@ -95,5 +86,5 @@ jobs:
             cp "docs/releases/$RELEASE_TAG.md" "$RUNNER_TEMP/release-notes.md"
           fi
           gh release create "$RELEASE_TAG" build_out/release/* \
-            --latest --target "$GITHUB_SHA" --title "Save Garage $RELEASE_TAG" \
+            --latest --target "$GITHUB_SHA" --title "MoonSlot $RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

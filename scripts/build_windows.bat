@@ -1,8 +1,8 @@
 @echo off
-rem Builds build_out\dist\SaveGarage\SaveGarage.exe. Needs: pip install -r requirements.txt pyinstaller
+rem Builds build_out\dist\MoonSlot\MoonSlot.exe. Needs: pip install -r requirements.txt pyinstaller
 cd /d "%~dp0.."
 set ROOT=%CD%
-python -m PyInstaller "%ROOT%\engine\main.py" --name SaveGarage --noconsole --onedir --noconfirm --clean ^
+python -m PyInstaller "%ROOT%\engine\main.py" --name MoonSlot --noconsole --onedir --noconfirm --clean ^
   --icon "%ROOT%\assets\icon.ico" ^
   --distpath "%ROOT%\build_out\dist" --workpath "%ROOT%\build_out\work" --specpath "%ROOT%\build_out" ^
   --paths "%ROOT%\engine" ^
