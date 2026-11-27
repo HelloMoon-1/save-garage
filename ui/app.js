@@ -55,6 +55,7 @@
     // GarlicSaves kept sending back a damaged copy of every story save in the download (issue #11)
     decrypt_bad: 'None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.',
     // the PS5 asked for the save over IPv6 (issue #7) and this computer's network adapter has no IPv6 address
+    adapter_query_failed: 'Windows could not list the network adapters. Extract the complete Windows package into a new folder and start the editor there.',
     ipv6_needed: 'This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.',
     pair_failed: 'Pairing failed or timed out. Start pairing again.',
     save_layout_changed: 'The save layout is different from what this editor knows. Download again. If it still fails, the editor needs an update.',
