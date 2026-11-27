@@ -983,6 +983,20 @@ def job_restore():
     stage('ready_to_upload')
 
 
+def upload_network_hint(line):
+    if not line.startswith('[network] '):
+        return None
+    try:
+        event = json.loads(line[len('[network] '):])
+    except ValueError:
+        return None
+    if not isinstance(event, dict) or event.get('issue') != 'local_ipv6':
+        return None
+    adapter = event.get('adapter')
+    return {'code': 'local_ipv6', 'adapter': adapter if isinstance(adapter, str) else '',
+            'platform': sys.platform}
+
+
 def job_upload():
     c = STATE['console']; sess = Path(STATE['session']); lib = sess / 'lib'; up = sess / 'upload'; up.mkdir(exist_ok=True)
     stage('preparing')
@@ -1002,6 +1016,11 @@ def job_upload():
     files = 0; finished = False
     for line in p.stdout:
         line = line.rstrip(); low = line.lower()
+        hint = upload_network_hint(line)
+        if hint:
+            stage('waiting_console', hint=hint)
+            log('The console connection needs a local IPv6 address. Waiting for reconnection.')
+            continue
         if 'srch' in low or not line:
             continue
         if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:

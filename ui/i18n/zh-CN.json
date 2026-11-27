@@ -1,4 +1,10 @@
 {
+"This transfer needs IPv6 on the local network.": "这次回传需要局域网 IPv6，请检查电脑连接 PS5 的网卡。",
+"Network adapter": "网卡",
+"Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version 6 (TCP/IPv6).": "按 Win + R，输入 ncpa.cpl 并回车。右键这张网卡，打开「属性」，勾选「Internet 协议版本 6 (TCP/IPv6)」并确定。",
+"Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "打开「系统设置 → 网络」，选择当前连接，进入「详细信息 → TCP/IP」，将「配置 IPv6」设为「自动」或「仅本地链路」。",
+"Open the settings for this network connection and enable automatic or link-local IPv6.": "打开当前网络连接的 IPv6 设置，选择「自动」或「仅本地链路」。",
+"Keep this page open. Search again on the PS5 and select Save Garage.": "保持本页打开，在 PS5 的「数据传输」里退一页，重新搜索并选择 Save Garage。",
 "${0} of ${1}": "${0}/${1}",
 "&offset=": "&offset=",
 "&path=": "&path=",
