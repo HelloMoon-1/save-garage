@@ -16,7 +16,7 @@ from poc.dt_layout import root_manifest, existing_payload
 from poc.dt_metadata import sync_other_metadata, sync_upload_metadata, validate_payload
 from poc.dt_pair import save_prefix
 from poc.dt_ppr_client import derive_with_oracle
-from poc.dt_psk_client import derive_keys, recv_exact, recv_record, send_record
+from poc.dt_psk_client import recv_exact, recv_record, send_record
 
 
 class Tee:
@@ -159,8 +159,6 @@ def packed_address(text):
 
 
 def derive_session(sock, oracle_host, oracle_port, client_value, server_value):
-    if sock.family == socket.AF_INET6:
-        return derive_keys(client_value, server_value)
     return derive_with_oracle(oracle_host, oracle_port, client_value, server_value)
 
 
@@ -255,7 +253,7 @@ def discovery_server(port, ipv6=False):
         sock.sendto(response, address)
 
 
-def console_info(hardware, product_code, np_env, version_a, version_b):
+def console_info(hardware, product_code, np_env, version_a, version_b, data_address=None):
     body = bytearray(72)
     body[:6] = bytes.fromhex(HOST_ID.decode())
     body[6] = 1
@@ -265,9 +263,19 @@ def console_info(hardware, product_code, np_env, version_a, version_b):
     struct.pack_into("<H", body, 18, 1)
     body[20:20 + len(np_env)] = np_env
     struct.pack_into("<I", body, 32, version_a)
-    struct.pack_into("<I", body, 40, 1)
-    struct.pack_into("<I", body, 44, version_b)
-    body[48:64] = DATA_ADDRESS
+    address = data_address if data_address is not None else DATA_ADDRESS
+    if len(address) != 16:
+        raise ValueError("data address must contain 16 bytes")
+    if hardware == 3:
+        struct.pack_into("<H", body, 16, 0)
+        struct.pack_into("<I", body, 40, version_a)
+        struct.pack_into("<I", body, 48, 1)
+        struct.pack_into("<I", body, 52, version_b)
+        body[56:72] = address
+    else:
+        struct.pack_into("<I", body, 40, 1)
+        struct.pack_into("<I", body, 44, version_b)
+        body[48:64] = address
     return bytes(body)
 
 
@@ -359,7 +367,25 @@ def cache_pairing_prefix(body):
     print("[pairing] cached console approval for future metadata downloads", flush=True)
 
 
-def serve_command(sock, oracle_host, oracle_port):
+def local_link_local(sock):
+    """Pick the IPv6 address on the interface carrying this command connection."""
+    import psutil
+    local = ipaddress.ip_address(sock.getsockname()[0].split("%")[0])
+    local = getattr(local, "ipv4_mapped", None) or local
+    matches = []
+    for name, addresses in psutil.net_if_addrs().items():
+        ips = [ipaddress.ip_address(a.address.split("%")[0])
+               for a in addresses if a.family in (socket.AF_INET, socket.AF_INET6)]
+        if local not in ips:
+            continue
+        matches = sorted({a for a in ips if a.version == 6 and a.is_link_local}, key=int)
+        break
+    if not matches:
+        raise ValueError("PS5 hardware 3 needs IPv6 on the network adapter used by this connection; enable IPv6 and retry")
+    return matches[0].packed
+
+
+def serve_command(sock, oracle_host, oracle_port, prepare_ipv6=None):
     server_value = os.urandom(16)
     sock.sendall(server_value + bytes(48))
     client_value = recv_exact(sock, 64)[:16]
@@ -383,11 +409,22 @@ def serve_command(sock, oracle_host, oracle_port):
             recv_sequence += 1
             print(f"[cmd] body: {body.hex()}", flush=True)
         if cmd in (0x91, 0x93):
+            if len(body) != 88:
+                raise ValueError("invalid power request length")
             hardware = struct.unpack_from("<I", body, 44)[0]
             product_code = struct.unpack_from("<I", body, 48)[0]
             version_a = struct.unpack_from("<I", body, 76)[0]
             version_b = struct.unpack_from("<I", body, 84)[0]
-            response_body = console_info(hardware, product_code, body[56:73], version_a, version_b)
+            if hardware == 3:
+                address = local_link_local(sock)
+                if prepare_ipv6 is None:
+                    raise ValueError("IPv6 data listener was not configured")
+                prepare_ipv6()
+                print("[compat] hardware 3: extended console info, IPv6 data, oracle keys", flush=True)
+            else:
+                address = DATA_ADDRESS
+                print("[compat] legacy console info and data listener", flush=True)
+            response_body = console_info(hardware, product_code, body[56:73], version_a, version_b, address)
             result = 0
             if cmd == 0x91:
                 cache_pairing_prefix(body)
@@ -444,8 +481,9 @@ def data_server(listener, oracle_host, oracle_port):
         with client:
             try:
                 serve_data(client, oracle_host, oracle_port)
-            except (EOFError, ConnectionError, TimeoutError) as exc:
-                print(f"[data] connection ended: {exc}", flush=True)
+            except Exception as exc:
+                # A rejected handshake must not kill the data accept loop for retries.
+                print(f"[data] connection ended: {type(exc).__name__}: {exc}", flush=True)
 
 
 def serve_data(client, oracle_host, oracle_port):
@@ -551,7 +589,13 @@ def serve_data(client, oracle_host, oracle_port):
 def open_data_listener(family, bind_address, args):
     listener = socket.socket(family, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listener.bind((bind_address, DATA_PORT))
+    try:
+        if family == socket.AF_INET6:
+            listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        listener.bind((bind_address, DATA_PORT))
+    except OSError:
+        listener.close()
+        raise
     listener.listen(1)
     threading.Thread(target=data_server, args=(listener, args.oracle_host, args.oracle_port), daemon=True).start()
     return listener
@@ -569,7 +613,7 @@ def main():
     parser.add_argument("--discovery-port", type=int, default=int(os.environ.get("DT_DISCOVERY_PORT", "1006")))
     parser.add_argument("--port", type=int, default=COMMAND_PORT)
     parser.add_argument("--data-port", type=int, default=DATA_PORT)
-    parser.add_argument("--ipv6", action="store_true", help="use local PSK derivation instead of the oracle")
+    parser.add_argument("--ipv6", action="store_true", help="use IPv6 for discovery and command connections; both channels use the oracle")
     parser.add_argument("--advertise-address", default=os.environ.get("DT_ADVERTISE"),
                         help="PC address to advertise for data connections (IPv4 or IPv6). "
                              "Default: detect the interface the console reaches us on")
@@ -589,8 +633,7 @@ def main():
             parser.error(f"--advertise-address is not a valid IP address: {exc}")
         ADDRESS_PINNED = True
         print(f"[ddp] advertising the pinned data address {args.advertise_address}", flush=True)
-    print(f"[oracle] deriving keys via {args.oracle_host}:{args.oracle_port}"
-          f"{' (not used for --ipv6)' if args.ipv6 else ''}", flush=True)
+    print(f"[oracle] deriving command and data keys via {args.oracle_host}:{args.oracle_port}", flush=True)
     family = socket.AF_INET6 if args.ipv6 else socket.AF_INET
     bind_address = "::" if args.ipv6 else "0.0.0.0"
     sys.stdout = Tee(os.environ.get("DT_LOG", "dt.txt"))
@@ -600,6 +643,14 @@ def main():
     data_listener = None
     if sys.platform != "darwin":
         data_listener = open_data_listener(family, bind_address, args)
+    ipv6_listener = data_listener if args.ipv6 else None
+
+    def prepare_ipv6():
+        nonlocal ipv6_listener
+        if ipv6_listener is None:
+            ipv6_listener = open_data_listener(socket.AF_INET6, "::", args)
+            print("[compat] IPv6 data listener ready", flush=True)
+
     listener = socket.socket(family, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind((bind_address, args.port))
@@ -612,11 +663,13 @@ def main():
         if data_listener is None:
             # macOS: the data port opens when the PS5 connects (the state every Mac send-back was verified in).
             data_listener = open_data_listener(family, bind_address, args)
+            if args.ipv6:
+                ipv6_listener = data_listener
         BUSY.set()
         with client:
             client.settimeout(310)
             try:
-                serve_command(client, args.oracle_host, args.oracle_port)
+                serve_command(client, args.oracle_host, args.oracle_port, prepare_ipv6)
             except (EOFError, OSError, ValueError) as exc:
                 print(f"[cmd] session ended: {exc}", flush=True)
         BUSY.clear()

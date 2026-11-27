@@ -17,6 +17,6 @@ PY="${PYTHON:-python3}"
   --hidden-import sqlite3 --hidden-import ipaddress --hidden-import select --hidden-import uuid --hidden-import hashlib \
   --hidden-import tempfile --hidden-import argparse --hidden-import contextlib --hidden-import stat --hidden-import zipfile \
   --hidden-import runpy --hidden-import urllib.parse \
-  --collect-all cryptography
+  --collect-all cryptography --collect-all psutil
 tar -C build_out/dist -czf build_out/dist/SaveGarage-linux.tar.gz SaveGarage
 echo "Built build_out/dist/SaveGarage"
