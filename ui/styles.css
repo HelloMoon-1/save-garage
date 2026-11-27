@@ -437,7 +437,5 @@ details.more-opts > .callout { margin-bottom: 24px; }
 .foot .legal { display: inline-block; margin-top: 6px; font-size: 0.92em; }
 .foot .legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
-.upstream-credit { max-width: 60rem; margin: 1rem auto; padding: .85rem 1.25rem; border-inline-start: 3px solid var(--edit); }
-.upstream-credit[hidden] { display: none; }
-.upstream-credit p { margin: .35rem 0 .6rem; }
-.upstream-credit .link { margin-inline-start: .8rem; }
+#upstream-credit:not([hidden]) { display: inline-flex; flex-wrap: wrap; gap: .75em; margin-inline-start: .5em; }
+#dismiss-credit { color: inherit; font: inherit; }

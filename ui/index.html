@@ -28,18 +28,16 @@
     </div>
     <nav class="steps-nav" id="route" aria-label="Steps"></nav>
   </header>
-  <aside id="upstream-credit" class="upstream-credit" hidden aria-labelledby="upstream-title">
-    <strong id="upstream-title">Support the original author</strong>
-    <p>NotHGM created Save Garage. If it helped you, give the original project a star on GitHub.</p>
-    <a class="btn small" href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener noreferrer">Star the original project</a>
-    <button class="link" type="button" id="dismiss-credit">Dismiss</button>
-  </aside>
   <main id="main" tabindex="-1"></main>
   <div class="pending" id="pending" hidden></div>
   <div class="passed" id="passed" hidden role="status" aria-live="assertive"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <footer class="foot">
-    <span>Runs on your own computer. Your PS5 talks to it over your home network.<br><span class="legal"><span>This is an unofficial modified build of Save Garage.</span><br><a data-no-i18n href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener noreferrer">Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)</a><br><span data-no-i18n>Save Garage © 2026 NotHGM.</span> Free software under the GNU GPL v3, with no warranty. <a href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener">Source and official releases</a></span></span>
+    <span>Runs on your own computer. Your PS5 talks to it over your home network.<br><span class="legal"><span>This is an unofficial modified build of Save Garage.</span><br><a data-no-i18n href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener noreferrer">Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)</a>
+      <span id="upstream-credit" hidden>
+        <a href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener noreferrer">Star the original project</a>
+        <button class="link" type="button" id="dismiss-credit">Dismiss</button>
+      </span><br><span data-no-i18n>Save Garage © 2026 NotHGM.</span> Free software under the GNU GPL v3, with no warranty. <a href="https://github.com/NotHGM/save-garage" target="_blank" rel="noopener">Source and official releases</a></span></span>
     <span class="foot-actions"><span id="version"></span><button class="link" id="quit" type="button" hidden>Quit editor</button></span>
     <div class="update" id="update" role="group" aria-label="Updates" hidden><span class="upd-status" id="update-status" role="status"></span><span class="upd-actions" id="update-actions"></span></div>
   </footer>

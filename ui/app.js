@@ -121,6 +121,14 @@
     find: {q: '', varies: true, named: false, game: false, limit: 150}, lastJob: '', localError: null,
     restarting: null, updAuto: null, signinFor: null, lastSignin: null};
 
+  // Remember the step across reloads in this tab, without storing any account details.
+  try { S.loginStep = sessionStorage.getItem('garlic-login-step') === '1'; } catch {}
+
+  function showLoginStep() {
+    S.loginStep = true;
+    try { sessionStorage.setItem('garlic-login-step', '1'); } catch {}
+  }
+
   // ------------------------------------------------------------ api
   async function api(path, body) {
     const post = body !== undefined;
@@ -202,6 +210,7 @@
       S.slot = slots.length ? slots[0].file : null;
     }
     S.state = st;
+    if (!S.loginStep && st.garlic?.signedIn) showLoginStep();
     if (prevJob && prevJob !== jobKey && job.status === 'done') jobDone(job);
     if (prevJob && prevJob !== jobKey && job.status === 'error') S.localError = null;
     S.lastJob = jobKey;
@@ -417,6 +426,14 @@
         ${jobBox('signin')}
       </div>`;
     }
+    const registration = 'href="https://garlicsaves.com/register" target="_blank" rel="noopener noreferrer"';
+    if (!S.loginStep && !busy && !err && !g.stored && !g.refused) {
+      return `
+      <section class="title-card">${chip}<h1>Register with GarlicSaves</h1>
+        <p>Create your account on GarlicSaves, then come back here to sign in.</p></section>
+      <div class="row"><a class="btn primary" data-act="register" ${registration}>Register with GarlicSaves</a>
+        <button class="btn" data-act="signin">I already have an account</button></div>`;
+    }
     const link = webLink(s.link);
     const waiting = s.status === 'waiting' && s.code ? `
         <div class="panel signin-code" data-signin-code>
@@ -441,7 +458,8 @@
           <li><strong>Open the GarlicSaves page, sign in and enter the code.</strong><span class="path">You can open it on this computer or on your phone.</span></li>
           <li><strong>Come back here.</strong><span class="path">Save Garage carries on by itself once you have approved the sign-in.</span></li>
         </ol>
-        <div class="row"><button class="btn primary" data-act="signin">Sign in to GarlicSaves</button></div>`}
+        <div class="row"><button class="btn primary" data-act="signin">Sign in to GarlicSaves</button>
+          <a class="btn" ${registration}>Open registration again</a></div>`}
         <p class="note">GarlicSaves gives Save Garage on this computer a key of its own. Save Garage keeps it in its data folder, readable only by you, and sends it only to GarlicSaves. It never appears on this page.</p>
         ${jobBox('signin')}
       </div>`;
@@ -457,7 +475,7 @@
 
   // on a step whose task goes through GarlicSaves, while not signed in: why, and the way to sign in
   const signinFirst = back => mustSignIn(S.state)
-    ? `<div class="callout signin-first"><span>${esc(ERR.not_signed_in)}</span><button class="btn small primary" data-act="signin" data-back="${back}">Sign in to GarlicSaves</button></div>` : '';
+    ? `<div class="callout signin-first"><span>${esc(ERR.not_signed_in)}</span><button class="btn small primary" data-act="signin-guide" data-back="${back}">Sign in to GarlicSaves</button></div>` : '';
 
   function viewPair() {
     return `
@@ -1782,7 +1800,7 @@
     if (!S.state?.garlic) return '';
     const back = SIGNIN_BACK[kind] || '';
     if (['key_disabled', 'garlic_key_disabled'].includes(code)) return `<div class="row" style="margin-top:10px"><button class="btn small primary" data-act="signin" data-back="${back}">Sign in again</button></div>`;
-    if (code === 'not_signed_in') return `<div class="row" style="margin-top:10px"><button class="btn small primary" data-act="signin" data-back="${back}">Sign in to GarlicSaves</button></div>`;
+    if (code === 'not_signed_in') return `<div class="row" style="margin-top:10px"><button class="btn small primary" data-act="signin-guide" data-back="${back}">Sign in to GarlicSaves</button></div>`;
     return '';
   }
 
@@ -1924,6 +1942,12 @@
         .catch(e => toast(ERR[e.code] || ERR.internal)).finally(() => { S.updAuto = null; renderUpdate(); });
       return;
     }
+    if (a === 'register') {
+      showLoginStep();
+      // Let the browser open the link before replacing it with the sign-in prompt.
+      setTimeout(() => { S.mainKey = ''; renderMain(); main.focus(); }, 0);
+      return;
+    }
     if (b.tagName === 'A') return;
     e.preventDefault();
     if (a === 'go') { S.localError = null; S.manualView = b.dataset.view; if (b.dataset.view !== 'signin') S.signinFor = null; S.mainKey = ''; renderRoute(); renderMain(); renderSigninLeft(); renderJob(); renderPending(); main.focus(); return; }
@@ -1933,7 +1957,8 @@
       return;
     }
     if (a === 'pick') { act('/api/console', {host: b.dataset.host}, st => { S.manualView = null; onState(st); }); return; }
-    if (a === 'signin') { goSignIn(b.dataset.back, true); return; }
+    if (a === 'signin-guide') { goSignIn(b.dataset.back); return; }
+    if (a === 'signin') { showLoginStep(); goSignIn(b.dataset.back, true); return; }
     if (a === 'signin-cancel') {
       act('/api/signin/cancel', {}, g => { if (S.state) S.state.garlic = g; S.mainKey = ''; renderMain(); renderSigninLeft(); });
       return;

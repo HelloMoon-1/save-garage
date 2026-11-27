@@ -61,7 +61,7 @@ your original save, and the original is backed up on your computer before anythi
      itself up on the first start. Allow access to devices on your local network when asked.
    - **Linux:** unpack `MoonSlot-…-linux-x64.tar.gz` and run `./MoonSlot --open`. See [Linux notes](#linux-notes).
 2. **Connect.** Click Find my PS5, or type its IP address.
-3. **Sign in to GarlicSaves (once per computer).** Click Sign in to GarlicSaves. Save Garage shows a code; click Open
+3. **Sign in to GarlicSaves (once per computer).** Choose **Register with GarlicSaves**, create an account on the website, then return and click **Sign in to GarlicSaves**. If you already have an account, click **I already have an account**. Save Garage shows a code; click Open
    GarlicSaves (or open the address it shows on your phone), sign in to your GarlicSaves account there and enter the
    code. Save Garage carries on by itself once you have approved it.
 4. **Pair (once per console).** Click Start pairing, then on the PS5 go to Settings, then System, then System
@@ -111,7 +111,7 @@ requests"). From 1.30.0 Save Garage signs in the way GarlicTransfer 0.4.0 does, 
 
 <p align="center"><img src="assets/screens/signin.png" alt="The Sign in step: the code to enter on GarlicSaves" width="88%"></p>
 
-1. On the Sign in step, click **Sign in to GarlicSaves**. Save Garage asks GarlicSaves for a code, as an
+1. Choose **Register with GarlicSaves** to create an account, then return and click **Sign in to GarlicSaves**. Existing users can click **I already have an account**. Save Garage asks GarlicSaves for a code, as an
    installation called "Save Garage" (nothing about your computer).
 2. Click **Open GarlicSaves**, or open the address shown on another device, sign in to your GarlicSaves account and
    enter the code. The code works for up to 10 minutes; the page counts down.
