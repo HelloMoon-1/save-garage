@@ -82,6 +82,7 @@ echo "== MoonSlot $VERSION"
 # ---------------------------------------------------------------- Windows (portable)
 WIN="$STAGE/win/MoonSlot"
 copy_app "$WIN/app"
+cp -R beta-diagnostics "$WIN/PS5-Pro-Diagnostics"
 EMBED="$CACHE/python-$PYWIN-embed-amd64.zip"
 [ -f "$EMBED" ] || curl -sSfL -o "$EMBED" "https://www.python.org/ftp/python/$PYWIN/python-$PYWIN-embed-amd64.zip"
 python3 -c "import zipfile, sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$EMBED" "$WIN/app/python"

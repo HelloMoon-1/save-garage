@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/beta' && endsWith(inputs.tag, '-beta.1')
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     permissions:
@@ -86,5 +87,5 @@ jobs:
             cp "docs/releases/$RELEASE_TAG.md" "$RUNNER_TEMP/release-notes.md"
           fi
           gh release create "$RELEASE_TAG" build_out/release/* \
-            --latest --target "$GITHUB_SHA" --title "GTA6 剧情存档编辑器 $RELEASE_TAG" \
+            --prerelease --latest=false --target "$GITHUB_SHA" --title "GTA6 剧情存档编辑器 $RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

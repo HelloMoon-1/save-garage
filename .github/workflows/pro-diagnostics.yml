@@ -10,22 +10,14 @@ jobs:
     if: github.ref == 'refs/heads/beta'
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Test and package
-        shell: powershell
+      - name: Test diagnostics
+        shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $log = Join-Path $env:RUNNER_TEMP 'dt-source.log'
           Set-Content $log '[tcp] connection from private-test','[data] connection from private-test','[data] GFP5 file complete id=1 bytes=100'
           $report = (& ./beta-diagnostics/Check-Transfer.ps1 -LogPath $log -NonInteractive) -join [Environment]::NewLine
           if ($report -notmatch '收到控制连接：有' -or $report -notmatch '收到数据连接：有' -or $report -notmatch '至少一个文件发送完成：有' -or $report -match 'private-test') { throw 'Unexpected diagnostic summary' }
-          Compress-Archive -Path beta-diagnostics/* -DestinationPath PS5-Pro-Diagnostics-Windows.zip
-      - name: Publish beta download
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "pro-diagnostics-beta-$env:GITHUB_RUN_NUMBER-$env:GITHUB_RUN_ATTEMPT"
-          gh release create $tag PS5-Pro-Diagnostics-Windows.zip --target $env:GITHUB_SHA --prerelease --latest=false --title "PS5 Pro 回传诊断 beta" --notes "Windows 只读诊断工具。解压后运行 Start.cmd，选择已有的 dt-source.log。可选填主机 IPv4 来检查对应网卡。工具不执行回传，不需要删除存档。"
