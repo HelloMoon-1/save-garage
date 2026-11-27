@@ -19,6 +19,14 @@ from poc.dt_ppr_client import derive_with_oracle
 from poc.dt_psk_client import recv_exact, recv_record, send_record
 
 
+class LocalIPv6Unavailable(ValueError):
+    """No link-local IPv6 address on the adapter used for this connection."""
+
+    def __init__(self, adapter):
+        self.adapter = adapter
+        super().__init__("No link-local IPv6 address on the console connection")
+
+
 class Tee:
     def __init__(self, path):
         self.stream = open(path, "w", buffering=1)
@@ -372,17 +380,18 @@ def local_link_local(sock):
     import psutil
     local = ipaddress.ip_address(sock.getsockname()[0].split("%")[0])
     local = getattr(local, "ipv4_mapped", None) or local
-    matches = []
+    adapter = None
     for name, addresses in psutil.net_if_addrs().items():
         ips = [ipaddress.ip_address(a.address.split("%")[0])
                for a in addresses if a.family in (socket.AF_INET, socket.AF_INET6)]
         if local not in ips:
             continue
+        adapter = name
         matches = sorted({a for a in ips if a.version == 6 and a.is_link_local}, key=int)
+        if matches:
+            return matches[0].packed
         break
-    if not matches:
-        raise ValueError("PS5 hardware 3 needs IPv6 on the network adapter used by this connection; enable IPv6 and retry")
-    return matches[0].packed
+    raise LocalIPv6Unavailable(adapter)
 
 
 def serve_command(sock, oracle_host, oracle_port, prepare_ipv6=None):
@@ -670,6 +679,8 @@ def main():
             client.settimeout(310)
             try:
                 serve_command(client, args.oracle_host, args.oracle_port, prepare_ipv6)
+            except LocalIPv6Unavailable as exc:
+                print("[network] " + json.dumps({"issue": "local_ipv6", "adapter": exc.adapter}), flush=True)
             except (EOFError, OSError, ValueError) as exc:
                 print(f"[cmd] session ended: {exc}", flush=True)
         BUSY.clear()

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import struct
 import sys
 import tempfile
 import unittest
@@ -55,6 +56,7 @@ class BatchDecrypt(unittest.TestCase):
                 on_job(job_id or 'saved-job')
                 if len(observed) == 1:
                     raise garlic.TemporaryServiceError('disconnected')
+                return []
             rows = {image.name: {'operation': 'decrypt', 'status': 'pending'}}
             with patch.dict(app.SERVICE_SLOTS, rows, clear=True), patch.dict(app.JOB, log=[]), \
                     patch.object(app.G, 'decrypt_batch', side_effect=batch), patch.object(app, 'read_slot', return_value='slot'):
@@ -64,33 +66,47 @@ class BatchDecrypt(unittest.TestCase):
             self.assertEqual(observed, [None, 'saved-job'])
             self.assertFalse(list(sess.glob('decrypt-*.json')))
 
-    def test_one_request_validates_all_slots_before_publishing_any(self):
-        client = garlic.Garlic(server='http://localhost', key='test', proxy='')
+    def test_mixed_result_retries_only_the_invalid_slot(self):
         names = ['sdimg_SAVEDATASARC0001', 'sdimg_sce_sdmemory']
         inner = ['SARC0001', 'memory.dat']
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            files = [root / name for name in names]
-            for incomplete in (True, False):
+        payload = b'JSAV' + struct.pack('<III', 3, 1, 0) + bytes(20)
+        metadata = struct.pack('<4sIIII', b'\0PSF', 257, 20, 20, 0)
+        for retry_succeeds in (True, False):
+            with self.subTest(retry_succeeds=retry_succeeds), tempfile.TemporaryDirectory() as folder:
+                sess = Path(folder)
+                files = [sess / name for name in names]
+                for file in files:
+                    file.write_bytes(b'original')
+                # An older build already cached an ASAV directory.
+                stale = sess / 'dec' / names[1]
+                stale.mkdir(parents=True)
+                (stale / inner[1]).write_bytes(b'ASAV')
+                requests = []
+
+                def submit(fields, first, name, status, rest):
+                    requests.append([first, *rest])
+                    return str(len(requests))
+
                 def result(job, dest):
                     with zipfile.ZipFile(dest, 'w') as archive:
-                        for name, file in zip(names, inner):
-                            archive.writestr(name + '/sce_sys/param.sfo', b'metadata')
-                            if not incomplete or name == names[0]:
-                                archive.writestr(name + '/' + file, file)
+                        for path in requests[int(job) - 1]:
+                            index = names.index(path.name)
+                            data = payload if index == 0 or (job == '2' and retry_succeeds) else b'ASAV'
+                            archive.writestr(path.name + '/' + inner[index], data)
+                            archive.writestr(path.name + '/sce_sys/param.sfo', metadata)
 
-                responses = [{'job_id': 'batch', 'status': 'queued'}, {'status': 'done'}]
-                seen = []
-                with patch.object(client, '_json', side_effect=responses) as api, patch.object(client, '_result', side_effect=result):
-                    if incomplete:
-                        with self.assertRaisesRegex(garlic.GarlicError, 'incomplete batch'):
-                            client.decrypt_batch(files, root / 'dec', lambda s: None, seen.append)
-                        self.assertFalse(any((root / 'dec').iterdir()))
+                rows = {n: {'operation': 'decrypt', 'status': 'pending'} for n in names}
+                with patch.dict(app.SERVICE_SLOTS, rows, clear=True), patch.dict(app.JOB, log=[]), \
+                        patch.object(app.G, '_submit', side_effect=submit), patch.object(app.G, '_wait'), \
+                        patch.object(app.G, '_result', side_effect=result), patch.object(app, 'read_slot', side_effect=lambda n, d: n):
+                    if retry_succeeds:
+                        self.assertEqual(app.decrypt_slots(sess, files), names)
                     else:
-                        client.decrypt_batch(files, root / 'dec', lambda s: None, seen.append)
-                        for name, file in zip(names, inner):
-                            self.assertEqual((root / 'dec' / name / file).read_text(), file)
-                    self.assertEqual(seen, ['batch'])
-                    self.assertEqual(api.call_count, 2)
-                    args = api.call_args_list[0][0][0]
-                    self.assertEqual(sum(a.startswith('files=@') for a in args), 2)
+                        with self.assertRaises(app.Fail) as failure:
+                            app.decrypt_slots(sess, files)
+                        self.assertEqual((failure.exception.code, failure.exception.detail), ('invalid_decrypt_result', names[1]))
+                        self.assertEqual(app.SERVICE_SLOTS[names[1]]['status'], 'failed')
+                self.assertEqual(requests, [files, files[1:]])
+                self.assertTrue(garlic.valid_decrypted_slot(sess / 'dec' / names[0], names[0]))
+                self.assertEqual(garlic.valid_decrypted_slot(stale, names[1]), retry_succeeds)
+                self.assertEqual(files[1].read_bytes(), b'original')

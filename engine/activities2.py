@@ -65,7 +65,7 @@ SHOOTING RANGE GOLD MEDALS 0/42 (shootingranges; gold encoding and unlock counte
   checklist   shootingrangegoldmedals/story000; percent totalprogressmade.shootingrangegoldmedals = pct(n, 42).
   evidence    Three played courses with highestmedal=3 had three bronze, three silver and zero gold in the
               venue and global counters. Read gold from the stored counter. Per-course gold encoding is unresolved.
-  writes      Counter mode updates the checklist. Full medal rewriting is unavailable.
+  writes      Preparation resolves medal codes per save and leaves one course for an in-game gold.
 
 POOL OPPONENTS DEFEATED 0/5 (pool; per-venue flag meaning inferred)
   rows        <68ea5b9f>.pool<venue> (bool) and gameswon.pool<venue> (int32) at 7 venues (delights, kowaachobee,
@@ -333,18 +333,19 @@ def gold_recipe(st):
             if sum(ranks[c] >= rank for c in rows) != st.value('shootingrange' + name + 'medals', qual, owner):
                 return None
     missing = [row for row in records if ranks[row[3]] < 3]
-    # Prefer a beginner challenge the player can immediately play.
-    keep = next((row for row in missing if row[2] == 'beginner' and st.value('unlocked', row[2], row[1]) is True), None)
-    if not keep:
-        keep = next((row for row in missing if st.value('unlocked', row[2], row[1]) is True), None)
-    if not keep:
-        return None
+    # The preparation opens the locked tiers too. On a completed card, choose
+    # one beginner gold to replay so the game sees the transition to 42 again.
+    candidates = missing or records
+    keep = min(candidates, key=lambda row: (st.value('unlocked', row[2], row[1]) is not True,
+                                             row[2] != 'beginner'))
     return ranks, [row for row in missing if row != keep], keep
 
 
-def prepare_gold(ed, recipe):
+def prepare_gold(ed, recipe, complete=False):
     ranks, targets, keep = recipe
     gold_code = next(c for c, rank in ranks.items() if rank == 3)
+    if complete and ranks[keep[3]] < 3:
+        targets = [*targets, keep]
     for venue, course, tier, old in targets:
         if ed.get('unlocked', tier, course) is not True:
             raise fl.FeatureError('range_access')
@@ -360,8 +361,18 @@ def prepare_gold(ed, recipe):
             for qual, owner in ((0, course), (tier, venue), (0, venue), (0, ST)):
                 ed.add(stat, qual, owner, 1, course)
                 ed.add(TOTAL_MEDALS, qual, owner, 1, course)
+    venue, course, tier, previous = keep
+    if not complete and ranks[previous] == 3:
+        # Keep lifetime play counts. Clear just this medal and its score threshold.
+        for field in ('highestmedal', 'bestscore', 'recentscore'):
+            ed.put(field, tier, course, 0, course + ' / ' + tier)
+        for qual, owner in ((0, course), (tier, venue), (0, venue), (0, ST)):
+            for name in ('bronze', 'silver', 'gold'):
+                ed.add('shootingrange' + name + 'medals', qual, owner, -1, course)
+            ed.add(TOTAL_MEDALS, qual, owner, -3, course)
+    expected = gold_code if complete else (0 if ranks[previous] == 3 else previous)
     _percent(ed, 'shootingranges', ed.get('shootingrangegoldmedals'))
-    if ed.get('shootingrangegoldmedals') != 41 or ed.get('highestmedal', keep[2], keep[1]) != keep[3]:
+    if ed.get('shootingrangegoldmedals') != (42 if complete else 41) or ed.get('highestmedal', keep[2], keep[1]) != expected:
         raise fl.FeatureError('verify_failed')
 
 
@@ -388,29 +399,31 @@ def range_access(st):
             break
         counts.append(sum(detailed))
     recorded = sum(counts) if len(counts) == len(VENUES) else None
-    recipe = gold_recipe(st) if recorded and recorded < 42 and all(v['open'] and v['valid'] for v in venues) else None
+    recipe = gold_recipe(st) if recorded and all(v['open'] and v['valid'] for v in venues) else None
     last = list(recipe[2][:3]) if recipe else None
-    return {'venues': venues, 'recorded': recorded, 'checklist': st.value(gold, 0, ST), 'last': last}
+    return {'venues': venues, 'recorded': recorded, 'checklist': st.value(gold, 0, ST), 'last': last,
+            'lastLocked': bool(last and not st.value('unlocked', last[2], last[1]))}
 
 
 def apply_range_access(b, choice):
-    if not isinstance(choice, dict) or set(choice) != {'venues', 'repair', 'prepare'}:
+    if not isinstance(choice, dict) or set(choice) not in ({'venues', 'repair', 'prepare'}, {'venues', 'repair', 'prepare', 'reward'}):
         raise fl.FeatureError('bad_request')
     venues, repair = choice['venues'], choice['repair']
     if (not isinstance(venues, list) or any(v not in ('griffin', 'rodgers') for v in venues)
             or type(repair) is not bool or type(choice['prepare']) is not bool):
+        raise fl.FeatureError('bad_request')
+    reward = choice.get('reward')
+    if reward not in (None, 'shop', 'skip') or (reward == 'skip' and choice['prepare']):
         raise fl.FeatureError('bad_request')
     s = fl.Save(b)
     st = fl.Stats(s.text(fl.STATS))
     ed = Edit(st)
     info = range_access(st)
     recipe = None
-    if choice['prepare']:
-        if not info['last'] or info['checklist'] is None or info['checklist'] < info['recorded']:
+    if choice['prepare'] or reward == 'skip':
+        if not info['last'] or info['checklist'] is None:
             raise fl.FeatureError('range_access')
         recipe = gold_recipe(st)
-        if not recipe[1] and info['recorded'] == info['checklist']:
-            return b, []
         venues = [v for v, _ in VENUES]
     for item in info['venues']:
         venue = item['id']
@@ -434,15 +447,18 @@ def apply_range_access(b, choice):
             ed.put(global_key, 0, ST, sum(ed.get(local_key, 0, v) for v, _ in VENUES), global_key)
     if repair or recipe:
         recorded = info['recorded']
-        if recorded is None or info['checklist'] is None or info['checklist'] < recorded:
+        if recorded is None or info['checklist'] is None:
             raise fl.FeatureError('range_access')
         ed.put('shootingrangegoldmedals', 0, ST, recorded, 'Shooting range gold medals')
         _percent(ed, 'shootingranges', recorded)
     if recipe:
-        prepare_gold(ed, recipe)
-    if not ed.moved:
-        return b, []
-    return finish(s, st, ed.moved, [])
+        prepare_gold(ed, recipe, complete=reward == 'skip')
+    result, log = finish(s, st, ed.moved, []) if ed.moved else (b, [])
+    if reward:
+        import rangereward
+        result, changes = rangereward.apply(result)
+        log += changes
+    return result, log
 
 
 def _read_pool(st):

@@ -26,7 +26,7 @@ else:
 DATA = APP_SUPPORT / 'MoonSlot' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.30.6'
+VERSION = '1.30.7'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -603,17 +603,7 @@ def remember_service_job(name, job_id):
 
 
 def decrypt_slots(sess, images):
-    slots = []
-    start = 0
-    while start < len(images):
-        end, size = start, 0
-        while end < len(images) and end - start < 64:
-            added = images[end].stat().st_size
-            if end > start and size + added > 64 * 1024 * 1024:
-                break
-            end += 1
-            size += added
-        batch = images[start:end]
+    def fetch(batch):
         receipt = sess / ('decrypt-' + batch[0].name + '.json')
         job_id = None
         if receipt.is_file():
@@ -638,11 +628,46 @@ def decrypt_slots(sess, images):
                     remember_service_job(path.name, jid)
 
             try:
-                G.decrypt_batch(batch, sess / 'dec', report, remember, job_id=job_id)
+                invalid = G.decrypt_batch(batch, sess / 'dec', report, remember, job_id=job_id)
+            except zipfile.BadZipFile:
+                log('Unreadable result ZIP for ' + ', '.join(p.name for p in batch))
+                invalid = batch
             except garlic.SaveJobEnded:
                 receipt.unlink(missing_ok=True)
                 raise
         receipt.unlink(missing_ok=True)
+        with LOCK:
+            for image in invalid:
+                SERVICE_SLOTS[image.name].update(status='pending', queuedAt=None, jobId=None)
+        return invalid
+
+    slots = []
+    start = 0
+    while start < len(images):
+        end, size = start, 0
+        while end < len(images) and end - start < 64:
+            if end > start and (sess / ('decrypt-' + images[end].name + '.json')).is_file():
+                break
+            added = images[end].stat().st_size
+            if end > start and size + added > 64 * 1024 * 1024:
+                break
+            end += 1
+            size += added
+        batch = images[start:end]
+        # A per-slot retry may have been interrupted after the service accepted it.
+        receipt = sess / ('decrypt-' + batch[0].name + '.json')
+        if receipt.is_file() and json.loads(receipt.read_text('utf-8')).get('slots') == [batch[0].name]:
+            batch, end = batch[:1], start + 1
+        invalid = fetch(batch)
+        failed = []
+        for image in invalid:
+            log('Invalid decrypt result for ' + image.name + '. Retrying this slot separately.')
+            if fetch([image]):
+                failed.append(image.name)
+                with LOCK:
+                    SERVICE_SLOTS[image.name]['status'] = 'failed'
+        if failed:
+            raise Fail('invalid_decrypt_result', ', '.join(failed))
         slots.extend(read_slot(p.name, sess / 'dec' / p.name) for p in batch)
         start = end
     return slots
@@ -720,6 +745,30 @@ def task_sources(slot):
                if current == 'active' and other['file'] != slot['file']
                and other.get('account') == slot.get('account') and phase(other) == 'done']
     return {'phase': current, 'sources': sources}
+
+
+def missing_link_slots(slot):
+    import tasks, featurelib
+    mission, heist = 0xb9f57af0, 0xe9816d77
+    def story(other):
+        def completed():
+            save = featurelib.Save(slot_bytes(other))
+            return {key for key, kind in tasks.records(save) if kind in (1, 3)}
+        return cached(('story_records', other['file']), completed)
+    current = story(slot)
+    earlier = []
+    if mission in current:
+        for other in STATE['slots']:
+            if other['file'] == slot['file'] or other.get('account') != slot.get('account') or other.get('excluded'):
+                continue
+            try:
+                done = story(other)
+            except (OSError, ValueError, KeyError, TypeError, IndexError, money.SaveError):
+                continue
+            if done < current and mission not in done and heist not in done:
+                earlier.append((len(done), other['file']))
+    return {'missionDone': mission in current, 'heistDone': heist in current,
+            'earlier': [name for _, name in sorted(earlier, reverse=True)]}
 
 
 def apply_slot_edits(slot, data, edits):
@@ -907,7 +956,7 @@ def restore_session(resume=False):
         return
     entry_id, owner, title = candidates[0]
     images = sorted((lib / 'Saves' / owner / title).glob('sdimg_*'))
-    missing = [p for p in images if SLOT_RE.fullmatch(p.name) and not (sess / 'dec' / p.name).is_dir()]
+    missing = [p for p in images if SLOT_RE.fullmatch(p.name) and not garlic.valid_decrypted_slot(sess / 'dec' / p.name, p.name)]
     if missing:
         originals = sess / 'orig'
         if len(candidates) != 1 or not all((originals / p.name).is_file()
@@ -1241,6 +1290,20 @@ def job_restore():
     stage('ready_to_upload')
 
 
+def upload_network_hint(line):
+    if not line.startswith('[network] '):
+        return None
+    try:
+        event = json.loads(line[len('[network] '):])
+    except ValueError:
+        return None
+    if not isinstance(event, dict) or event.get('issue') != 'local_ipv6':
+        return None
+    adapter = event.get('adapter')
+    return {'code': 'local_ipv6', 'adapter': adapter if isinstance(adapter, str) else '',
+            'platform': sys.platform}
+
+
 def job_upload():
     c = STATE['console']; sess = Path(STATE['session']); lib = sess / 'lib'; up = sess / 'upload'; up.mkdir(exist_ok=True)
     stage('preparing')
@@ -1266,6 +1329,11 @@ def job_upload():
     files = 0; finished = False
     for line in p.stdout:
         line = line.rstrip(); low = line.lower()
+        hint = upload_network_hint(line)
+        if hint:
+            stage('waiting_console', hint=hint)
+            log('The console connection needs a local IPv6 address. Waiting for reconnection.')
+            continue
         if 'srch' in low or not line:
             continue
         if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:
@@ -1426,7 +1494,13 @@ class H(BaseHTTPRequestHandler):
                     out[key] = fn()
                 except Exception as e:
                     out[key], errors[key] = None, repr(e)[:200]
+            import rangereward
+            out['rangeReward'] = rangereward.status(b)
             if out.get('tasks'):
+                try:
+                    out['tasks']['missingLink'] = missing_link_slots(slot)
+                except (OSError, ValueError, KeyError, TypeError, IndexError, money.SaveError) as e:
+                    errors['missingLink'] = repr(e)[:200]
                 out['tasks']['skip'] = task_sources(slot)
             out['errors'] = errors
             return self._send(200, out)

@@ -61,6 +61,8 @@
     save_out_of_range: 'One of the new values is outside the allowed range.',
     save_bad_time: 'The time of day needs an hour from 0 to 23 and a minute from 0 to 59.',
     save_fog_reference: 'Choose a decrypted save with all 889 compatible map regions.',
+    invalid_decrypt_result: 'The service returned an unreadable save twice. Resume the download to retry the listed slots.',
+    save_range_reward_layout: 'Shop entry layout unavailable for this save.',
     save_range_access: 'Recheck the venue access and medal records for this save.',
     save_task_layout: 'The task or reference slot no longer matches the supported state.',
     save_award_layout: 'The award records could not be read for this slot.',
@@ -407,7 +409,7 @@
     ['Ammo', 'Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.', 'tested'],
     ['Stats', 'Fitness, overpowers and buffs, time played, distances, earnings, wanted levels and trophy counters, with the game’s own labels.', 'tested'],
     ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.', 'caution'],
-    ['World', 'Time of day, health, armour and the map, plus Lucia’s and Jason’s skills, special meter, criminal profile and relationship.', 'caution'],
+    ['World', 'Time of day and map visibility.', 'caution'],
     ['All stats and Save data', 'Every one of the save’s values, with names or descriptions for almost all of them. For experts.', 'danger']];
 
   const fw = f => /^[0-9a-f]{8}$/i.test(f || '') ? `${Number(f.slice(0, 2))}.${f.slice(2, 4)}` : (f || 'unknown');
@@ -560,7 +562,7 @@
     const st = S.state;
     const s = slotOf(S.slot);
     if (!s) return '<div class="empty">No story saves were found in this download.</div>';
-    const tabs = [['known', 'Known save fields'], ['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
+    const tabs = [['known', 'Known save fields'], ['money', 'Money'], ['ammo', 'Ammo'], ['stats', 'Stats'], ['completion', 'Completion'], ['personal', 'Player attributes'], ['world', 'World'], ['all', 'All stats'], ['data', 'Save data'], ['trophies', 'Trophies']];
     return `
       <section class="title-card"><span class="chip">${label(s)}</span><h1 data-no-i18n>${esc(missionName(s))}</h1>
         <p><span>Save time</span> · <strong>${saveTime(s) || '<span>Save time unavailable</span>'}</strong></p>
@@ -590,8 +592,8 @@
     if (S.tab === 'stats') return panelStats(s, d);
     if (S.tab === 'data') return S.sd[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.sd[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
       : S.sd[s.file] ? panelData(s) : '<div class="empty">Reading this save…</div>';
-    if (S.tab === 'world') return S.world[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.world[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
-      : S.world[s.file] ? panelWorld(s) : '<div class="empty">Reading this save…</div>';
+    if (['world', 'personal'].includes(S.tab)) return S.world[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.world[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
+      : S.world[s.file] ? (S.tab === 'personal' ? panelPersonal(s) : panelWorld(s)) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'completion') return S.comp[s.file]?.failed ? `<div class="callout danger">${esc(ERR[S.comp[s.file].failed] || ERR.internal)} <button class="btn small" data-act="reload">Try again</button></div>`
       : S.comp[s.file] ? panelCompletion(s) : '<div class="empty">Reading this save…</div>';
     if (S.tab === 'all') return S.stats[s.file] ? panelAll(s) : '<div class="empty">Loading every stat in this save…</div>';
@@ -1152,16 +1154,35 @@
     if (!data) return '';
     const choice = draftOf(s.file).completion.rangeAccess;
     const control = (action, label, on, disabled) => `<button class="btn small" data-act="range-access" data-value="${action}" aria-pressed="${!!on}" ${disabled ? 'disabled' : ''}>${esc(T(on ? 'Undo' : label))}</button>`;
-    const repair = data.recorded != null && data.checklist > data.recorded;
+    const repair = data.recorded != null && data.checklist != null && data.checklist !== data.recorded;
     const last = data.last;
+    const replay = data.recorded === 42;
+    const prepare = last && (data.recorded !== 41 || data.lastLocked)
+      ? control('prepare', replay ? 'Reset this gold for replay' : 'Prepare 41 gold medals', choice?.prepare, data.checklist == null || choice?.reward === 'skip') : '';
     const venues = data.venues.map(v => `<div class="field"><div class="name">${esc(v.label)} <small>${v.available} / ${v.total}</small></div>
       ${v.open ? control(v.id, 'Open all difficulties here', choice?.venues.includes(v.id), !v.valid || v.available === v.total || choice?.prepare) : '<span>Buy the waiver at this range in game.</span>'}</div>`).join('');
     return `<div class="group"><div class="section-head"><h3>Hillinger M306 TMR</h3>${riskTag('experimental')}</div>
       <p><span>Gold medals by course</span> <strong>${data.recorded ?? '—'} / 42</strong> · <span>Checklist</span> ${data.checklist ?? '—'} / 42</p>${venues}
+      ${C.rangeReward === 'unavailable' ? '<p>Shop entry layout unavailable for this save.</p>' :
+        `<p>Try writing the shop entry directly. Check the TMR in an expanded gun shop after loading the edited slot.</p>
+        ${C.rangeReward === 'set' ? '<span>Shop entry already set.</span>' : control('shop', 'Try unlocking the TMR without playing the ranges', choice?.reward === 'shop', false)}
+        ${last && data.recorded < 42 ? control('skip', 'Skip remaining courses and try the TMR unlock', choice?.reward === 'skip', !!choice?.prepare) : ''}`}
       ${repair ? control('repair', 'Repair checklist from course medals', choice?.repair, choice?.prepare) : ''}
-      ${last ? `<p><span>Earn the final gold in game</span> · <strong>${esc(last[0] === 'griffin' ? 'Griffin' : 'Rodgers')} / ${esc(last[1].slice(last[0].length, -5))} / ${esc(T(last[2]))}</strong></p>${data.recorded < 41 ? control('prepare', 'Prepare 41 gold medals', choice?.prepare, data.checklist == null || data.checklist < data.recorded) : ''}`
+      ${last ? `<p><span>Earn the final gold in game</span> · <strong>${esc(last[0] === 'griffin' ? 'Griffin' : 'Rodgers')} / ${esc(last[1].slice(last[0].length, -5))} / ${esc(T(last[2]))}</strong></p>${replay ? '<p>Replay clears the medal and scores for this course. After transfer, earn gold here and check the shop.</p>' : ''}${prepare}`
       : data.recorded === 42 ? '<p>All course golds are recorded. Check the shop in game.</p>' : data.recorded === 41 ? '<p>One course gold remains. Earn it in game and check the shop.</p>' : '<p>To prepare 41 golds, open both venues and earn a gold in game. The editor checks the medal encoding against your course records.</p>'}
       <p>Shop availability after the final gold still needs console testing.</p></div>`;
+  }
+
+  function missingLinkPanel(info) {
+    if (!info) return '';
+    const progress = done => esc(T(done ? 'Completed' : 'No completion record'));
+    const slots = info.earlier.map(slotOf).filter(Boolean);
+    return `<details class="group"><summary>Monty interrogation and heist progress</summary>
+      <p><span>The Missing Link</span> · ${progress(info.missionDone)}<br><span>The Cartel Heist</span> · ${progress(info.heistDone)}</p>
+      <p>The three intel flags have not been identified.</p>
+      ${slots.length ? `<p>To replay from an earlier slot, load it in game and save the new run in a separate slot. Listed by story progress.</p>
+        <ul>${slots.map(x => `<li>${esc(x.file)} · ${esc(missionName(x))} · ${esc(saveTime(x))}</li>`).join('')}</ul>` :
+        info.missionDone ? '<p>No earlier eligible slot in this download.</p>' : ''}</details>`;
   }
 
   function panelCompletion(s) {
@@ -1173,6 +1194,7 @@
       ${compSummary(s)}
       ${missing.length ? `<div class="callout">Some parts can’t be read in this save yet, usually because it’s early in the story: ${missing.map(esc).join(', ')}. Everything else works.</div>` : ''}
       ${taskSkipControl(s, C.tasks?.skip)}
+      ${missingLinkPanel(C.tasks?.missingLink)}
       ${rangeRewards(s, C)}
       ${checklistSections(s)}
       <details class="more-opts" data-keep="compMore" ${S.keep.compMore ? 'open' : ''}><summary>Every option, part by part</summary>
@@ -1345,6 +1367,17 @@
   function panelWorld(s) {
     const w = S.world[s.file], d = draftOf(s.file).world, c = w.clock;
     const t = d.time || {hour: c.hour, minute: c.minute};
+    return `<div class="section-head"><h2>World</h2>${riskTag('caution')}
+        <p>Time of day and map visibility.</p></div>
+      <div class="fields">
+        <div class="field"><div class="name">Time of day<span class="help">Now ${two(c.hour)}:${two(c.minute)} on ${c.day} ${monthName(c.month)} ${c.year} in the game. The date stays the same.</span></div>
+          <div class="inputs"><div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-hour">Hour</label><span class="with-unit"><input id="w-hour" type="number" min="0" max="23" step="1" value="${t.hour}" data-world="hour"></span></div>
+            <div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-min">Minute</label><span class="with-unit"><input id="w-min" type="number" min="0" max="59" step="1" value="${two(t.minute)}" data-world="minute"></span></div></div></div>
+      </div>${mapGroup(s)}`;
+  }
+
+  function panelPersonal(s) {
+    const w = S.world[s.file], d = draftOf(s.file).world;
     const hp = d.health ?? w.health;
     const growth = ['lucia', 'jason'].map(player => {
       const fields = Object.entries(w.capacities || {}).filter(([key]) => key.startsWith(player + '_'));
@@ -1355,12 +1388,8 @@
           <button class="btn small" data-act="growth-fill" data-growth="${key}">Max</button></div>`).join('')}
         <button class="btn small" data-act="growth-fill" data-growth="${player}">Max available capacities</button></div>`;
     }).join('');
-    return `<div class="section-head"><h2>World</h2>${riskTag('caution')}
-        <p>The time of day, health and armour the save was made with. Not tested on a PS5 yet: send the save and check it loads before relying on it.</p></div>
+    return `<h2>Player attributes</h2>${characterGroups(s)}
       <div class="fields">
-        <div class="field"><div class="name">Time of day<span class="help">Now ${two(c.hour)}:${two(c.minute)} on ${c.day} ${monthName(c.month)} ${c.year} in the game. The date stays the same.</span></div>
-          <div class="inputs"><div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-hour">Hour</label><span class="with-unit"><input id="w-hour" type="number" min="0" max="23" step="1" value="${t.hour}" data-world="hour"></span></div>
-            <div class="cell narrow ${d.time ? 'changed' : ''}"><label for="w-min">Minute</label><span class="with-unit"><input id="w-min" type="number" min="0" max="59" step="1" value="${two(t.minute)}" data-world="minute"></span></div></div></div>
         <h3>Current condition</h3><button class="btn small" data-act="condition-fill">Fill health and armour</button>
         <div class="field"><div class="name">Health<span class="help">Now ${nf2.format(w.health)}. Up to ${nf.format(w.healthMax)}; above 100 is overpowered health.</span></div>
           <div class="inputs"><div class="cell ${d.health != null ? 'changed' : ''}"><label for="w-hp">Health</label><span class="with-unit"><input id="w-hp" type="number" min="1" max="${w.healthMax}" step="any" value="${hp}" data-world="health">
@@ -1369,7 +1398,7 @@
           <div class="inputs">${d.armour === 'full' ? '<span class="note">Will be filled. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="armour">Undo</button>'
             : `<button class="btn small" data-act="world-fill" data-what="armour" ${w.armour >= w.armourMax ? 'disabled' : ''}>${w.armour >= w.armourMax ? 'Already full' : 'Fill armour'}</button>`}</div></div>
       </div><h2>Long-term capacities</h2><p>Editor target: 100 points. Only capacities with matching saved values are listed.</p>${growth}
-      ${mapGroup(s)}${characterGroups(s)}`;
+      `;
   }
 
   // a World field with its own risk label; help is plain text
@@ -1514,7 +1543,7 @@
     activities: 'Meditation', checklist: 'Completion checklist', tasks: 'Tasks', gangs: 'Gangs', robberies: 'Robberies',
     fencing: 'Fencing', activities2: 'Activities', hoops: 'Basketball hoops', vehicles: 'Vehicle compendium', collectibles: 'Collectibles'
   };
-  const researchLinks = [['money','Money'],['ammo','Ammo'],['world','Current condition'],['stats','Stats'],
+  const researchLinks = [['money','Money'],['ammo','Ammo'],['personal','Player attributes'],['world','World'],['stats','Stats'],
     ['completion','Completion'],['all','All stats'],['data','Save data']];
 
   function topicRows(file, topic) {
@@ -1701,7 +1730,7 @@
       catch (e) { S.sd[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
-    if (S.tab === 'world' && !S.world[file]) {
+    if (['world', 'personal'].includes(S.tab) && !S.world[file]) {
       try { S.world[file] = await api('/api/world?file=' + encodeURIComponent(file)); } catch (e) { S.world[file] = {failed: e.code || 'request_failed'}; }
       S.mainKey = ''; renderMain(); return;
     }
@@ -1726,7 +1755,8 @@
     const feat = new Set((S.detail[S.slot]?.featured || []).flatMap(f => f.entries.map(e => `${e.group}:${e.row}`)));
     const stunt = S.stuntKeys[S.slot] || new Set();
     n.trophies = d.completion.awards?.ids?.length || 0;
-    n.completion = compCount(d.completion) - (n.trophies ? 1 : 0); n.world = worldCount(d.world); n.data = Object.keys(d.raw || {}).length;
+    n.completion = compCount(d.completion) - (n.trophies ? 1 : 0); n.world = ['time', 'fog'].filter(k => d.world?.[k] != null).length;
+    n.personal = worldCount(Object.fromEntries(Object.entries(d.world || {}).filter(([k]) => !['time', 'fog'].includes(k) && !k.startsWith('research_')))); n.data = Object.keys(d.raw || {}).length;
     for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     const known = S.known[S.slot]?.rows || [];
     n.known = Object.keys(d.world || {}).filter(k=>k.startsWith('research_')).length
@@ -1855,6 +1885,18 @@
       <div class="bar ${pct == null ? '' : 'fixed'}"><span ${pct == null ? '' : `style="width:${pct}%"`}></span></div>`;
   }
 
+  function uploadNetworkHelp(hint) {
+    if (hint?.code !== 'local_ipv6') return '';
+    const steps = hint.platform === 'win32'
+      ? 'Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version 6 (TCP/IPv6).'
+      : hint.platform === 'darwin'
+        ? 'Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.'
+        : 'Open the settings for this network connection and enable automatic or link-local IPv6.';
+    return `<div class="callout" role="status"><strong>${esc(T('This transfer needs IPv6 on the local network.'))}</strong>
+      ${hint.adapter ? `<div>${esc(T('Network adapter'))} · <b>${esc(hint.adapter)}</b></div>` : ''}
+      <div>${esc(T(steps))}</div><div>${esc(T('Keep this page open. Search again on the PS5 and select Save Garage.'))}</div></div>`;
+  }
+
   function renderJob() {
     const st = S.state;
     if (!st) return;
@@ -1876,6 +1918,7 @@
             ${job.stage === 'choose_account' && job.accounts ? `<div class="accounts"><strong>Which account’s save do you want to edit?</strong>
               <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
+            ${uploadNetworkHelp(job.hint)}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
             ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'key_rate_wait', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${serviceQueue(job)}${logBlock(job)}</div>`;
@@ -1943,7 +1986,8 @@
       worldList.push({label:row?T(row.label):key, value:row?.value??'',newValue:v});
     }
     const cp = d.completion || {};
-    const compList = [cp.rangeAccess && {label: T('Shooting range progress'), value: '', newValue: [cp.rangeAccess.prepare && T('Prepare 41 gold medals'), ...cp.rangeAccess.venues, cp.rangeAccess.repair && T('Repair checklist from course medals')].filter(Boolean).join(' · ')}, cp.skipTask && {label: T('Optional task') + ' 0xad8c8a22', value: '', newValue: T('Complete')}, cp.awards && {label: T('Award records'), value: '', newValue: cp.awards.ids.length}, cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
+    const rangeGolds = S.comp[s.file]?.activities2?.lines?.find(l => l.key === 'shootingranges')?.access?.recorded;
+    const compList = [cp.rangeAccess && {label: T('Shooting range progress'), value: '', newValue: [cp.rangeAccess.reward && T(cp.rangeAccess.reward === 'skip' ? 'Skip remaining courses and try the TMR unlock' : 'Try unlocking the TMR without playing the ranges'), cp.rangeAccess.prepare && T(rangeGolds === 42 ? 'Reset this gold for replay' : 'Prepare 41 gold medals'), ...cp.rangeAccess.venues, cp.rangeAccess.repair && T('Repair checklist from course medals')].filter(Boolean).join(' · ')}, cp.skipTask && {label: T('Optional task') + ' 0xad8c8a22', value: '', newValue: T('Complete')}, cp.awards && {label: T('Award records'), value: '', newValue: cp.awards.ids.length}, cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
       cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
       cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
@@ -2136,10 +2180,14 @@
       const edit = d.rangeAccess || {venues: [], repair: false, prepare: false};
       const value = b.dataset.value;
       if (value === 'prepare') edit.prepare = !edit.prepare;
+      else if (value === 'shop' || value === 'skip') {
+        if (edit.reward === value) delete edit.reward;
+        else edit.reward = value;
+      }
       else if (value === 'repair') edit.repair = !edit.repair;
       else if (edit.venues.includes(value)) edit.venues = edit.venues.filter(v => v !== value);
       else edit.venues.push(value);
-      if (edit.venues.length || edit.repair || edit.prepare) d.rangeAccess = edit;
+      if (edit.venues.length || edit.repair || edit.prepare || edit.reward) d.rangeAccess = edit;
       else delete d.rangeAccess;
       S.mainKey = ''; renderMain(); renderPending(); renderCounts(); return;
     }

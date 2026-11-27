@@ -2,7 +2,7 @@
 # the additional terms in NOTICE. See LICENSE.
 """GarlicSaves client: decrypt, encrypt and transfer-key derivation, and the sign-in that gets this installation its
 worker key. Uses curl because Cloudflare blocks Python's own HTTP fingerprint."""
-import json, subprocess, time, urllib.request, urllib.parse, shutil, os, re, socket, threading, unicodedata, zipfile
+import json, subprocess, time, urllib.request, urllib.parse, shutil, os, re, socket, threading, unicodedata, zipfile, struct
 from pathlib import Path
 
 DEFAULT_SERVER = 'https://garlicsaves.com'
@@ -62,6 +62,27 @@ def web_link(v):
 
 class GarlicError(Exception):
     pass
+
+
+def valid_decrypted_slot(folder, name):
+    """Recognise the game payload before caching or reusing a service result."""
+    inner = 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.removeprefix('sdimg_SAVEDATA')
+    try:
+        with (folder / inner).open('rb') as payload:
+            header = payload.read(16)
+            if len(header) < 16 or header[:4] != b'JSAV':
+                return False
+            sections = sum(struct.unpack_from('<II', header, 8))
+            if not 0 < sections <= (os.fstat(payload.fileno()).st_size - 16) // 20:
+                return False
+        with (folder / 'sce_sys' / 'param.sfo').open('rb') as meta:
+            header = meta.read(20)
+            if len(header) != 20 or header[:4] != b'\0PSF':
+                return False
+            keys, data, fields = struct.unpack_from('<III', header, 8)
+            return 20 + fields * 16 <= keys <= data <= os.fstat(meta.fileno()).st_size
+    except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
+        return False
 
 
 class TemporaryServiceError(GarlicError):
@@ -538,20 +559,40 @@ class Garlic:
             archive = Path(temp) / 'result.zip'
             self._result(jid, str(archive))
             unpack = Path(temp) / 'slots'
+            invalid = []
             with zipfile.ZipFile(archive) as zf:
-                for member in zf.namelist():
-                    parts = member.rstrip('/').split('/')
-                    if (parts[0] not in expected or any(p in ('', '.', '..') for p in parts)
-                            or '\\' in member or ':' in member):
-                        raise GarlicError('unexpected batch result layout')
-                for name in expected:
-                    inner = 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.removeprefix('sdimg_SAVEDATA')
-                    for required in (name + '/' + inner, name + '/sce_sys/param.sfo'):
-                        if required not in zf.NameToInfo or not zf.getinfo(required).file_size:
-                            raise GarlicError('incomplete batch result: ' + name)
-                zf.extractall(unpack)
-            for path in images:
-                (unpack / path.name).rename(out_dir / path.name)
+                members = {name: [] for name in expected}
+                for entry in zf.infolist():
+                    parts = entry.filename.rstrip('/').split('/')
+                    if any(p in ('', '.', '..') for p in parts) or '\\' in entry.filename or ':' in entry.filename:
+                        raise GarlicError('unsafe archive')
+                    if parts[0] in members:
+                        members[parts[0]].append(entry)
+                for path in images:
+                    name = path.name
+                    dest = out_dir / name
+                    if valid_decrypted_slot(dest, name):
+                        continue
+                    try:
+                        for entry in members[name]:
+                            zf.extract(entry, unpack)
+                    except zipfile.BadZipFile:
+                        invalid.append(path)
+                        continue
+                    if not valid_decrypted_slot(unpack / name, name):
+                        invalid.append(path)
+                        continue
+                    # Windows cannot replace a non-empty directory directly.
+                    backup = Path(temp) / ('old-' + name)
+                    if dest.exists():
+                        dest.rename(backup)
+                    try:
+                        (unpack / name).rename(dest)
+                    except OSError:
+                        if backup.exists():
+                            backup.rename(dest)
+                        raise
+            return invalid
 
     def encrypt(self, workspace_zip, account_id_hex, out_path, on_status=None, on_job=None):
         jid = self._submit({'operation': 'encrypt', 'account_id': account_id_hex, 'platform': 'ps5'}, workspace_zip, 'workspace.zip', on_status)
