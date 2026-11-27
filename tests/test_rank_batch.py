@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+import sqlite3
 import struct
 import sys
 import tempfile
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -62,7 +64,7 @@ class BatchDecrypt(unittest.TestCase):
                     patch.object(app.G, 'decrypt_batch', side_effect=batch), patch.object(app, 'read_slot', return_value='slot'):
                 with self.assertRaises(garlic.TemporaryServiceError):
                     app.decrypt_slots(sess, [image])
-                self.assertEqual(app.decrypt_slots(sess, [image]), ['slot'])
+                self.assertEqual(app.decrypt_slots(sess, [image]), (['slot'], []))
             self.assertEqual(observed, [None, 'saved-job'])
             self.assertFalse(list(sess.glob('decrypt-*.json')))
 
@@ -99,14 +101,48 @@ class BatchDecrypt(unittest.TestCase):
                 with patch.dict(app.SERVICE_SLOTS, rows, clear=True), patch.dict(app.JOB, log=[]), \
                         patch.object(app.G, '_submit', side_effect=submit), patch.object(app.G, '_wait'), \
                         patch.object(app.G, '_result', side_effect=result), patch.object(app, 'read_slot', side_effect=lambda n, d: n):
+                    slots, skipped = app.decrypt_slots(sess, files)
                     if retry_succeeds:
-                        self.assertEqual(app.decrypt_slots(sess, files), names)
+                        self.assertEqual((slots, skipped), (names, []))
                     else:
-                        with self.assertRaises(app.Fail) as failure:
-                            app.decrypt_slots(sess, files)
-                        self.assertEqual((failure.exception.code, failure.exception.detail), ('invalid_decrypt_result', names[1]))
+                        self.assertEqual(slots, names[:1])
+                        self.assertEqual(skipped, [{'file': names[1], 'subtitle': '', 'why': 'damaged'}])
                         self.assertEqual(app.SERVICE_SLOTS[names[1]]['status'], 'failed')
-                self.assertEqual(requests, [files, files[1:]])
+                self.assertEqual(requests, [files] + [files[1:]] * (1 if retry_succeeds else 2))
                 self.assertTrue(garlic.valid_decrypted_slot(sess / 'dec' / names[0], names[0]))
                 self.assertEqual(garlic.valid_decrypted_slot(stale, names[1]), retry_succeeds)
                 self.assertEqual(files[1].read_bytes(), b'original')
+
+    def test_restore_keeps_readable_slots_and_pending_deletion_after_partial_download(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            sess = root / time.strftime('%Y%m%d-%H%M%S')
+            owner, title = '00000001', app.GTA_TITLES[0]
+            catalog = sess / 'lib' / 'Saves' / owner / title
+            catalog.mkdir(parents=True)
+            meta = sess / 'lib' / 'Transfer-Metadata'
+            meta.mkdir()
+            db = sqlite3.connect(meta / 'metadata.db')
+            try:
+                db.execute('CREATE TABLE dir_entry_info_tbl(id, path)')
+                db.execute('CREATE TABLE user_info_tbl(user_id, user_name, login_id, online_id)')
+                db.execute('INSERT INTO user_info_tbl VALUES (1, "Player", "", "")')
+                db.execute('INSERT INTO dir_entry_info_tbl VALUES (42, ?)', (f'/lib/Saves/{owner}/{title}',))
+                db.commit()
+            finally:
+                db.close()
+            names = [f'sdimg_SAVEDATASARC000{i}' for i in range(3)]
+            for name in names:
+                (catalog / name).write_bytes(b'original')
+            app.remember_skipped(sess, [{'why': 'damaged', 'file': names[2]}])
+            (sess / 'excluded-slots.json').write_text(json.dumps([names[1]]))
+            with patch.object(app, 'session_dir', return_value=root), patch.object(app, 'console_dir', return_value=root), \
+                    patch.object(garlic, 'valid_decrypted_slot', side_effect=lambda _, n: n in names[:2]), \
+                    patch.object(app, 'read_slot', side_effect=lambda n, folder: {'file': n}), \
+                    patch.dict(app.STATE, clear=True), patch.object(app.G, 'decrypt_batch') as decrypt:
+                app.restore_session()
+                self.assertEqual(app.STATE['user']['name'], 'Player')
+                self.assertEqual([s['file'] for s in app.STATE['slots']], names[:2])
+                self.assertTrue(app.STATE['slots'][1]['excluded'])
+                self.assertEqual(app.STATE['skipped'][0]['file'], names[2])
+                decrypt.assert_not_called()

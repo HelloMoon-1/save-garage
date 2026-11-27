@@ -1710,5 +1710,16 @@
 "GTA6 Story Save Editor": "GTA6 剧情存档编辑器",
 "GTA6 Story Save Editor home": "GTA6 剧情存档编辑器主页",
 "This is an unofficial modified build of Save Garage.": "本工具是基于 Save Garage 的非官方修改版。",
-"Quit editor": "退出编辑器"
+"Quit editor": "退出编辑器",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again.": "即使再次请 GarlicSaves 解密，这次下载中的存档仍然都无法读取。",
+"The saves on your PS5 are fine.": "你 PS5 上的存档没有问题。",
+"Wait a few minutes, then download again.": "请等几分钟，然后重新下载。",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5.": "这台 PS5 通过 IPv6 传回存档，但这台电脑用来连接 PS5 的网络适配器没有 IPv6 地址。",
+"Turn on IPv6 for that adapter, then send the save again.": "请为该适配器开启 IPv6，然后重新传回存档。",
+"Save Garage couldn’t read these saves, so they can’t be edited this time.": "Save Garage 无法读取这些存档，所以这次不能编辑它们。",
+"They stay on the PS5 as they are, and you can edit the other saves as usual.": "它们会原样保留在 PS5 上，其他存档可以照常编辑。",
+"Downloading again later may help.": "稍后重新下载可能会解决。",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "即使再次请 GarlicSaves 解密，这次下载中的存档仍然都无法读取。你 PS5 上的存档没有问题。请等几分钟，然后重新下载。",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "这台 PS5 通过 IPv6 传回存档，但这台电脑用来连接 PS5 的网络适配器没有 IPv6 地址。请为该适配器开启 IPv6，然后重新传回存档。",
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage 无法读取这些存档，所以这次不能编辑它们。它们会原样保留在 PS5 上，其他存档可以照常编辑。稍后重新下载可能会解决。"
 }

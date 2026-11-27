@@ -26,7 +26,7 @@ else:
 DATA = APP_SUPPORT / 'MoonSlot' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.30.7'
+VERSION = '1.31.0'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -166,7 +166,7 @@ RESTART = threading.Event()                                 # set by /api/update
 SRV = {'s': None}
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
-         'slots': [], 'readyToUpload': False, 'network': None}
+         'slots': [], 'skipped': [], 'readyToUpload': False, 'network': None}
 JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None,
        'wait': None, 'log': []}
 CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
@@ -177,9 +177,23 @@ SERVICE_SLOTS = {}  # insertion order is the local submission order for this job
 JOB_STARTED = 0.0
 
 
+HOME = os.path.expanduser('~')
+CONSOLE_DIR_RE = re.compile(r'(consoles[\\/])[0-9A-Fa-f]{12}(?![0-9A-Fa-f])')
+
+
+def scrub(msg):
+    """Text for the details, which people paste into bug reports: the data folder becomes <data>, the home folder (it
+    holds the computer's user name) ~, and a PS5's ID in a consoles/ path <console>."""
+    s = str(msg)
+    for path, short in ((str(DATA), '<data>'), (HOME, '~')):
+        if len(path) > 3:
+            s = s.replace(path, short)
+    return CONSOLE_DIR_RE.sub(r'\1<console>', s)
+
+
 def log(msg):
     with LOCK:
-        JOB['log'].append({'t': round(time.time(), 1), 'm': str(msg)[:300]})
+        JOB['log'].append({'t': round(time.time(), 1), 'm': scrub(msg)[:300]})
         del JOB['log'][:-200]
 
 
@@ -259,7 +273,7 @@ def start_job(kind, fn):
     def failed(code, detail):
         log('FAIL %s %s' % (code, detail))
         with LOCK:
-            JOB.update(status='error', error={'code': code, 'detail': str(detail)[:300]}, needPower=False, accounts=None, wait=None)
+            JOB.update(status='error', error={'code': code, 'detail': scrub(detail)[:300]}, needPower=False, accounts=None, wait=None)
 
     def run():
         try:
@@ -275,7 +289,7 @@ def start_job(kind, fn):
         except Exception as e:
             log(traceback.format_exc()[-600:])
             with LOCK:
-                JOB.update(status='error', error={'code': 'internal', 'detail': repr(e)[:300]}, needPower=False, accounts=None)
+                JOB.update(status='error', error={'code': 'internal', 'detail': scrub(repr(e))[:300]}, needPower=False, accounts=None)
         finally:
             kill_proc()
     threading.Thread(target=run, daemon=True).start()
@@ -641,7 +655,7 @@ def decrypt_slots(sess, images):
                 SERVICE_SLOTS[image.name].update(status='pending', queuedAt=None, jobId=None)
         return invalid
 
-    slots = []
+    slots, skipped = [], []
     start = 0
     while start < len(images):
         end, size = start, 0
@@ -659,18 +673,63 @@ def decrypt_slots(sess, images):
         if receipt.is_file() and json.loads(receipt.read_text('utf-8')).get('slots') == [batch[0].name]:
             batch, end = batch[:1], start + 1
         invalid = fetch(batch)
-        failed = []
+        damaged_slots = set()
         for image in invalid:
-            log('Invalid decrypt result for ' + image.name + '. Retrying this slot separately.')
-            if fetch([image]):
-                failed.append(image.name)
-                with LOCK:
-                    SERVICE_SLOTS[image.name]['status'] = 'failed'
-        if failed:
-            raise Fail('invalid_decrypt_result', ', '.join(failed))
-        slots.extend(read_slot(p.name, sess / 'dec' / p.name) for p in batch)
+            for _ in range(DECRYPT_TRIES - 1):
+                log('Invalid decrypt result for ' + image.name + '. Retrying this slot separately.')
+                if not fetch([image]):
+                    break
+            else:
+                damaged_slots.add(image.name)
+        for image in batch:
+            if image.name in damaged_slots:
+                why = 'damaged'
+            else:
+                try:
+                    slot = read_slot(image.name, sess / 'dec' / image.name)
+                except Exception as exc:
+                    log('Could not read %s: %r' % (image.name, exc))
+                    why = 'layout'
+                else:
+                    slots.append(slot)
+                    continue
+            log('Skipping %s (%s)' % (image.name, why))
+            skipped.append(skipped_slot(sess, image.name, why))
+            with LOCK:
+                SERVICE_SLOTS[image.name]['status'] = 'failed'
         start = end
-    return slots
+    return slots, skipped
+
+
+DECRYPT_TRIES = 3                       # decrypts of one slot, in all, before it is left out as unreadable
+
+
+def inner_name(name):
+    return 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.replace('sdimg_SAVEDATA', '')
+
+
+def skipped_slot(sess, name, why):
+    """How the page lists a slot left out: its file, and its title when the copy's param.sfo can be read."""
+    try:
+        subtitle = sfo_fields(sess / 'dec' / name / 'sce_sys' / 'param.sfo').get('SUBTITLE', '')
+    except Exception:
+        subtitle = ''
+    return {'file': name, 'subtitle': subtitle if isinstance(subtitle, str) else '', 'why': why}
+
+
+def remember_skipped(sess, skipped):
+    # Invalid service results never enter dec/. Only a completed download may treat them as intentionally skipped.
+    marker = sess / 'unreadable-slots.json'
+    tmp = marker.with_suffix('.tmp')
+    tmp.write_text(json.dumps([s['file'] for s in skipped if s['why'] == 'damaged']), 'utf-8')
+    os.replace(tmp, marker)
+
+
+def no_readable_slots(skipped):
+    if skipped:
+        return Fail('decrypt_bad' if any(s['why'] == 'damaged' for s in skipped) else 'save_layout_changed',
+                    ', '.join(s['file'] for s in skipped))
+    return Fail('no_story_slot')
 
 
 # sce_sdmemory is the game's autosave (what Continue loads); its memory.dat has the same format as manual saves
@@ -679,7 +738,7 @@ SLOT_RE = re.compile(r'sdimg_(SAVEDATASARC\d+|sce_sdmemory)')
 
 def read_slot(name, top):
     """Read a save slot's balances from its decrypted folder."""
-    inner = 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.replace('sdimg_SAVEDATA', '')
+    inner = inner_name(name)
     f = top / inner
     if not f.is_file():
         raise Fail('unexpected_save_layout', name)
@@ -956,7 +1015,10 @@ def restore_session(resume=False):
         return
     entry_id, owner, title = candidates[0]
     images = sorted((lib / 'Saves' / owner / title).glob('sdimg_*'))
-    missing = [p for p in images if SLOT_RE.fullmatch(p.name) and not garlic.valid_decrypted_slot(sess / 'dec' / p.name, p.name)]
+    marker = sess / 'unreadable-slots.json'
+    known_damaged = set(json.loads(marker.read_text('utf-8'))) if marker.is_file() else set()
+    missing = [p for p in images if SLOT_RE.fullmatch(p.name) and p.name not in known_damaged
+               and not garlic.valid_decrypted_slot(sess / 'dec' / p.name, p.name)]
     if missing:
         originals = sess / 'orig'
         if len(candidates) != 1 or not all((originals / p.name).is_file()
@@ -969,12 +1031,21 @@ def restore_session(resume=False):
         with LOCK:
             SERVICE_SLOTS.update((p.name, {'operation': 'decrypt', 'status': 'pending'}) for p in missing)
         stage('decrypting')
-        decrypt_slots(sess, [originals / p.name for p in missing])
-    slots = []
-    for f in sorted((lib / 'Saves' / owner / title).glob('sdimg_*')):
+        _, retried = decrypt_slots(sess, [originals / p.name for p in missing])
+        known_damaged.update(s['file'] for s in retried if s['why'] == 'damaged')
+    slots, skipped = [], []
+    for f in images:
         top = sess / 'dec' / f.name
-        if SLOT_RE.fullmatch(f.name) and top.is_dir():
-            s = read_slot(f.name, top)
+        if SLOT_RE.fullmatch(f.name):
+            if f.name in known_damaged:
+                skipped.append(skipped_slot(sess, f.name, 'damaged'))
+                continue
+            try:
+                s = read_slot(f.name, top)
+            except Exception as exc:
+                log('Could not restore %s: %r' % (f.name, exc))
+                skipped.append(skipped_slot(sess, f.name, 'layout'))
+                continue
             orig = sess / 'orig' / f.name
             s['modified'] = orig.is_file() and orig.read_bytes() != f.read_bytes()   # the transfer library already holds an edited save
             ed = sess / 'mod' / (f.name + '.edits.json')                  # edits applied before a restart
@@ -985,18 +1056,22 @@ def restore_session(resume=False):
                     pass
             slots.append(s)
     if not slots:
+        if resume:
+            raise no_readable_slots(skipped)
         return
+    if resume:
+        remember_skipped(sess, skipped)
     marker = sess / 'excluded-slots.json'
     if marker.is_file():
         excluded = json.loads(marker.read_text('utf-8'))
-        names = {s['file'] for s in slots}
-        if not isinstance(excluded, list) or not set(excluded) < names:
+        slot_names = {s['file'] for s in slots}
+        if not isinstance(excluded, list) or not set(excluded) < slot_names:
             raise ValueError('invalid saved slot selection')
         for s in slots:
             s['excluded'] = s['file'] in excluded
     with LOCK:
         STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
-                     slots=slots, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
+                     slots=slots, skipped=skipped, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
 
@@ -1167,12 +1242,13 @@ def job_download():
         STATE['resumeDownload'] = sess.name
         SERVICE_SLOTS.update((f.name, {'operation': 'decrypt', 'status': 'pending'}) for f in images)
     stage('decrypting')
-    slots = decrypt_slots(sess, images)
+    slots, skipped = decrypt_slots(sess, images)
     if not slots:
-        raise Fail('no_story_slot')
+        raise no_readable_slots(skipped)
+    remember_skipped(sess, skipped)
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
+        STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, skipped=skipped, readyToUpload=False, fileCount=len(imgs))
     stage('ready')
 
 
@@ -1338,6 +1414,10 @@ def job_upload():
             continue
         if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:
             refused_key_request(t0)             # a channel closed because GarlicSaves turned its key request down
+        if 'no ipv6 address on the network adapter' in low:
+            raise Fail('ipv6_needed', line)     # the PS5 asked for IPv6 data (issue #7) and this adapter has none
+        if 'psutil package is missing' in low:
+            raise Fail('tool_failed', line)     # a source checkout that predates the psutil requirement
         if '[tcp] connection from' in low:
             stage('console_connected', hint=None)
         elif 'gfp5 id=' in low and files == 0:
@@ -1544,7 +1624,7 @@ class H(BaseHTTPRequestHandler):
                     raise Fail('console_not_found')
                 with LOCK:
                     STATE['console'] = {'host': c['host'], 'name': c['name'], 'hostId': c['hostId'], 'firmware': c['firmware']}
-                    STATE.update(session=None, resumeDownload=None, slots=[], readyToUpload=False, user=None, entryId=None)
+                    STATE.update(session=None, resumeDownload=None, slots=[], skipped=[], readyToUpload=False, user=None, entryId=None)
                     refresh_paired()
                     try:
                         restore_session()

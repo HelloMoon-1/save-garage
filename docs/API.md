@@ -31,8 +31,9 @@ The whole app state, polled about once a second by the UI.
   }],
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": [], "serviceQueue": []},
+  "skipped": [{"file": "sdimg_SAVEDATASARC0003", "subtitle": "Mission name", "why": "damaged"}],   // story saves left out: "damaged" or "layout"
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
-  "version": "1.30.1",
+  "version": "1.31.0",
   "canQuit": false,                                   // true in the desktop builds
   "update": {"auto": true, "mode": "install", "why": null, "flavour": "windows", "status": "ready", "current": "1.30.0",
              "latest": "1.30.1", "error": null, "progress": null, "total": null, "checked": 1795651200, "installed": null,
@@ -185,6 +186,17 @@ without an automatic retry, and a `detail` such as `GarlicSaves is limiting requ
 or 403 also sets `state.garlic.refused`, so the page says the sign-in was refused and offers to sign in again. The other
 codes are `not_paired`, `not_signed_in`, `garlic_unreachable`, `console_rejected`, `download_failed`, `no_gta_save` and
 `no_story_slot`.
+
+Each story save is decrypted and checked: a copy that isn't a JSAV save (GarlicSaves has sent back damaged copies now and
+then, GitHub issue #11) is asked for again, up to three decrypts in all. A save that still can't be read is left out and
+listed in `state.skipped` (`why` is `damaged`, or `layout` for a JSAV save the reader can't follow); its file goes back
+to the PS5 unchanged. When no story save can be read the download ends with `decrypt_bad` (a damaged copy among them) or
+`save_layout_changed`. Sending back ends with `ipv6_needed` when the PS5 asked for its data over IPv6 (a console that
+sends `01000000` at bytes 52-55 of its power request, issue #7) and the computer's network adapter for it has no IPv6
+address.
+
+The details (`job.log`, `job.error.detail`) show the data folder as `<data>`, the home folder as `~` and a PS5's ID in a
+path as `<console>`, since they get pasted into bug reports.
 
 The job's `log` has a line for each derivation, saying why it gave no keys when it didn't: `Key service: answered in
 4.2 s (1 request)`, `answered too late, after 31.0 s (2 requests)`, `rate limited by GarlicSaves (retry after 60 s)` (or

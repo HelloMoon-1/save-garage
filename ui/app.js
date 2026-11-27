@@ -52,6 +52,10 @@
     console_rejected: 'The PS5 refused the request. Sign in with the account you paired with, or pair again.',
     no_gta_save: 'No GTA VI save was found on the PS5. Save once in the game, then try again.',
     no_story_slot: 'No story save was found. Save once in story mode, then try again.',
+    // GarlicSaves kept sending back a damaged copy of every story save in the download (issue #11)
+    decrypt_bad: 'None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.',
+    // the PS5 asked for the save over IPv6 (issue #7) and this computer's network adapter has no IPv6 address
+    ipv6_needed: 'This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.',
     pair_failed: 'Pairing failed or timed out. Start pairing again.',
     save_layout_changed: 'The save layout is different from what this editor knows. Download again. If it still fails, the editor needs an update.',
     save_verify_failed: 'A value in the save didn’t match what was expected. Download again and redo the edit.',
@@ -178,6 +182,8 @@
   const running = () => S.state?.job?.status === 'running';
   const label = s => s.file === 'sdimg_sce_sdmemory' ? 'Autosave' : 'Manual save';
   const missionName = s => String(s.subtitle || s.file).replace(/^\(Autosave\)\s*/, '');
+  // a slot left out of the download because it couldn't be read (state.skipped): its title, else its file's number
+  const skippedName = s => s.subtitle ? missionName(s) : s.file.replace(/^sdimg_(SAVEDATA)?/, '');
   // the steps: a Save Garage from before 1.30.0 has no GarlicSaves sign-in (no state.garlic), so no Sign in step either
   const stepsOf = st => st?.garlic ? STEPS : STEPS.filter(([id]) => id !== 'signin');
   const stepNo = (id, st) => stepsOf(st).findIndex(([x]) => x === id) + 1;
@@ -573,6 +579,8 @@
           <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span><small>${saveTime(x) || '<span>Save time unavailable</span>'}</small>${x.excluded ? '<span class="m">Marked for deletion</span>' : x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
       <div class="row"><button class="btn" data-act="exclude-slot" ${running() ? 'disabled' : ''}>${s.excluded ? 'Undo slot deletion' : 'Delete this slot on next transfer'}</button>
         ${st.readyToUpload ? '<button class="link" data-act="go" data-view="send">Review transfer</button>' : ''}</div>
+      ${(st.skipped || []).length ? `<div class="callout skipped"><div>Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.<ul class="skipped-list">${st.skipped.map(x => `
+        <li><span>${label(x)}</span>: <span data-no-i18n>${esc(skippedName(x))}</span></li>`).join('')}</ul></div></div>` : ''}
       <div class="editor">
         <div class="tabs" role="tablist" aria-label="What to edit">${tabs.map(([id, name]) => `
           <button role="tab" aria-selected="${S.tab === id}" data-act="tab" data-tab="${id}">${name}<span class="count" data-count="${id}"></span></button>`).join('')}</div>
