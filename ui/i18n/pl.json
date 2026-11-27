@@ -1489,5 +1489,16 @@
 "Unzip the whole Save Garage download into a new folder and start it from there.": "Rozpakuj całe pobrane archiwum Save Garage do nowego folderu i uruchom Save Garage stamtąd.",
 "When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "Gdy ta strona o to poprosi, przytrzymaj przycisk zasilania PS5 przez około sekundę, a potem go puść. PS5 wyda sygnał, gdy puścisz przycisk.",
 "Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "Potem go puść. PS5 wyda sygnał i uruchomi się ponownie w trybie transferu. Jeśli przytrzymasz go dłużej, PS5 się wyłączy. Masz około {0} min.",
-"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows nie mógł wyświetlić kart sieciowych tego komputera. Rozpakuj całe pobrane archiwum Save Garage do nowego folderu i uruchom Save Garage stamtąd."
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows nie mógł wyświetlić kart sieciowych tego komputera. Rozpakuj całe pobrane archiwum Save Garage do nowego folderu i uruchom Save Garage stamtąd.",
+"Signing the saves for the other account": "Podpisywanie zapisów dla drugiego konta",
+"Checking the copy for the other account": "Sprawdzanie kopii dla drugiego konta",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent.": "GarlicSaves nie mógł podpisać zapisów dla drugiego konta, więc nic nie zostało wysłane.",
+"Try again in a minute.": "Spróbuj ponownie za minutę.",
+"Send to another account on this PS5": "Wyślij na inne konto na tej PS5",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5.": "Zapisy są podpisywane dla wybranego konta przez GarlicSaves, zanim trafią na PS5.",
+"The account you downloaded from keeps its own saves.": "Konto, z którego pobrano zapisy, zachowuje własne zapisy.",
+"Send to": "Wyślij do",
+"Switch the PS5 to that account and delete its GTA VI save.": "Przełącz PS5 na to konto i usuń jego zapis GTA VI.",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.": "GarlicSaves nie mógł podpisać zapisów dla drugiego konta, więc nic nie zostało wysłane. Spróbuj ponownie za minutę.",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5. The account you downloaded from keeps its own saves.": "Zapisy są podpisywane dla wybranego konta przez GarlicSaves, zanim trafią na PS5. Konto, z którego pobrano zapisy, zachowuje własne zapisy."
 }

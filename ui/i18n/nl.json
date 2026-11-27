@@ -1489,5 +1489,16 @@
 "Unzip the whole Save Garage download into a new folder and start it from there.": "Pak de volledige download van Save Garage uit in een nieuwe map en start Save Garage vanaf daar.",
 "When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "Houd, als deze pagina erom vraagt, de aan/uit-knop van de PS5 ongeveer een seconde ingedrukt en laat hem dan los. De PS5 piept nadat je hebt losgelaten.",
 "Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "Laat hem dan los. De PS5 piept en start opnieuw op in de overdrachtsmodus. Houd je hem langer ingedrukt, dan gaat de PS5 uit. Je hebt ongeveer {0} minuten.",
-"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows kon de netwerkadapters van deze computer niet weergeven. Pak de volledige download van Save Garage uit in een nieuwe map en start Save Garage vanaf daar."
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows kon de netwerkadapters van deze computer niet weergeven. Pak de volledige download van Save Garage uit in een nieuwe map en start Save Garage vanaf daar.",
+"Signing the saves for the other account": "Savegames ondertekenen voor het andere account",
+"Checking the copy for the other account": "Kopie voor het andere account controleren",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent.": "GarlicSaves kon de savegames niet ondertekenen voor het andere account, dus er is niets verstuurd.",
+"Try again in a minute.": "Probeer het over een minuut opnieuw.",
+"Send to another account on this PS5": "Naar een ander account op deze PS5 sturen",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5.": "De savegames worden via GarlicSaves ondertekend voor het account dat je kiest, voordat ze naar de PS5 gaan.",
+"The account you downloaded from keeps its own saves.": "Het account waarvan je hebt gedownload, houdt zijn eigen savegames.",
+"Send to": "Sturen naar",
+"Switch the PS5 to that account and delete its GTA VI save.": "Schakel op de PS5 over naar dat account en verwijder daar de savegame van GTA VI.",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.": "GarlicSaves kon de savegames niet ondertekenen voor het andere account, dus er is niets verstuurd. Probeer het over een minuut opnieuw.",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5. The account you downloaded from keeps its own saves.": "De savegames worden via GarlicSaves ondertekend voor het account dat je kiest, voordat ze naar de PS5 gaan. Het account waarvan je hebt gedownload, houdt zijn eigen savegames."
 }

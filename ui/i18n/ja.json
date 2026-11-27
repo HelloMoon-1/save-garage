@@ -1489,5 +1489,16 @@
 "Unzip the whole Save Garage download into a new folder and start it from there.": "Save Garageのダウンロードをすべて新しいフォルダーに展開し、そこからSave Garageを起動してください。",
 "When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "このページで指示が出たら、PS5の電源ボタンを1秒ほど長押しして、指を離してください。指を離した後にピッと鳴ります。",
 "Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "その後、指を離してください。PS5がピッと鳴り、転送モードで再起動します。それより長く押し続けると、PS5の電源が切れます。残り時間は約{0}分です。",
-"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windowsでこのコンピューターのネットワークアダプターの一覧を取得できませんでした。Save Garageのダウンロードをすべて新しいフォルダーに展開し、そこからSave Garageを起動してください。"
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windowsでこのコンピューターのネットワークアダプターの一覧を取得できませんでした。Save Garageのダウンロードをすべて新しいフォルダーに展開し、そこからSave Garageを起動してください。",
+"Signing the saves for the other account": "もう一方のアカウント用にセーブデータに署名しています",
+"Checking the copy for the other account": "もう一方のアカウント用のコピーを確認しています",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent.": "GarlicSavesがもう一方のアカウント用にセーブデータに署名できなかったため、何も送信されていません。",
+"Try again in a minute.": "1分ほどしてからもう一度お試しください。",
+"Send to another account on this PS5": "このPS5の別のアカウントに送る",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5.": "セーブデータはPS5に送る前に、GarlicSavesで選んだアカウント用に署名されます。",
+"The account you downloaded from keeps its own saves.": "ダウンロード元のアカウントのセーブデータはそのまま残ります。",
+"Send to": "送信先",
+"Switch the PS5 to that account and delete its GTA VI save.": "PS5でそのアカウントに切り替えて、そのアカウントのGTA VIのセーブデータを削除してください。",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.": "GarlicSavesがもう一方のアカウント用にセーブデータに署名できなかったため、何も送信されていません。1分ほどしてからもう一度お試しください。",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5. The account you downloaded from keeps its own saves.": "セーブデータはPS5に送る前に、GarlicSavesで選んだアカウント用に署名されます。ダウンロード元のアカウントのセーブデータはそのまま残ります。"
 }

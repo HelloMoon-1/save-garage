@@ -28,6 +28,7 @@ The whole app state, polled about once a second by the UI.
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": []},
   "skipped": [{"file": "sdimg_SAVEDATASARC0003", "subtitle": "Mission name", "why": "damaged"}],   // story saves left out: "damaged" or "layout"
+  "users": [{"id": "1447854d", "name": "Name"}],   // the users of the PS5 the session came from (its transfer data)
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
   "version": "1.31.2",
   "canQuit": false,                                   // true in the desktop builds
@@ -193,6 +194,15 @@ sets `job.hint` to `{"code": "local_ipv6", "adapter": "<adapter name, or empty>"
 The adapter's addresses come from psutil; on Windows, when psutil can't be loaded, from Windows itself (PowerShell's
 `Get-NetIPAddress`, pull request #18). Sending back ends with `adapter_query_failed` when that fails too, and with
 `tool_failed` when psutil is missing on another system.
+
+`/api/upload` takes `{"to": "<user ID>"}` (one of `state.users`) to send the session's saves to another account on the same
+PS5. Every file of the save is re-signed for that account's PSN account ID (from the PS5's transfer data) with
+GarlicSaves' `resign` job, one job a file (stage `resigning`, with `progress`), and one copy is decrypted again to
+check it carries the new account (stage `resign_check`). The copy becomes a new library entry under the other
+user's save folder, keeping the PS5's own file headers with only the entry ID and the user in the path changed,
+and is sent like any other save. A copy made earlier in the session from the same files is used again. With `to`
+the upload doesn't need edits. It ends with `resign_failed` when GarlicSaves can't sign the saves or the copy
+doesn't check out; nothing is sent then.
 
 The details (`job.log`, `job.error.detail`) show the data folder as `<data>`, the home folder as `~` and a PS5's ID in a
 path as `<console>`, since they get pasted into bug reports.

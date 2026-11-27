@@ -31,7 +31,8 @@
     key_rate_wait: 'GarlicSaves is getting too many requests right now, so it is briefly limiting them.',
     choose_account: 'Choose the PS5 account', downloading: 'Downloading your save', decrypting: 'Decrypting your save', ready: 'Your save is ready to edit',
     patching: 'Applying your edits', encrypting: 'Encrypting the edited save', importing: 'Getting the save ready to send',
-    ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer', waiting_console: 'Waiting for Data Transfer on the PS5',
+    ready_to_upload: 'Edits saved and ready to send', preparing: 'Preparing the transfer',
+    resigning: 'Signing the saves for the other account', resign_check: 'Checking the copy for the other account', waiting_console: 'Waiting for Data Transfer on the PS5',
     console_connected: 'PS5 connected. Keep this page open.', transferring: 'Sending your save', uploaded: 'Your save is back on the PS5', starting: 'Starting'};
   // GarlicSaves limits the jobs it takes from each sign-in's key: in a download's key requests (key_rate_limited) or in
   // decrypting and encrypting a save (garlic_rate_limited)
@@ -51,6 +52,8 @@
     console_rejected: 'The PS5 refused the request. Sign in with the account you paired with, or pair again.',
     no_gta_save: 'No GTA VI save was found on the PS5. Save once in the game, then try again.',
     no_story_slot: 'No story save was found. Save once in story mode, then try again.',
+    // sending to another account on the PS5: GarlicSaves' resign failed, or the copy didn't check out (nothing was sent)
+    resign_failed: 'GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.',
     // GarlicSaves kept sending back a damaged copy of every story save in the download (issue #11)
     decrypt_bad: 'None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.',
     pair_failed: 'Pairing failed or timed out. Start pairing again.',
@@ -1514,9 +1517,22 @@
   }
 
   // ------------------------------------------------------------ send back
+  // another user of the PS5 the saves are going to (state.users), or null for the account they came from
+  const sendTarget = st => (st.users || []).find(u => u.id === S.sendTo && u.id !== String(st.user?.id || '').toLowerCase()) || null;
+  function accountChoice(st) {
+    const others = (st.users || []).filter(u => u.id !== String(st.user?.id || '').toLowerCase());
+    if (!others.length) return '';
+    const target = sendTarget(st);
+    return `<div class="panel"><h3>Send to another account on this PS5</h3>
+      <p class="detail" style="margin:6px 0 10px">The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5. The account you downloaded from keeps its own saves.</p>
+      <div class="saves" role="group" aria-label="Send to"><button class="save" data-act="sendto" data-user="" aria-pressed="${!target}"><span class="t" data-no-i18n>${esc(st.user?.name || '')}</span></button>${others.map(u => `
+        <button class="save" data-act="sendto" data-user="${esc(u.id)}" aria-pressed="${target?.id === u.id}"><span class="t" data-no-i18n>${esc(u.name)}</span></button>`).join('')}</div></div>`;
+  }
+
   function viewSend() {
     const st = S.state;
     const job = st.job || {};
+    const target = sendTarget(st);
     const done = job.kind === 'upload' && job.stage === 'uploaded';
     const edited = (st.slots || []).filter(x => x.modified);
     const summary = edited.length ? `<div class="panel"><h3>What’s being sent</h3><ul class="review" style="max-height:none;margin-top:8px">${edited.map(x =>
@@ -1541,19 +1557,20 @@
           ${jobBox('restore')}
         </div>`;
     }
-    if (!st.readyToUpload) {
+    if (!st.readyToUpload && !target) {
       return `<section class="title-card"><span class="chip">Step ${stepNo('send', st)}</span><h1>Nothing to send yet</h1><p>Save some edits first. They’ll wait here until you send them.</p></section>
-        <div class="row"><button class="btn primary" data-act="go" data-view="edit">Edit a save</button></div>${jobBox('restore')}`;
+        <div class="row"><button class="btn primary" data-act="go" data-view="edit">Edit a save</button></div>${accountChoice(st)}${jobBox('restore upload')}`;
     }
     return `
       <section class="title-card"><span class="chip">Step ${stepNo('send', st)}</span><h1>Send your save back</h1>
         <p>Your edits are encrypted and waiting. The PS5 won’t overwrite a save, so the old ones have to be deleted first. Every save of this account comes back, and the originals stay backed up on this computer.</p></section>
       <div class="stack">
+        ${accountChoice(st)}
         ${summary}
         ${allList}
         <ol class="how">
           <li><strong>Optional: upload your GTA VI save to PS Plus cloud storage.</strong><span class="path">That gives you a second backup. Turn off auto-sync for GTA VI until you know the edited save works.</span></li>
-          <li><strong>Delete the GTA VI save on the PS5.</strong><span class="path">${PS5_DELETE}, then pick Grand Theft Auto VI.</span>
+          <li><strong>${target ? 'Switch the PS5 to that account and delete its GTA VI save.' : 'Delete the GTA VI save on the PS5.'}</strong><span class="path">${PS5_DELETE}, then pick Grand Theft Auto VI.</span>
             <label class="check" style="margin-top:10px"><input type="checkbox" data-act="deleted" ${S.deleted ? 'checked' : ''}><span>I deleted the GTA VI save on my PS5</span></label></li>
           <li><strong>Click Send save to PS5, then start the transfer on the PS5.</strong><span class="path">${PS5_TRANSFER}, then pick “Save Garage” and choose Start Transfer.</span></li>
         </ol>
@@ -1809,12 +1826,13 @@
         .catch(e => toast(ERR[e.code] || ERR.internal));
       return;
     }
-    if (a === 'upload') { act('/api/upload'); return; }
+    if (a === 'upload') { const to = sendTarget(S.state); act('/api/upload', to ? {to: to.id} : {}); return; }
     if (a === 'restore') {
       if (confirm(T('Put the original saves back? Every edit you saved here is undone. You still need to send the save to the PS5 afterwards.'))) act('/api/restore', {}, () => { S.drafts = {}; });
       return;
     }
     if (a === 'slot') { S.slot = b.dataset.file; S.reviewOpen = false; S.mainKey = ''; renderMain(); renderPending(); return; }
+    if (a === 'sendto') { S.sendTo = b.dataset.user || null; S.mainKey = ''; renderMain(); return; }
     if (a === 'tab') { S.tab = b.dataset.tab; S.mainKey = ''; renderMain(); return; }
     if (a === 'unstick') {      // move bank money out of the Savings boxes an older version used: same or lower total, saved explicitly
       const s = slotOf(S.slot), d = draftOf(s.file);

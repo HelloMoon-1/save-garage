@@ -1489,5 +1489,16 @@
 "Unzip the whole Save Garage download into a new folder and start it from there.": "فك ضغط تنزيل Save Garage بالكامل في مجلد جديد، ثم شغّل Save Garage من هناك.",
 "When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "عندما تطلب هذه الصفحة ذلك، اضغط مطولًا على زر التشغيل في جهاز PS5 لمدة ثانية تقريبًا، ثم اتركه. يصدر الجهاز صفيرًا بعد أن تترك الزر.",
 "Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "ثم اتركه. يصدر جهاز PS5 صفيرًا ويُعاد تشغيله في وضع النقل. إذا ضغطت عليه مدة أطول، ينطفئ جهاز PS5. لديك نحو {0} دقائق.",
-"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "تعذّر على Windows عرض محولات الشبكة في هذا الكمبيوتر. فك ضغط تنزيل Save Garage بالكامل في مجلد جديد، ثم شغّل Save Garage من هناك."
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "تعذّر على Windows عرض محولات الشبكة في هذا الكمبيوتر. فك ضغط تنزيل Save Garage بالكامل في مجلد جديد، ثم شغّل Save Garage من هناك.",
+"Signing the saves for the other account": "توقيع ملفات الحفظ للحساب الآخر",
+"Checking the copy for the other account": "التحقق من النسخة للحساب الآخر",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent.": "تعذّر على GarlicSaves توقيع ملفات الحفظ للحساب الآخر، لذا لم يُرسَل شيء.",
+"Try again in a minute.": "حاول مرة أخرى بعد دقيقة.",
+"Send to another account on this PS5": "الإرسال إلى حساب آخر على جهاز PS5 هذا",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5.": "تُوقَّع ملفات الحفظ للحساب الذي تختاره عبر GarlicSaves قبل أن تُرسَل إلى جهاز PS5.",
+"The account you downloaded from keeps its own saves.": "يحتفظ الحساب الذي نزّلت منه بملفات الحفظ الخاصة به.",
+"Send to": "الإرسال إلى",
+"Switch the PS5 to that account and delete its GTA VI save.": "بدّل جهاز PS5 إلى ذلك الحساب واحذف ملف حفظ GTA VI الخاص به.",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.": "تعذّر على GarlicSaves توقيع ملفات الحفظ للحساب الآخر، لذا لم يُرسَل شيء. حاول مرة أخرى بعد دقيقة.",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5. The account you downloaded from keeps its own saves.": "تُوقَّع ملفات الحفظ للحساب الذي تختاره عبر GarlicSaves قبل أن تُرسَل إلى جهاز PS5. يحتفظ الحساب الذي نزّلت منه بملفات الحفظ الخاصة به."
 }

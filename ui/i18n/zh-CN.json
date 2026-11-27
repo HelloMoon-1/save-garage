@@ -1491,5 +1491,16 @@
 "Unzip the whole Save Garage download into a new folder and start it from there.": "请把完整的 Save Garage 下载解压到新文件夹，然后从那里启动 Save Garage。",
 "When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "页面提示时，按住 PS5 电源键约一秒，然后松手。松手后会听到“嘀”一声。",
 "Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "然后松手。PS5 会“嘀”一声，并重启进入传输模式。按得更久会让 PS5 关机。你大约有 {0} 分钟时间。",
-"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows 未能列出这台电脑的网卡。请把完整的 Save Garage 下载解压到新文件夹，然后从那里启动 Save Garage。"
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows 未能列出这台电脑的网卡。请把完整的 Save Garage 下载解压到新文件夹，然后从那里启动 Save Garage。",
+"Signing the saves for the other account": "正在为另一个账号签名存档",
+"Checking the copy for the other account": "正在检查给另一个账号的副本",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent.": "GarlicSaves 未能为另一个账号签名存档，所以没有传回任何内容。",
+"Try again in a minute.": "请一分钟后重试。",
+"Send to another account on this PS5": "传回到这台 PS5 上的另一个账号",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5.": "存档在传回 PS5 之前，会通过 GarlicSaves 为你选择的账号签名。",
+"The account you downloaded from keeps its own saves.": "下载来源账号的存档保持不变。",
+"Send to": "传回到",
+"Switch the PS5 to that account and delete its GTA VI save.": "在 PS5 上切换到该账号，并删除它的 GTA VI 存档。",
+"GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.": "GarlicSaves 未能为另一个账号签名存档，所以没有传回任何内容。请一分钟后重试。",
+"The saves are signed for the account you pick, through GarlicSaves, before they go to the PS5. The account you downloaded from keeps its own saves.": "存档在传回 PS5 之前，会通过 GarlicSaves 为你选择的账号签名。下载来源账号的存档保持不变。"
 }
