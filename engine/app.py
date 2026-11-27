@@ -648,6 +648,7 @@ def copy_to_user(sess, lib, entry_id, target):
             m = json.loads(marker.read_text('utf-8'))
             if m.get('source') == digests and str(m.get('entry')) in json.loads(root_manifest.read_text('utf-8')):
                 log('copy for %s: using the one made earlier in this session' % users[target]['name'])
+                entry_row(meta, int(m['entry']), target, title, int(m.get('size') or 0))
                 return int(m['entry']), dict(users[target])
         except (ValueError, KeyError, TypeError):
             pass
@@ -686,7 +687,7 @@ def copy_to_user(sess, lib, entry_id, target):
     if got != account:
         raise Fail('resign_failed', 'the copy is still signed for another account')
     new_id = register_copy(lib, entry_id, entry, target, title, out)
-    marker.write_text(json.dumps({'source': digests, 'entry': new_id}), 'utf-8')
+    marker.write_text(json.dumps({'source': digests, 'entry': new_id, 'size': sum(f.stat().st_size for f in out)}), 'utf-8')
     log('copy for %s: %d files re-signed and checked, entry %d' % (users[target]['name'], len(out), new_id))
     return new_id, dict(users[target])
 
@@ -730,13 +731,32 @@ def register_copy(lib, entry_id, entry, target, title, files):
         em = lib / 'Transfer-Metadata' / str(new_id)
         em.mkdir(parents=True, exist_ok=True)
         (em / 'manifest.json').write_text(json.dumps({'entry_id': new_id, 'files': items, str(new_id): new_entry}, indent=2) + '\n', 'utf-8')
-        db.execute('INSERT INTO dir_entry_info_tbl (id, path, partition, target_type, target_subtype, title_id, content_id, actual_size, '
-                   'transfer_size, required_size, required_zone_size) VALUES (?, ?, 1, 3, 0, \'\', \'\', ?, ?, ?, 0)',
-                   (new_id, '/user/home/%s/savedata_prospero/%s/' % (target, title), total, total, total))
+    finally:
+        db.close()
+    entry_row(meta, new_id, target, title, total)
+    return new_id
+
+
+def entry_row(meta, new_id, target, title, total):
+    """Make the transfer data hold exactly one row for the target user's save folder of this title: dt_metadata's upload
+    builder matches the copy to that row and sends it under the PS5's own entry ID. When the PS5 already listed the folder
+    (the account had a save of this title when the saves were downloaded), its row is the one, and a row of ours for the
+    same folder is taken out again; otherwise the copy gets a row of its own."""
+    path = '/user/home/%s/savedata_prospero/%s/' % (target, title)
+    db = sqlite3.connect(str(meta))
+    try:
+        rows = [r[0] for r in db.execute('SELECT id FROM dir_entry_info_tbl WHERE target_type = 3 AND lower(path) = lower(?)', (path,))]
+        console = [r for r in rows if r != new_id]
+        if console:
+            db.execute('DELETE FROM dir_entry_info_tbl WHERE id = ?', (new_id,))
+        elif not rows:
+            db.execute('INSERT INTO dir_entry_info_tbl (id, path, partition, target_type, target_subtype, title_id, content_id, actual_size, '
+                       'transfer_size, required_size, required_zone_size) VALUES (?, ?, 1, 3, 0, \'\', \'\', ?, ?, ?, 0)',
+                       (new_id, path, total, total, total))
         db.commit()
     finally:
         db.close()
-    return new_id
+
 
 # sce_sdmemory is the game's autosave (what Continue loads); its memory.dat has the same format as manual saves
 SLOT_RE = re.compile(r'sdimg_(SAVEDATASARC\d+|sce_sdmemory)')
