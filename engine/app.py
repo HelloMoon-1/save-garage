@@ -1111,6 +1111,8 @@ def job_upload():
             continue
         if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:
             refused_key_request(t0)             # a channel closed because GarlicSaves turned its key request down
+        if 'could not read windows network adapters' in low:
+            raise Fail('adapter_query_failed', line)
         if 'psutil package is missing' in low:
             raise Fail('tool_failed', line)     # a source checkout that predates the psutil requirement
         if '[tcp] connection from' in low:

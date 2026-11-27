@@ -1,4 +1,5 @@
 {
+"Windows could not list the network adapters. Extract the complete Windows package into a new folder and start the editor there.": "Windows 未能读取网卡列表。请把完整 Windows 安装包解压到新文件夹，从那里启动编辑器。",
 "This transfer needs IPv6 on the local network.": "这次回传需要局域网 IPv6，请检查电脑连接 PS5 的网卡。",
 "Network adapter": "网卡",
 "Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version 6 (TCP/IPv6).": "按 Win + R，输入 ncpa.cpl 并回车。右键这张网卡，打开「属性」，勾选「Internet 协议版本 6 (TCP/IPv6)」并确定。",

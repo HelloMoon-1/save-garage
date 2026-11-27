@@ -7,6 +7,7 @@ import socket
 import time
 import sqlite3
 import struct
+import subprocess
 import sys
 import threading
 from contextlib import closing
@@ -388,18 +389,40 @@ def cache_pairing_prefix(body):
     print("[pairing] cached console approval for future metadata downloads", flush=True)
 
 
-def local_link_local(sock):
-    """Pick the IPv6 address on the interface carrying this command connection."""
+def adapter_addresses():
+    """Local interface names and their IP addresses; portable Windows installs can also query the OS directly."""
     try:
         import psutil
-    except ImportError:
-        raise ValueError("no IPv6 data channel: the psutil package is missing (pip install -r requirements.txt)")
+    except (ImportError, OSError):
+        if sys.platform != "win32":
+            raise ValueError("no IPv6 data channel: the psutil package is missing (pip install -r requirements.txt)")
+    else:
+        return {name: [a.address for a in rows if a.family in (socket.AF_INET, socket.AF_INET6)]
+                for name, rows in psutil.net_if_addrs().items()}
+
+    shell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    query = ("[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); "
+             "$rows=@(Get-NetIPAddress -ErrorAction Stop | Select-Object InterfaceAlias,IPAddress); "
+             "ConvertTo-Json -InputObject $rows -Compress")
+    try:
+        result = subprocess.run([str(shell), "-NoProfile", "-NonInteractive", "-Command", query],
+                                capture_output=True, encoding="utf-8", errors="replace", check=True, timeout=12,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        addresses = {}
+        for row in json.loads(result.stdout):
+            addresses.setdefault(row["InterfaceAlias"], []).append(row["IPAddress"])
+        return addresses
+    except (OSError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("could not read Windows network adapters") from exc
+
+
+def local_link_local(sock):
+    """Pick the IPv6 address on the interface carrying this command connection."""
     local = ipaddress.ip_address(sock.getsockname()[0].split("%")[0])
     local = getattr(local, "ipv4_mapped", None) or local
     adapter = None
-    for name, addresses in psutil.net_if_addrs().items():
-        ips = [ipaddress.ip_address(a.address.split("%")[0])
-               for a in addresses if a.family in (socket.AF_INET, socket.AF_INET6)]
+    for name, addresses in adapter_addresses().items():
+        ips = [ipaddress.ip_address(address.split("%")[0]) for address in addresses]
         if local not in ips:
             continue
         adapter = name

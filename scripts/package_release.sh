@@ -132,7 +132,10 @@ fi
 mkdir -p "$SUPPORT"
 if [ ! -x "$VENV/bin/python" ]; then
   echo "Setting up Save Garage for the first time. This takes a minute."
-  "$PY" -m venv "$VENV" && "$VENV/bin/python" -m pip install -q -r requirements.txt || { echo "Setup failed. Check your internet connection and try again."; rm -rf "$VENV"; read -n 1 -s -r -p "Press any key to close."; exit 1; }
+  "$PY" -m venv "$VENV" || exit 1
+fi
+if ! "$VENV/bin/python" -c 'import psutil, cryptography' 2>/dev/null; then
+  "$VENV/bin/python" -m pip install -q -r requirements.txt || { echo "Dependency setup failed. Check your connection and start again."; read -n 1 -s -r -p "Press any key to close."; exit 1; }
 fi
 echo "Save Garage is running. Keep this window open while you use it. Close it, or click Quit in the page, to stop."
 SAVEGARAGE_DESKTOP=1 exec "$VENV/bin/python" engine/main.py --open
