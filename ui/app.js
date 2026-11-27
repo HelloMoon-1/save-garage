@@ -80,6 +80,7 @@
     port_in_use: 'Ports 1004 to 1006 are already in use. Close any other save-transfer tool or another copy of Save Garage.',
     upload_failed: 'Sending failed. Check the PS5 and the network, then try again.',
     download_failed: 'The download failed. Go back to the PS5 home screen and try again.',
+    adapter_query_failed: 'Windows could not list the network adapters. Extract the complete Windows package into a new folder and start the editor there.',
     tool_failed: 'Save processing failed. Open the details below.',
     internal: 'Something went wrong. Open the details below.',
     busy: 'Another task is running. Wait for it to finish.',

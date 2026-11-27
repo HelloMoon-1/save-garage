@@ -32,6 +32,23 @@ class LocalIPv6Tests(unittest.TestCase):
             self.adapters['Wi-Fi'].append(SimpleNamespace(family=socket.AF_INET6, address='fe80::2%5'))
             self.assertEqual(dt_source.local_link_local(self.sock), ipaddress.IPv6Address('fe80::2').packed)
 
+    def test_windows_fallback_without_psutil_uses_only_the_connected_adapter(self):
+        rows = [{"InterfaceAlias": "VPN", "IPAddress": "fe80::1"},
+                {"InterfaceAlias": "家庭网络", "IPAddress": "192.0.2.1"}]
+        with patch.dict(sys.modules, psutil=None), patch.object(sys, 'platform', 'win32'), \
+                patch.dict(dt_source.os.environ, SystemRoot='C:/Windows'), \
+                patch.object(dt_source.subprocess, 'run') as query:
+            query.return_value.stdout = json.dumps(rows)
+            with self.assertRaises(dt_source.LocalIPv6Unavailable) as failure:
+                dt_source.local_link_local(self.sock)
+            self.assertEqual(failure.exception.adapter, '家庭网络')
+            rows.append({"InterfaceAlias": "家庭网络", "IPAddress": "fe80::2%5"})
+            query.return_value.stdout = json.dumps(rows)
+            self.assertEqual(dt_source.local_link_local(self.sock), ipaddress.IPv6Address('fe80::2').packed)
+            query.side_effect = OSError('unavailable')
+            with self.assertRaisesRegex(ValueError, 'could not read Windows network adapters'):
+                dt_source.local_link_local(self.sock)
+
     def test_unknown_interface_and_unrelated_messages(self):
         with patch('psutil.net_if_addrs', return_value={}):
             with self.assertRaises(dt_source.LocalIPv6Unavailable) as failure:
