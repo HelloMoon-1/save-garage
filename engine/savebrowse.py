@@ -25,7 +25,7 @@ READ_ONLY = {
     money.SEC_INV: 'use the Money and Ammo tabs',
     money.SEC_STAT: 'use the Stats and All stats tabs',
     0x6296c122: 'the bank ledger is kept in step by the Money tab',
-    0x46f14889: 'health, stamina and focus levels, which the game works out from play; a wrong value can leave a character weaker',
+    0x46f14889: 'use the World tab',                      # the strength, cardio and focus levels (levels.py)
     fog.SEC: 'use the World tab',
 }
 # Single fields with their own rule: (section, key) -> reason it can't be changed, the (low, high) range allowed, or a

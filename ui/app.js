@@ -400,7 +400,7 @@
     ['Money', 'Bank account and Family Savings, up to what the game can hold.', 'tested'],
     ['Ammo', 'Refill or set the ammo for every weapon Lucia and Jason carry. Adding guns they don’t have yet is experimental.', 'tested'],
     ['Stats', 'Fitness, overpowers and buffs, time played, distances, earnings, wanted levels and trophy counters, with the game’s own labels.', 'tested'],
-    ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5. Unlocking cheats is experimental.', 'caution'],
+    ['Completion', 'Complete lines of the 100% checklist: robberies, fencing, collectibles, races and activities, stunts, challenges, hoops and the compendium. The new percentage shows before you save. Partly tested on PS5.', 'caution'],
     ['World', 'Time of day, health, armour and the map, plus Lucia’s and Jason’s skills, special meter, criminal profile and relationship.', 'caution'],
     ['All stats and Save data', 'Every one of the save’s values, with names or descriptions for almost all of them. For experts.', 'danger']];
 
@@ -599,8 +599,10 @@
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {})), guns: JSON.parse(JSON.stringify(d.guns || {}))});
   const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'cheats'].filter(k => c && c[k]).length;
-  // World edits: each key is one change, except a character's object ({meter, skills, profile, vest}), where each counts
-  const worldCount = w => Object.entries(w || {}).reduce((n, [k, v]) => n + (k === 'lucia' || k === 'jason' ? Object.keys(v || {}).length : 1), 0);
+  // World edits: each key is one change, except a character's object ({meter, skills, profile, vest}), where each counts,
+  // and the levels ({lucia: {muscle, cardio, focus}, jason: {...}}), where each level counts
+  const worldCount = w => Object.entries(w || {}).reduce((n, [k, v]) => n + (k === 'lucia' || k === 'jason' ? Object.keys(v || {}).length
+    : k === 'levels' ? Object.values(v || {}).reduce((m, c) => m + Object.keys(c || {}).length, 0) : 1), 0);
   // guns to add: {lucia: [weapon ids], jason: [...]}, each gun one change
   const gunCount = g => Object.values(g || {}).reduce((n, v) => n + (v || []).length, 0);
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + worldCount(d.world)
@@ -710,18 +712,18 @@
       const carried = (d.weapons || []).filter(w => w.inv === inv), unnamed = carried.filter(w => !w.label).length;
       const guns = carried.filter(w => w.label).map(w => `<li>${esc(w.label)}${w.kind ? ` <span class="kind">${esc(w.kind)}</span>` : ''}</li>`).join('')
         + (unnamed ? `<li class="kind">${unnamed} more not identified yet</li>` : '');
-      return `<div class="group"><div class="section-head"><h3>${who}</h3><div class="head-actions"><button class="btn small" data-act="fillall" data-scope="ammo-${inv}">Refill all</button><button class="btn small" data-act="maxall" data-scope="ammo-${inv}">Max all</button></div></div>
+      return `<div class="group"><div class="section-head"><h3>${who}</h3><div class="head-actions"><button class="btn small" data-act="fillall" data-scope="ammo-${inv}">Refill all</button></div></div>
         ${guns ? `<p class="note">Weapons carried</p><ul class="weapons">${guns}</ul>` : ''}
         <div class="fields">${rows.map(a => {
-          const help = a.full ? `A full load is ${nf.format(a.full)}. Can go up to ${nf.format(a.max)}.` : `Can go up to ${nf.format(a.max)}. The game’s full load for this isn’t known yet.`;
+          const help = a.full ? `A full load is ${nf.format(a.full)}.` : `Can go up to ${nf.format(a.max)}. The game’s full load for this isn’t known yet.`;
           return `<div class="field"><div class="name">${esc(a.label)}<span class="help">${help}</span></div>
             <div class="inputs" data-scope="ammo-${inv}">${cell({kind: 'ammo', key: `${a.inv}:${a.idx}`, label: a.type.startsWith('thrown') ? 'How many' : 'Rounds', value: a.value, display: String(a.value), unit: 'count', type: 'int', min: 1, max: a.max,
               attrs: `data-inv="${a.inv}" data-idx="${a.idx}" data-label="${esc(a.label + ', ' + who)}" data-full="${a.full || ''}" data-max="${a.max}"`,
-              extra: (a.full ? `<button class="btn small" data-act="fill" data-to="${a.full}">Full</button>` : '') + `<button class="btn small" data-act="fill" data-to="${a.max}">Max</button>`})}</div></div>`;
+              extra: a.full ? `<button class="btn small" data-act="fill" data-to="${a.full}">Full</button>` : `<button class="btn small" data-act="fill" data-to="${a.max}">Max</button>`})}</div></div>`;
         }).join('')}</div></div>`;
     };
     return `<div class="section-head"><h2>Ammo</h2>${riskTag('tested')}
-        <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Amounts up to a full load have been tested on a PS5 and the game keeps them. Larger amounts haven’t been tried yet: the game may cut them back to a full load when it loads the save.</p></div>
+        <p>Only ammo a character is carrying is listed. To add a new type, pick some up in the game first. Tested on a PS5: the game keeps up to a full load and cuts larger amounts back to it.</p></div>
       ${d.ammo.length ? block(0, 'Lucia') + block(1, 'Jason') : '<div class="empty">Neither character is carrying ammo in this save.</div>'}
       ${gunsSection(s, d)}`;
   }
@@ -738,8 +740,8 @@
     const known = (G?.characters || []).flatMap(c => [...c.offered, ...c.owned]);
     const amount = kind => known.find(g => g.name === `weaponspec_thrown_${kind}_default`)?.ammo;
     const amounts = [amount('grenade'), amount('bomb')].filter(x => x != null);
-    const head = `<div class="group guns"><div class="section-head"><h2>Guns</h2>${riskTag('experimental')}
-        <p>Adds guns a character doesn’t have yet, each with the kit and default parts the game gives a gun you buy. Only guns whose parts Save Garage has seen the game write are offered, and nothing a character already has is changed. Each gun takes a few inventory slots, and ${nf.format(G?.itemReserve ?? 300)} are always left free.</p>
+    const head = `<div class="group guns"><div class="section-head"><h2>Guns</h2>${riskTag('tested')}
+        <p>Adds guns a character doesn’t have yet, each with the kit and default parts the game gives a gun you buy. Tested on a PS5: they show up in the loadout, as guns you buy do. Only guns whose parts Save Garage has seen the game write are offered, and nothing a character already has is changed. Each gun takes a few inventory slots, and ${nf.format(G?.itemReserve ?? 300)} are always left free.</p>
         <p>Guns come without ammo: buy some in the game, or pick some up, and refill it here next time.${amounts.length === 2 ? ` Grenades and sticky bombs come with ${nf.format(amounts[0])} and ${nf.format(amounts[1])}, as many as the game gave when they were bought.` : ''} A gun the compendium doesn’t list yet is added to it too, as the game does, which can raise STANDARD ISSUE WEAPONS and the 100% figure.</p></div>`;
     if (!G) return head + '<div class="callout">This part of the save can’t be read yet.</div></div>';
     const rows = G.characters.map(c => {
@@ -1117,29 +1119,26 @@
       <details class="more-opts" data-keep="compLeft" ${S.keep.compLeft ? 'open' : ''}><summary>What’s left to play in the game</summary>${leftToPlay(s) || '<p class="note">Not available for this save.</p>'}</details>`;
   }
 
-  // ---- cheats: complete chosen cheat unlock trackers (challenges.py, set d6d53427)
+  // ---- cheats: the cheat unlock trackers (challenges.py, set d6d53427), shown read-only. Tested on a PS5, completing a
+  // tracker doesn't unlock its cheat: when the game unlocks one it also sets the cheat's entry in the unlock catalog
+  // (block 6df5d2cf) from 0 to 2, and that entry is known for only one cheat so far (dev_scratch/cheats). A tracker
+  // completed without it might also keep the game from unlocking the cheat later, so the page doesn't offer it.
   const cheatText = c => `${c.name ? `<span class="cheat-name" data-no-i18n>${esc(c.name)}</span>` : ''}<span class="${c.name ? 'effect' : 'cheat-name'}">${esc(c.effect)}</span>
     <span class="help"><b>To unlock:</b> ${esc(c.unlock)}</span>`;
   function cheatParts(s) {
-    const C = S.comp[s.file].cheats, d = draftOf(s.file).completion;
-    const warn = '<div class="callout danger"><span class="risk danger"></span><div><b>Using a cheat in the game turns off trophies and saving for the rest of that session.</b> The game warns about this when you use one. Unlocking a cheat here doesn’t use it.</div></div>';
-    if (!C) return warn + '<p class="note">This part of the save can’t be read yet.</p>';
-    if (C.problem) return warn + `<div class="callout">${esc(ERR['save_' + C.problem] || ERR.save_layout_changed)}</div>`;
-    const picked = new Set(d.cheats?.trackers || []);
-    const open = C.entries.filter(e => e.done < e.of && !e.ids.every(i => picked.has(i)));
-    const head = `<div class="section-head"><h3>Cheat unlocks</h3><div class="head-actions">${riskTag('experimental')}${open.length > 1 ? '<button class="btn small" data-act="cheat-add" data-key="all">Pick every cheat</button>' : ''}</div>
-        <p>The game unlocks a cheat when you meet its condition, and keeps a tracker for each one in the save. ${nf.format(C.done)} of ${nf.format(C.of)} are complete in this save. Completing one here marks it the way the game does when the condition is met; whether the cheat then shows in the game’s Progress menu hasn’t been tested on a PS5 yet. No other progress, trophy or counter changes, and the 100% figure stays the same.</p>
-        <p>Each challenge category has two cheats, one for 5 of its challenges and one for all of them. The save doesn’t show which of the two trackers is which, so they are completed together.</p></div>`;
-    const ctl = e => e.done >= e.of ? '<span class="done-mark">Unlocked</span>'
-      : e.ids.every(i => picked.has(i)) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="cheat-undo" data-key="${esc(e.key)}">Undo</button>`
-      : `<button class="btn small" data-act="cheat-add" data-key="${esc(e.key)}">Unlock</button>`;
+    const C = S.comp[s.file].cheats;
+    if (!C) return '<p class="note">This part of the save can’t be read yet.</p>';
+    if (C.problem) return `<div class="callout">${esc(ERR['save_' + C.problem] || ERR.save_layout_changed)}</div>`;
+    const head = `<div class="section-head"><h3>Cheat unlocks</h3>
+        <p>The game unlocks a cheat when you meet its condition, and keeps a tracker for each one in the save. ${nf.format(C.done)} of ${nf.format(C.of)} are complete in this save. Tested on a PS5, completing a tracker isn’t enough: the game also marks the unlock in a list, and the entry for most cheats isn’t known yet. So cheats can’t be unlocked here for now.</p></div>`;
+    const ctl = e => e.done >= e.of ? '<span class="done-mark">Unlocked</span>' : '';
     const rows = C.entries.map(e => {
       if (e.kind === 'single') return `<div class="field cheat"><div class="name">${cheatText(e.cheats[0])}</div><div class="inputs">${ctl(e)}</div></div>`;
-      const note = e.kind === 'pair' ? '' : `<span class="help">Save Garage hasn’t seen these ${nf.format(e.of)} trackers hold any progress in a save, so it can’t tell which cheat each one is. They can only be completed together${e.done ? `, and ${nf.format(e.done)} of them are complete already` : ''}.</span>`;
+      const note = e.kind === 'pair' ? '' : `<span class="help">Save Garage hasn’t seen these ${nf.format(e.of)} trackers hold any progress in a save, so it can’t tell which cheat each one is.</span>`;
       return `<div class="field cheat ${e.kind}"><div class="name">${note}<ul class="cheats">${e.cheats.map(c => `<li>${cheatText(c)}</li>`).join('')}</ul></div>
         <div class="inputs">${ctl(e)}</div></div>`;
     }).join('');
-    return `${warn}<div class="group">${head}<div class="fields">${rows}</div></div>`;
+    return `<div class="group">${head}<div class="fields">${rows}</div></div>`;
   }
 
   function compParts(s) {
@@ -1305,14 +1304,34 @@
     return `<div class="group"><div class="section-head"><h3>Map</h3></div><div class="fields">${worldField('Reveal the map', 'untested', help, ctl)}</div></div>`;
   }
 
-  // Lucia and Jason: special meter, skills, criminal profile and a vest each, then their relationship (player.py)
+  // Lucia and Jason: special meter, skills, levels, criminal profile and a vest each, then their relationship (player.py,
+  // levels.py)
   function characterGroups(s) {
-    const P = S.world[s.file].player, d = draftOf(s.file).world;
+    const P = S.world[s.file].player, L = S.world[s.file].levels, d = draftOf(s.file).world;
     if (!P) return '<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="callout">This part of the save can’t be read yet.</div></div>';
-    return P.characters.map(c => characterGroup(P, c, d[c.key] || {})).join('') + relationshipGroup(P, d);
+    return P.characters.map(c => characterGroup(P, c, d[c.key] || {}, L, d.levels?.[c.key] || {})).join('') + relationshipGroup(P, d);
   }
 
-  function characterGroup(P, c, dc) {
+  // strength, cardio and focus: the save counts levels from 0, the page from 1 as the game shows them
+  const LEVELS = ['muscle', 'cardio', 'focus'];
+  const LEVEL_LABEL = {muscle: 'Strength', cardio: 'Cardio', focus: 'Focus'};
+  const LEVEL_REVIEW = {muscle: n => `Strength level (${n})`, cardio: n => `Cardio level (${n})`, focus: n => `Focus level (${n})`};
+  function levelsField(L, key, dl) {
+    const name = 'Strength, cardio and focus';
+    if (!L || L.problem) return worldField(name, 'experimental', L ? ERR['save_' + L.problem] || ERR.save_layout_changed : 'This part of the save can’t be read yet.', '');
+    const c = L.characters.find(x => x.key === key);
+    if (!c || !c.levels.muscle) return '';
+    // the level the game shows is the one outside the stats (levels.py); the stats copy follows it when a level is set
+    const atMax = LEVELS.every(a => c.levels[a].value === c.levels[a].max && dl[a] == null);
+    const cells = LEVELS.map(a => {
+      const x = c.levels[a], now = x.value + 1;
+      return worldCell({what: a, who: key, label: LEVEL_LABEL[a], min: 1, max: x.max + 1, step: 1, value: dl[a] != null ? dl[a] + 1 : now, init: now, was: String(now), changed: dl[a] != null});
+    }).join('');
+    return worldField(name, 'experimental', `Strength goes up to level ${L.max.muscle + 1}, cardio and focus up to level ${L.max.cardio + 1}. The game keeps each level in two places, and both are changed together.`,
+      cells + `<button class="btn small" data-act="world-fill" data-what="levels" data-who="${key}" ${atMax ? 'disabled' : ''}>Max all</button>`);
+  }
+
+  function characterGroup(P, c, dc, L, dl) {
     const pending = (what, text) => `<span class="note">${text} Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="${what}" data-who="${c.key}">Undo</button>`;
     let rows = '';
     if (c.attributesProblem || !c.skills) rows += worldField('Special meter and skills', 'experimental', ERR['save_' + c.attributesProblem] || ERR.save_layout_changed, '');
@@ -1324,6 +1343,7 @@
         worldCell({what: 'skills', who: c.key, label: 'Raise to', min: P.skillMin, max: P.skillMax, step: 1, value: dc.skills ?? lo, init: lo, was: now, changed: dc.skills != null,
           extra: P.skillChoices.map(v => `<button class="btn small" data-act="world-fill" data-what="skills" data-who="${c.key}" data-to="${v}">${v}</button>`).join('')}));
     }
+    rows += levelsField(L, c.key, dl);
     if (c.profile != null) {
       const was = nf2.format(c.profile);
       rows += worldField('Criminal profile', 'experimental', `Now ${was}. The game calls it the criminal profile: a temperament score behind the Professional, Hardened, Violent, Psycho and Irredeemable profiles in the Jason & Lucia menu. Which score gives which profile isn’t known yet. Lucia starts a new game at ${nf.format(P.profileNewGame)}; saves written by the game hold ${nf.format(P.profileMin)} to ${nf2.format(P.profileMax)}.`,
@@ -1378,6 +1398,18 @@
         if (!ok || same) delete ch[what]; else ch[what] = v;
         if (Object.keys(ch).length) d[who] = ch; else delete d[who];
       }
+      mark(el.closest('.cell'), ok && !same, el);
+    } else if (LEVELS.includes(what) && w.levels?.characters) {
+      // the page shows levels from 1, the save and the drafts hold them from 0
+      const who = el.dataset.who, x = w.levels.characters.find(c => c.key === who)?.levels?.[what];
+      if (!x) return;
+      const ok = el.value.trim() !== '' && Number.isInteger(v) && v >= 1 && v <= x.max + 1;
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      const same = v - 1 === x.value;
+      const all = d.levels || {}, ch = all[who] || {};
+      if (!ok || same) delete ch[what]; else ch[what] = v - 1;
+      if (Object.keys(ch).length) all[who] = ch; else delete all[who];
+      if (Object.keys(all).length) d.levels = all; else delete d.levels;
       mark(el.closest('.cell'), ok && !same, el);
     }
     renderPending(); renderCounts();
@@ -1682,6 +1714,10 @@
           e.profile != null && {label: `Criminal profile (${name})`, value: c?.profile ?? '', newValue: e.profile},
           e.vest && {label: `Vest (${name})`, value: c?.vest?.armour ?? '', newValue: P?.vestArmour ?? 150}];
       }),
+      ...Object.entries(w.levels || {}).flatMap(([k, ch]) => {
+        const c = now?.levels?.characters?.find(x => x.key === k), name = c?.name || (k === 'lucia' ? 'Lucia' : 'Jason');
+        return Object.entries(ch || {}).map(([a, v]) => ({label: LEVEL_REVIEW[a] ? LEVEL_REVIEW[a](name) : a, value: c?.levels?.[a] ? c.levels[a].value + 1 : '', newValue: v + 1}));
+      }),
       w.relationship != null && {label: 'Relationship', value: P?.relationship?.value ?? '', newValue: w.relationship}].filter(Boolean);
     const cp = d.completion || {};
     const compList = [cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
@@ -1925,16 +1961,6 @@
       S.mainKey = ''; renderMain(); renderPending(); renderCounts();
       return;
     }
-    if (a === 'cheat-add' || a === 'cheat-undo') {        // the cheat trackers to complete, by entry (a pair or the unmatched group is one entry)
-      const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file]?.cheats;
-      if (!C?.entries) return;
-      const cur = new Set(d.cheats?.trackers || []), key = b.dataset.key;
-      const entries = key === 'all' ? C.entries.filter(e => e.done < e.of) : C.entries.filter(e => e.key === key);
-      for (const e of entries) for (const i of e.ids) { if (a === 'cheat-add') cur.add(i); else cur.delete(i); }
-      if (cur.size) d.cheats = {trackers: [...cur]}; else delete d.cheats;
-      S.mainKey = ''; renderMain(); renderPending(); renderCounts();
-      return;
-    }
     if (a === 'guns-all' || a === 'guns-none') {
       const s = slotOf(S.slot), d = draftOf(s.file), who = b.dataset.who;
       const c = S.detail[s.file]?.guns?.characters?.find(x => x.key === who);
@@ -1947,7 +1973,12 @@
     if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
     if (a === 'world-fill' || a === 'world-undo') {
       const s = slotOf(S.slot), w = S.world[s.file], d = draftOf(s.file).world, what = b.dataset.what, who = b.dataset.who;
-      if (who) {                                  // one character's special meter, skills or vest
+      if (what === 'levels') {                    // one character's strength, cardio and focus, each to its highest level
+        const c = w.levels?.characters?.find(x => x.key === who), all = d.levels || {}, ch = {};
+        for (const a of LEVELS) { const x = c?.levels?.[a]; if (x && x.value !== x.max) ch[a] = x.max; }
+        if (Object.keys(ch).length) all[who] = ch; else delete all[who];
+        if (Object.keys(all).length) d.levels = all; else delete d.levels;
+      } else if (who) {                           // one character's special meter, skills or vest
         const ch = d[who] || {}, c = w.player.characters.find(x => x.key === who);
         if (a === 'world-undo') delete ch[what];
         else if (what === 'skills') { const to = Number(b.dataset.to); if (to > Math.min(...c.skills)) ch.skills = to; else delete ch.skills; }
@@ -1969,10 +2000,10 @@
       setStunts(file, [...sel]);
       return;
     }
-    if (a === 'fillall' || a === 'maxall') {
+    if (a === 'fillall') {                       // each ammo type with a known full load, to that load
       for (const w of $$(`.inputs[data-scope="${b.dataset.scope}"]`)) {
         const input = w.querySelector('input[type="number"]');
-        const to = input && (a === 'fillall' ? input.dataset.full : input.dataset.max);
+        const to = input && input.dataset.full;
         if (to) { input.value = to; onEdit(input); }
       }
       return;

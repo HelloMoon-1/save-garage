@@ -20,7 +20,7 @@ The whole app state, polled about once a second by the UI.
     "subtitle": "Mission name",
     "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 231933844, "spendable": 85000,
                "stuck": 0, "boxMax": 223844, "stacks": 0}],
-    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 9999}],
+    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 300}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
     "applied": {"money": [], "ammo": [], "stats": []} | null
@@ -55,7 +55,8 @@ where new stacks would start: `max` plus $85,000 for each of them (equal to `max
 version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it), and
 `spendable` is the rest of `value`, extra stacks included. Without `stuck` money, a `value` above `max` is money in extra
 stacks, as versions 1.26.0 to 1.30.0 wrote it.
-For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes.
+For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes: the
+full load where it's known (a PS5 cut larger amounts back to it), otherwise 9,999.
 Each weapon is
 `{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:
 `label` is what the game calls it (empty while the weapon isn't identified) and `kind` is the type of weapon when the
@@ -106,6 +107,9 @@ and `errors` says why:
   `lowerCap` and `cap`, the range the story allows now, `level`, `locked`, `disabled` and `problem`, a refusal code
   while it can't be changed); and the limits: `meterFull` (100), `skillMin` and `skillMax` (1 and 99),
   `skillChoices` (60 and 99), `profileMin` and `profileMax` (-100 and 0.25), `profileNewGame` (-25), `vestArmour` (150).
+- `levels`: `characters`, one per character (`key`, `name` and `levels`: `muscle` (strength), `cardio` and `focus`, each
+  `{"value", "stat", "max"}`, counted from 0 as the save keeps them: `value` is the level the game reads, `stat` the
+  copy in the stats, `max` 4 for strength and 3 for the others); `max` and `problem` (a refusal code).
 - `fog`: the map's fog of war. `regions` uncovered in the save (`named` and `cells`), `known` (the 722 regions Save
   Garage knows: `knownNamed` 52, `knownCells` 670), `mapTotal` (889), `missing` (known regions the save still lacks),
   `unknown` (regions in the save that Save Garage doesn't know, kept as they are) and `problem` (a refusal code).
@@ -120,7 +124,7 @@ the same limits the World tab keeps to: maximum health is read-only; health is 1
 to 0.25; the relationship stays within the story's caps and is read-only while the story has it locked or switched
 off, and those caps and flags are read-only themselves; the skill slots of a character's attributes go up to 99 and
 slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmour up to 150. FogOfWar is read-only
-(the World tab reveals the map).
+(the World tab reveals the map), and so is ScriptCharacterPhysique (the World tab sets the levels in it).
 
 ## POST endpoints
 
@@ -225,7 +229,8 @@ counts and reasons only: never the worker key, key material, the client or serve
   "fog": "known",                           // reveal every map region Save Garage knows
   "lucia": {"meter": "full", "skills": 99, "profile": -25.0, "vest": true},
   "jason": {"skills": 60},                  // any of the four, for either character
-  "relationship": 69                        // within the story's caps
+  "relationship": 69,                       // within the story's caps
+  "levels": {"lucia": {"muscle": 4, "cardio": 3, "focus": 3}, "jason": {"cardio": 1}}   // counted from 0
 }
 ```
 
@@ -243,6 +248,11 @@ Every key may be left out, and every edit is checked against the save before any
   character who already wears armour is left as is.
 - `relationship` is refused while the story has it locked (`relationship_locked`) or switched off
   (`relationship_disabled`), and outside its caps (`out_of_range`). Its level isn't changed.
+- `levels` sets strength (`muscle`, 0 to 4), `cardio` and `focus` (0 to 3), counted from 0 as the save keeps them (the
+  game shows them from 1). Both copies are written: the character's record in ScriptCharacterPhysique, which the game
+  reads when the save loads, and `currentlevel` in the stats, with `numlevelups` for cardio and focus so that ups minus
+  downs still gives the level. A level that changes has its progress points set to 0. Refused when a record or stat
+  isn't where Save Garage expects (`levels_layout`).
 
 Out-of-range values are `out_of_range`, wrong types `bad_value`, and unknown keys in a character's object
 `bad_request` (other keys of `world` are ignored); in the job's error they carry the `save_` prefix. Applying the
@@ -280,8 +290,9 @@ character), `bad_request`, `verify_failed` (the result isn't the old inventory p
 Each chosen cheat tracker that isn't complete is completed the way the game completes one when its condition is met:
 `isComplete` true and the empty parameter, nothing else. No counter or 100% line counts these trackers, so the
 checklist and the 100% figure stay as they are; the profile-wide awards, the goals and the unlock catalogs aren't
-touched. Whether the cheat then shows in the game's Progress menu isn't known yet. Using a cheat in the game turns off
-trophies and saving for the rest of that session. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
+touched. Tested on a PS5, that doesn't unlock the cheats: when the game unlocks one it also sets the cheat's entry in
+the unlock catalog (block 6df5d2cf) from 0 to 2, and that entry is known for only one cheat so far. So the page lists
+the cheats read-only and doesn't send this edit; the API keeps it for research. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
 record isn't shaped as the game writes it), `not_editable` (a record of another challenge set), `unknown_challenge`,
 `bad_request`, `verify_failed`. Errors carry the `save_` prefix in the job's error.
 

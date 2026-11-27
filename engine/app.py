@@ -34,8 +34,9 @@ BIND = os.environ.get('SAVEGARAGE_HOST', '127.0.0.1')
 ALLOW_NETS = [ipaddress.ip_network(n.strip(), strict=False) for n in os.environ.get('SAVEGARAGE_ALLOW', '127.0.0.0/8').split(',') if n.strip()]
 OK_HOSTS = ['127.0.0.1', 'localhost'] + ([BIND] if BIND not in ('', '0.0.0.0', '127.0.0.1', 'localhost') else [])
 GTA_TITLES = ['PPSA01547', 'PPSA38500', 'PPSA29660']   # GTA VI title IDs (regions); PPSA29660: GarlicSaves treats it as GTA VI too
-# the World tab's edits: world.py (time, health, armour), player.py (each character and the relationship), fog.py (the map)
-WORLD_KEYS = ('time', 'health', 'armour', 'lucia', 'jason', 'relationship', 'fog')
+# the World tab's edits: world.py (time, health, armour), player.py (each character and the relationship), levels.py
+# (strength, cardio and focus), fog.py (the map)
+WORLD_KEYS = ('time', 'health', 'armour', 'lucia', 'jason', 'relationship', 'levels', 'fog')
 NOWIN = 0x08000000 if os.name == 'nt' else 0
 PY = sys.executable
 LAST_SEEN = {'t': time.time()}
@@ -1408,18 +1409,18 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, savebrowse.node(b, int(q['section'][0], 16), p, int((q.get('offset') or ['0'])[0]), 200))
             except Exception as e:
                 return self._send(400, {'error': 'bad_request', 'detail': repr(e)[:300]})
-        if path == '/api/world':                        # time of day, health and armour, the characters and the map
+        if path == '/api/world':                        # time of day, health and armour, the characters, their levels and the map
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import world, player, fog
+                import world, player, levels, fog
                 b = slot_bytes(slot)
                 out = world.read(b)
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
             out['errors'] = {}
-            for key, mod in (('player', player), ('fog', fog)):   # each on its own: one that can't be read leaves the rest working
+            for key, mod in (('player', player), ('levels', levels), ('fog', fog)):   # each on its own: one that can't be read leaves the rest working
                 try:
                     out[key] = mod.read(b)
                 except Exception as e:
