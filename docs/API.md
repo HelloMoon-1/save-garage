@@ -18,8 +18,8 @@ The whole app state, polled about once a second by the UI.
   "slots": [{
     "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
     "subtitle": "Mission name",
-    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 231933844, "spendable": 85000,
-               "stuck": 0, "boxMax": 223844, "stacks": 0}],
+    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 8723844, "spendable": 85000,
+               "stuck": 0, "boxMax": 223844, "stacks": 0, "stackCap": 100}],
     "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 300}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
@@ -49,12 +49,14 @@ Editor data for one save: featured stats with the exact rows to edit, ammo and t
 For the bank, `max` is what the bank's own money boxes hold at this point in the story, which shops spend from; an edit
 goes no higher unless it asks for the extra stacks (`stacks`, under `/api/patch` below). `maxStacks` is the limit with
 them: a $85,000 stack under the bank's $85,000 box for every inventory slot left above the 300 kept free, at most
-$999,999,999, and equal to `max` when the save has no $85,000 box yet. The stacks are experimental and may not be
-spendable (issue #8). `stacks` counts the extra stacks the bank already has, and `boxMax`, kept for compatibility, is
+`stackCap` (100) stacks in all, and equal to `max` when the save has no $85,000 box yet. The stacks are experimental
+and may not be spendable (issue #8), and thousands of them made the game nearly freeze whenever it paid (issue #21);
+stacks past the cap that a bank already has don't count, so `value` can be above `maxStacks` until it is edited.
+`stacks` counts the extra stacks the bank already has, and `boxMax`, kept for compatibility, is
 where new stacks would start: `max` plus $85,000 for each of them (equal to `max` without any). `stuck` is money an older
 version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it), and
 `spendable` is the rest of `value`, extra stacks included. Without `stuck` money, a `value` above `max` is money in extra
-stacks, as versions 1.26.0 to 1.30.0 wrote it.
+stacks, as versions 1.26.0 to 1.30.0 wrote it, or as the experimental option wrote it since 1.30.1.
 For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes: the
 full load where it's known (a PS5 cut larger amounts back to it), otherwise 9,999.
 Each weapon is

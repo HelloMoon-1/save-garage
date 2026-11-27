@@ -69,6 +69,12 @@ CHECKING_BOXES = ((0x26457c8e, 0x006854cf, 15000),
 # so ITEM_RESERVE entries are always left free for items the game adds later. BANK_CEILING keeps the signed 32-bit
 # ledger and stats far from overflowing. Rows emptied by a lower balance stay in place (at 0) and are filled again first.
 STACK_BOX, STACK_SLOT, STACK_MAX = 0x33894998, 0x81cc2559, 85000
+# At most STACK_CAP extra stacks count toward the limit. A player who filled the bank to $273,630,000 (its own $100,000
+# and 3,218 stacks) found the game nearly froze whenever it paid, buying or customising a weapon, until the bank went
+# back to its own boxes (GitHub issue #21); a PS5 with 12 stacks ($1,000,000) ran normally. Stacks past the cap that a
+# save already has (versions up to 1.32.0 made them) don't count, so any edit of such a bank brings it under the cap,
+# and the rows it no longer needs are emptied.
+STACK_CAP = 100
 ITEM_LIMIT, ITEM_RESERVE = 4095, 300
 BANK_CEILING = 999999999
 # Family Savings' boxes. Under checking (where only earlier versions of this editor put them) the game does not spend from them.
@@ -238,10 +244,15 @@ def _own_limit(boxes):
     return sum(_checking_caps(boxes).values()) + sum(x['qty'] for x in boxes if x['cap'] is None and not x['foreign'])
 
 
+def _stack_count(boxes):
+    """How many extra stacks checking's 85,000 box has: its rows after the first."""
+    stack = next((x for x in boxes if x['box'] == STACK_BOX), None)
+    return len(stack['rows'][1:]) if stack else 0
+
+
 def _box_limit(boxes):
     """Checking without new stacks: its own boxes and the stacks it already has."""
-    stack = next((x for x in boxes if x['box'] == STACK_BOX), None)
-    return _own_limit(boxes) + (STACK_MAX * len(stack['rows'][1:]) if stack else 0)
+    return _own_limit(boxes) + STACK_MAX * _stack_count(boxes)
 
 
 def _new_stacks(boxes, items_n):
@@ -255,12 +266,15 @@ def _new_stacks(boxes, items_n):
 
 def _limit(kind, boxes, items_n=0):
     """The most an account can hold. Checking with stacks (scan's 'maxStacks'): the capacity of the own boxes the save has
-    (it gets no new boxes) and of the stacks it has, plus 85,000 for every stack that still fits under its 85,000 box, at
-    most BANK_CEILING. Savings: every box it can have, since missing ones are added."""
+    (it gets no new boxes) and of the stacks it has, plus 85,000 for every stack that still fits under its 85,000 box,
+    with at most STACK_CAP stacks in all and at most BANK_CEILING. Savings: every box it can have, since missing ones are
+    added."""
     if kind == 'bank':
-        lim = _box_limit(boxes)
+        have = _stack_count(boxes)
+        lim = _own_limit(boxes) + STACK_MAX * min(have, STACK_CAP)
         n = _new_stacks(boxes, items_n)
         if n:
+            n = min(n, max(0, STACK_CAP - have))
             lim = max(min(lim + STACK_MAX * n, BANK_CEILING), lim)
         return lim
     return sum(cap for _, _, cap in ACCOUNTS[kind][1]) + sum(x['qty'] for x in boxes if x['cap'] is None)
@@ -290,6 +304,7 @@ def scan(b):
                 item['stuck'] = item['value'] - item['spendable']
                 item['boxMax'] = _box_limit(boxes)        # above this, the balance goes into new 85,000 stacks
                 item['stacks'] = sum(len(x['rows'][1:]) for x in boxes if x['box'] == STACK_BOX)
+                item['stackCap'] = STACK_CAP              # the most extra stacks maxStacks counts
             items.append(item)
         for k, q in enumerate(v['qty']):
             if v['item'][k] == MONEY_CAT and k not in seen:

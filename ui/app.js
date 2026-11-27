@@ -654,7 +654,8 @@
 
   // ---- money
   // The bank goes up to what its own money boxes hold (max), which shops spend from. Past them it can take extra $85,000
-  // stacks (maxStacks), but only when the user ticks the experimental option: a player couldn't spend them (issue #8).
+  // stacks (maxStacks), but only when the user ticks the experimental option: a player couldn't spend them (issue #8),
+  // and with thousands of them the game nearly froze whenever it paid (issue #21), so at most stackCap count.
   function panelMoney(s) {
     const items = (s.items || []).filter(x => x.kind !== 'other');
     const name = x => ({bank: 'Bank account', savings: 'Family Savings', cash: 'Cash, ' + (x.inv === 0 ? 'Lucia' : 'Jason')})[x.kind];
@@ -664,11 +665,12 @@
                           ? `BuckMe shows $${nf.format(x.value)}, but $${nf.format(x.stuck)} of it sits in Family Savings boxes that an older version of Save Garage put under the bank, and the game can’t spend it. Moving it puts as much as fits, up to $${nf.format(x.max)}, in the bank’s own money boxes.`
                           : over(x)
                           ? `$${nf.format(x.value - x.max)} of the $${nf.format(x.value)} in the bank sits in extra stacks the game may not let you spend. Setting the bank to $${nf.format(x.max)} or less keeps everything spendable.`
+                            + (x.stacks > (x.stackCap ?? 100) ? ' This many stacks can make the game nearly freeze when it pays.' : '')
                           : `Up to $${nf.format(x.max)}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.`,
                         savings: `Up to $${nf.format(x.max)}.`, cash: `Up to $${nf.format(x.max)}, the size of the wallet.`})[x.kind];
     const stacksOpt = (x, key, on) => `<div class="stacks-opt">
         <div class="row"><label class="toggle small"><input type="checkbox" data-stacks="${key}" data-max="${x.max}" data-max-stacks="${x.maxStacks}" ${on ? 'checked' : ''}> Allow more than $${nf.format(x.max)} (experimental)</label>${riskTag('stacks')}</div>
-        <span class="help">Up to $${nf.format(x.maxStacks)}. Amounts above $${nf.format(x.max)} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.</span></div>`;
+        <span class="help">Up to $${nf.format(x.maxStacks)}. Amounts above $${nf.format(x.max)} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Save Garage adds at most ${nf.format(x.stackCap ?? 100)} stacks: with thousands of them, the game nearly froze whenever it paid. Use it only if you’re fine with that.</span></div>`;
     return `
       <div class="group"><div class="section-head"><h2>Money</h2>${riskTag('tested')}
         <p>Balances of 0 aren’t stored in the save, so they don’t show here. Get a little money in the game, save, and download again to edit them.</p></div>

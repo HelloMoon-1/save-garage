@@ -199,11 +199,13 @@ backups or GarlicSaves sign-in.
   Past its boxes, the bank can also take $85,000 stacks under its $85,000 box, which BuckMe shows in the balance.
   Versions 1.26.0 to 1.30.0 put anything past the boxes in such stacks, but they may not be spendable: a player on
   1.30.0 with about $2,000,000 in the bank couldn't make a $150,000 phone payment (issue #8). Since 1.30.1 the stacks
-  are an experimental option on the Money tab, off by default, until a PS5 shows the game spends them. Each stack takes
-  one inventory slot, and Save Garage always leaves 300 free, so their limit depends on the save (about $230 million in
-  a late save, and at most $999,999,999). An early save, before the story gives the bank its $85,000 box, has no
-  stacks. A bank already past its boxes shows how much of it is in stacks, and **Make it spendable** sets it to what
-  its boxes hold, emptying the stacks. Cash stays at the $20,000 wallet.
+  are an experimental option on the Money tab, off by default, until a PS5 shows the game spends them. Since 1.32.1
+  Save Garage adds at most 100 stacks ($8,500,000 on top of the boxes): a player who filled the bank to $273,630,000,
+  3,218 stacks, found the game nearly froze whenever it paid, until the bank went back to its own boxes (issue #21).
+  Each stack also takes one inventory slot, and Save Garage always leaves 300 free. An early save, before the story
+  gives the bank its $85,000 box, has no stacks. A bank already past its boxes shows how much of it is in stacks, and
+  **Make it spendable** sets it to what its boxes hold, emptying the stacks; that also fixes a save with thousands of
+  them. Cash stays at the $20,000 wallet.
 - **A balance of 0 can't be edited.** The game doesn't store it. Get a little money in the game, save and download again.
 - **Only ammo you carry is listed.** Pick some up in the game first to add a new type.
 - **Adding guns works like buying them.** A gun is built row for row the way the game wrote guns that were bought in a save:
