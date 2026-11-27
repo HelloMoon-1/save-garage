@@ -274,7 +274,7 @@
   // ------------------------------------------------------------ header and route
   function renderFoot() {
     const st = S.state || {};
-    $('#version').textContent = st.version ? 'Version ' + st.version + ' (beta 1)' : '';
+    $('#version').textContent = st.version ? 'Version ' + st.version + ' (beta 2)' : '';
     $('#quit').hidden = !st.canQuit;
     renderUpdate();
   }
