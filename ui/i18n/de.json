@@ -1469,5 +1469,14 @@
 "Downloading again later may help.": "Ein späterer erneuter Download kann helfen.",
 "None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "Keiner der Spielstände in diesem Download ließ sich lesen, auch nicht nach einer erneuten Entschlüsselung durch GarlicSaves. Die Spielstände auf deiner PS5 sind in Ordnung. Warte ein paar Minuten und lade sie dann erneut herunter.",
 "This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "Diese PS5 sendet Spielstände über IPv6 zurück, aber dieser Computer hat keine IPv6-Adresse auf dem Netzwerkadapter, den er für die PS5 nutzt. Aktiviere IPv6 für diesen Adapter und sende den Spielstand dann erneut.",
-"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage konnte diese Spielstände nicht lesen, daher lassen sie sich diesmal nicht bearbeiten. Sie bleiben auf der PS5 unverändert, und die anderen Spielstände kannst du wie gewohnt bearbeiten. Ein späterer erneuter Download kann helfen."
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage konnte diese Spielstände nicht lesen, daher lassen sie sich diesmal nicht bearbeiten. Sie bleiben auf der PS5 unverändert, und die anderen Spielstände kannst du wie gewohnt bearbeiten. Ein späterer erneuter Download kann helfen.",
+"This transfer needs IPv6 on the local network.": "Diese Übertragung braucht IPv6 im lokalen Netzwerk.",
+"Network adapter": "Netzwerkadapter",
+"Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version {0} (TCP/IPv6).": "Drücke Win + R, öffne ncpa.cpl, öffne die Eigenschaften des Adapters und aktiviere „Internetprotokoll, Version {0} (TCP/IPv6)“.",
+"Open System Settings → Network → your connection → Details → TCP/IP.": "Öffne Systemeinstellungen → Netzwerk → deine Verbindung → Details → TCP/IP.",
+"Set Configure IPv6 to Automatically or Link-local only.": "Stelle „IPv6 konfigurieren“ auf „Automatisch“ oder „Nur Link-Local“.",
+"Open the settings for this network connection and enable automatic or link-local IPv6.": "Öffne die Einstellungen dieser Netzwerkverbindung und aktiviere automatisches oder Link-Local-IPv6.",
+"Search again on the PS5 and select Save Garage.": "Suche auf der PS5 erneut und wähle Save Garage aus.",
+"Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "Öffne Systemeinstellungen → Netzwerk → deine Verbindung → Details → TCP/IP. Stelle „IPv6 konfigurieren“ auf „Automatisch“ oder „Nur Link-Local“.",
+"Keep this page open. Search again on the PS5 and select Save Garage.": "Lass diese Seite offen. Suche auf der PS5 erneut und wähle Save Garage aus."
 }

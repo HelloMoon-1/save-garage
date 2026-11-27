@@ -156,6 +156,8 @@ p { margin: 0; }
 .callout.signin-first .btn { flex: none; margin-inline-start: auto; }
 .callout.skipped { margin-top: 12px; }
 .skipped-list { margin: 8px 0 0; padding-inline-start: 18px; }
+.callout.ipv6 { margin-top: 12px; }
+.callout.ipv6 div + div { margin-top: 4px; }
 details.log { margin-top: 10px; }
 details.log summary { cursor: pointer; color: var(--text-2); font-size: 14px; }
 details.log pre { max-height: 220px; overflow: auto; background: var(--field); padding: 10px; border-radius: var(--r-input); font-size: 12px; white-space: pre-wrap; color: var(--text-2); }

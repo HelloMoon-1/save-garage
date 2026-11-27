@@ -53,8 +53,6 @@
     no_story_slot: 'No story save was found. Save once in story mode, then try again.',
     // GarlicSaves kept sending back a damaged copy of every story save in the download (issue #11)
     decrypt_bad: 'None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.',
-    // the PS5 asked for the save over IPv6 (issue #7) and this computer's network adapter has no IPv6 address
-    ipv6_needed: 'This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.',
     pair_failed: 'Pairing failed or timed out. Start pairing again.',
     save_layout_changed: 'The save layout is different from what this editor knows. Download again. If it still fails, the editor needs an update.',
     save_verify_failed: 'A value in the save didn’t match what was expected. Download again and redo the edit.',
@@ -1567,6 +1565,21 @@
   const fmtChange = v => typeof v === 'boolean' ? (v ? 'yes' : 'no') : typeof v === 'number' ? (Number.isInteger(v) ? nf.format(v) : nf2.format(v)) : String(v);
 
   // ------------------------------------------------------------ job box
+  // a PS5 asked for IPv6 data (issue #7) and the adapter carrying its connection has no link-local IPv6 address
+  // (job.hint from upload_network_hint, PR #14): how to turn it on, for the computer's system. The upload keeps
+  // waiting, so the player can turn IPv6 on and pick Save Garage on the PS5 again.
+  function uploadNetworkHelp(hint) {
+    if (hint?.code !== 'local_ipv6') return '';
+    const steps = hint.platform === 'win32'
+      ? 'Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version 6 (TCP/IPv6).'
+      : hint.platform === 'darwin'
+        ? 'Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.'
+        : 'Open the settings for this network connection and enable automatic or link-local IPv6.';
+    return `<div class="callout ipv6" role="status"><div><strong>This transfer needs IPv6 on the local network.</strong>
+      ${hint.adapter ? `<div><span>Network adapter</span>: <b data-no-i18n>${esc(hint.adapter)}</b></div>` : ''}
+      <div>${esc(steps)}</div><div>Keep this page open. Search again on the PS5 and select Save Garage.</div></div></div>`;
+  }
+
   function renderJob() {
     const st = S.state;
     if (!st) return;
@@ -1591,6 +1604,7 @@
             ${job.stage === 'choose_account' && job.accounts ? `<div class="accounts"><strong>Which account’s save do you want to edit?</strong>
               <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
+            ${uploadNetworkHelp(job.hint)}
             ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
             ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'key_rate_wait', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${logBlock(job)}</div>`;

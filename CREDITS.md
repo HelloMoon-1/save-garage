@@ -25,7 +25,8 @@ Modified from the projects above, November 2026:
   in place of the shared worker key GarlicSaves has revoked.
 - Renamed and rebranded; new default port 7283; comments translated to English.
 - Sending back to consoles that ask for the newer console information and IPv6 data (1.31.0, GitHub issue #7),
-  ported by HelloMoon-1 (pull request #10) from ImNotTom's findings on a PS5 Pro.
+  ported by HelloMoon-1 (pull request #10) from ImNotTom's findings on a PS5 Pro, and the help that names the
+  network adapter when it has no IPv6 address (1.31.1, pull request #14, also by HelloMoon-1).
 
 ## Services and assets
 

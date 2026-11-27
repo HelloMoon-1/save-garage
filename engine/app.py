@@ -1066,6 +1066,23 @@ def job_restore():
     stage('ready_to_upload')
 
 
+def upload_network_hint(line):
+    """job.hint for a [network] line of the transfer code: a PS5 asked for IPv6 data (issue #7) and the adapter carrying
+    its connection has no link-local IPv6 address. The upload keeps waiting, so the player can turn IPv6 on and pick Save
+    Garage on the PS5 again; the next connection clears the hint."""
+    if not line.startswith('[network] '):
+        return None
+    try:
+        event = json.loads(line[len('[network] '):])
+    except ValueError:
+        return None
+    if not isinstance(event, dict) or event.get('issue') != 'local_ipv6':
+        return None
+    adapter = event.get('adapter')
+    return {'code': 'local_ipv6', 'adapter': adapter if isinstance(adapter, str) else '',
+            'platform': sys.platform}
+
+
 def job_upload():
     c = STATE['console']; sess = Path(STATE['session']); lib = sess / 'lib'; up = sess / 'upload'; up.mkdir(exist_ok=True)
     stage('preparing')
@@ -1085,12 +1102,15 @@ def job_upload():
     files = 0; finished = False
     for line in p.stdout:
         line = line.rstrip(); low = line.lower()
+        hint = upload_network_hint(line)
+        if hint:
+            stage('waiting_console', hint=hint)
+            log('The console connection needs a local IPv6 address. Waiting for reconnection.')
+            continue
         if 'srch' in low or not line:
             continue
         if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:
             refused_key_request(t0)             # a channel closed because GarlicSaves turned its key request down
-        if 'no ipv6 address on the network adapter' in low:
-            raise Fail('ipv6_needed', line)     # the PS5 asked for IPv6 data (issue #7) and this adapter has none
         if 'psutil package is missing' in low:
             raise Fail('tool_failed', line)     # a source checkout that predates the psutil requirement
         if '[tcp] connection from' in low:

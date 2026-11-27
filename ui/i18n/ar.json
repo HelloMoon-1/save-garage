@@ -1469,5 +1469,14 @@
 "Downloading again later may help.": "قد تفيد إعادة التنزيل لاحقًا.",
 "None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "تعذّرت قراءة كل ملفات الحفظ في هذا التنزيل، حتى بعد طلب فك تشفيرها مرة أخرى من GarlicSaves. ملفات الحفظ على جهاز PS5 سليمة. انتظر بضع دقائق، ثم نزّلها مجددًا.",
 "This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "يرسل جهاز PS5 هذا ملفات الحفظ عبر IPv6، لكن هذا الكمبيوتر ليس لديه عنوان IPv6 على محول الشبكة الذي يستخدمه للاتصال بجهاز PS5. فعّل IPv6 لهذا المحول، ثم أرسل ملف الحفظ مجددًا.",
-"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "تعذّر على Save Garage قراءة ملفات الحفظ هذه، لذا لا يمكن تعديلها هذه المرة. تبقى على جهاز PS5 كما هي، ويمكنك تعديل ملفات الحفظ الأخرى كالمعتاد. قد تفيد إعادة التنزيل لاحقًا."
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "تعذّر على Save Garage قراءة ملفات الحفظ هذه، لذا لا يمكن تعديلها هذه المرة. تبقى على جهاز PS5 كما هي، ويمكنك تعديل ملفات الحفظ الأخرى كالمعتاد. قد تفيد إعادة التنزيل لاحقًا.",
+"This transfer needs IPv6 on the local network.": "يحتاج هذا النقل إلى IPv6 على الشبكة المحلية.",
+"Network adapter": "محول الشبكة",
+"Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version {0} (TCP/IPv6).": "اضغط Win + R، وافتح ncpa.cpl، ثم افتح خصائص المحول وحدد «بروتوكول الإنترنت الإصدار {0} (TCP/IPv6)».",
+"Open System Settings → Network → your connection → Details → TCP/IP.": "افتح إعدادات النظام ← الشبكة ← اتصالك ← التفاصيل ← TCP/IP.",
+"Set Configure IPv6 to Automatically or Link-local only.": "اضبط «تكوين IPv6» على «تلقائيًا» أو «الارتباط المحلي فقط».",
+"Open the settings for this network connection and enable automatic or link-local IPv6.": "افتح إعدادات اتصال الشبكة هذا، وفعّل IPv6 تلقائيًا أو للارتباط المحلي فقط.",
+"Search again on the PS5 and select Save Garage.": "ابحث مجددًا على جهاز PS5 واختر Save Garage.",
+"Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "افتح إعدادات النظام ← الشبكة ← اتصالك ← التفاصيل ← TCP/IP. اضبط «تكوين IPv6» على «تلقائيًا» أو «الارتباط المحلي فقط».",
+"Keep this page open. Search again on the PS5 and select Save Garage.": "أبقِ هذه الصفحة مفتوحة. ابحث مجددًا على جهاز PS5 واختر Save Garage."
 }

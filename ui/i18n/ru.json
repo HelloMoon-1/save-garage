@@ -1469,5 +1469,14 @@
 "Downloading again later may help.": "Может помочь повторная загрузка позже.",
 "None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "Ни одно сохранение из этой загрузки не удалось прочитать, даже после повторной расшифровки через GarlicSaves. Сохранения на твоей PS5 в порядке. Подожди несколько минут, затем скачай их заново.",
 "This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "Эта PS5 отправляет сохранения обратно по IPv6, но у этого компьютера нет IPv6-адреса на сетевом адаптере, который он использует для PS5. Включи IPv6 для этого адаптера, затем отправь сохранение снова.",
-"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage не смог прочитать эти сохранения, поэтому в этот раз их нельзя изменить. Они остаются на PS5 без изменений, а остальные сохранения можно изменять как обычно. Может помочь повторная загрузка позже."
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage не смог прочитать эти сохранения, поэтому в этот раз их нельзя изменить. Они остаются на PS5 без изменений, а остальные сохранения можно изменять как обычно. Может помочь повторная загрузка позже.",
+"This transfer needs IPv6 on the local network.": "Для этой передачи нужен IPv6 в локальной сети.",
+"Network adapter": "Сетевой адаптер",
+"Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version {0} (TCP/IPv6).": "Нажми Win + R, открой ncpa.cpl, открой свойства адаптера и отметь «IP версии {0} (TCP/IPv6)».",
+"Open System Settings → Network → your connection → Details → TCP/IP.": "Открой «Системные настройки» → «Сеть» → твоё подключение → «Подробнее» → TCP/IP.",
+"Set Configure IPv6 to Automatically or Link-local only.": "Установи «Конфигурация IPv6» на «Автоматически» или «Только локальная связь».",
+"Open the settings for this network connection and enable automatic or link-local IPv6.": "Открой настройки этого сетевого подключения и включи IPv6 в автоматическом режиме или только для локальной связи.",
+"Search again on the PS5 and select Save Garage.": "Снова выполни поиск на PS5 и выбери Save Garage.",
+"Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "Открой «Системные настройки» → «Сеть» → твоё подключение → «Подробнее» → TCP/IP. Установи «Конфигурация IPv6» на «Автоматически» или «Только локальная связь».",
+"Keep this page open. Search again on the PS5 and select Save Garage.": "Не закрывай эту страницу. Снова выполни поиск на PS5 и выбери Save Garage."
 }

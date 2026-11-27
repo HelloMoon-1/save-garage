@@ -19,6 +19,16 @@ from poc.dt_ppr_client import derive_with_oracle
 from poc.dt_psk_client import recv_exact, recv_record, send_record
 
 
+class LocalIPv6Unavailable(ValueError):
+    """No link-local IPv6 address on the adapter used for this connection, which a console that asked for IPv6 data
+    needs. main() reports it as a [network] line (the adapter's name, when known) and keeps waiting, so the player can
+    turn IPv6 on and pick the source on the PS5 again."""
+
+    def __init__(self, adapter):
+        self.adapter = adapter
+        super().__init__("no link-local IPv6 address on the network adapter used by this connection")
+
+
 class Tee:
     def __init__(self, path):
         self.stream = open(path, "w", buffering=1)
@@ -386,18 +396,18 @@ def local_link_local(sock):
         raise ValueError("no IPv6 data channel: the psutil package is missing (pip install -r requirements.txt)")
     local = ipaddress.ip_address(sock.getsockname()[0].split("%")[0])
     local = getattr(local, "ipv4_mapped", None) or local
-    matches = []
+    adapter = None
     for name, addresses in psutil.net_if_addrs().items():
         ips = [ipaddress.ip_address(a.address.split("%")[0])
                for a in addresses if a.family in (socket.AF_INET, socket.AF_INET6)]
         if local not in ips:
             continue
+        adapter = name
         matches = sorted({a for a in ips if a.version == 6 and a.is_link_local}, key=int)
+        if matches:
+            return matches[0].packed
         break
-    if not matches:
-        raise ValueError("no IPv6 address on the network adapter used by this connection; the PS5 asked for IPv6 data, "
-                         "so turn on IPv6 for that adapter and try again")
-    return matches[0].packed
+    raise LocalIPv6Unavailable(adapter)
 
 
 def serve_command(sock, oracle_host, oracle_port, prepare_ipv6=None):
@@ -686,6 +696,8 @@ def main():
             client.settimeout(310)
             try:
                 serve_command(client, args.oracle_host, args.oracle_port, prepare_ipv6)
+            except LocalIPv6Unavailable as exc:
+                print("[network] " + json.dumps({"issue": "local_ipv6", "adapter": exc.adapter}), flush=True)
             except (EOFError, OSError, ValueError) as exc:
                 print(f"[cmd] session ended: {exc}", flush=True)
         BUSY.clear()

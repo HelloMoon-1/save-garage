@@ -1469,5 +1469,14 @@
 "Downloading again later may help.": "나중에 다시 다운로드하면 해결될 수 있어요.",
 "None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "GarlicSaves에 다시 복호화를 요청했지만 이 다운로드의 세이브를 하나도 읽지 못했어요. PS5에 있는 세이브는 안전해요. 몇 분 기다린 뒤 다시 다운로드하세요.",
 "This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "이 PS5는 IPv6로 세이브를 돌려보내는데, 이 컴퓨터가 PS5와 통신할 때 쓰는 네트워크 어댑터에 IPv6 주소가 없어요. 그 어댑터에서 IPv6를 켠 뒤 세이브를 다시 보내세요.",
-"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage가 이 세이브들을 읽지 못해서 이번에는 편집할 수 없어요. PS5에는 그대로 남아 있고, 다른 세이브는 평소처럼 편집할 수 있어요. 나중에 다시 다운로드하면 해결될 수 있어요."
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage가 이 세이브들을 읽지 못해서 이번에는 편집할 수 없어요. PS5에는 그대로 남아 있고, 다른 세이브는 평소처럼 편집할 수 있어요. 나중에 다시 다운로드하면 해결될 수 있어요.",
+"This transfer needs IPv6 on the local network.": "이 전송에는 로컬 네트워크의 IPv6가 필요해요.",
+"Network adapter": "네트워크 어댑터",
+"Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version {0} (TCP/IPv6).": "Win + R을 누르고 ncpa.cpl을 연 다음, 어댑터 속성을 열고 '인터넷 프로토콜 버전 {0}(TCP/IPv6)'에 체크하세요.",
+"Open System Settings → Network → your connection → Details → TCP/IP.": "시스템 설정 → 네트워크 → 사용 중인 연결 → 세부사항 → TCP/IP를 여세요.",
+"Set Configure IPv6 to Automatically or Link-local only.": "'IPv6 구성'을 '자동' 또는 '링크-로컬만'으로 설정하세요.",
+"Open the settings for this network connection and enable automatic or link-local IPv6.": "이 네트워크 연결의 설정을 열고 IPv6를 자동 또는 링크-로컬로 켜세요.",
+"Search again on the PS5 and select Save Garage.": "PS5에서 다시 검색한 뒤 Save Garage를 선택하세요.",
+"Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "시스템 설정 → 네트워크 → 사용 중인 연결 → 세부사항 → TCP/IP를 여세요. 'IPv6 구성'을 '자동' 또는 '링크-로컬만'으로 설정하세요.",
+"Keep this page open. Search again on the PS5 and select Save Garage.": "이 페이지를 열어 두세요. PS5에서 다시 검색한 뒤 Save Garage를 선택하세요."
 }

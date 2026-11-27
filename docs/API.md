@@ -186,9 +186,10 @@ Each story save is decrypted and checked: a copy that isn't a JSAV save (GarlicS
 then, GitHub issue #11) is asked for again, up to three decrypts in all. A save that still can't be read is left out and
 listed in `state.skipped` (`why` is `damaged`, or `layout` for a JSAV save the reader can't follow); its file goes back
 to the PS5 unchanged. When no story save can be read the download ends with `decrypt_bad` (a damaged copy among them) or
-`save_layout_changed`. Sending back ends with `ipv6_needed` when the PS5 asked for its data over IPv6 (a console that
-sends `01000000` at bytes 52-55 of its power request, issue #7) and the computer's network adapter for it has no IPv6
-address.
+`save_layout_changed`. While sending back, a PS5 that asked for its data over IPv6 (a console that sends `01000000` at
+bytes 52-55 of its power request, issue #7) when the computer's network adapter for it has no link-local IPv6 address
+sets `job.hint` to `{"code": "local_ipv6", "adapter": "<adapter name, or empty>", "platform": "win32" | "darwin" | "linux"}`
+(pull request #14); the job keeps waiting (stage `waiting_console`), and the next connection from the PS5 clears it.
 
 The details (`job.log`, `job.error.detail`) show the data folder as `<data>`, the home folder as `~` and a PS5's ID in a
 path as `<console>`, since they get pasted into bug reports.
