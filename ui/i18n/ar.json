@@ -1478,5 +1478,16 @@
 "Open the settings for this network connection and enable automatic or link-local IPv6.": "افتح إعدادات اتصال الشبكة هذا، وفعّل IPv6 تلقائيًا أو للارتباط المحلي فقط.",
 "Search again on the PS5 and select Save Garage.": "ابحث مجددًا على جهاز PS5 واختر Save Garage.",
 "Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "افتح إعدادات النظام ← الشبكة ← اتصالك ← التفاصيل ← TCP/IP. اضبط «تكوين IPv6» على «تلقائيًا» أو «الارتباط المحلي فقط».",
-"Keep this page open. Search again on the PS5 and select Save Garage.": "أبقِ هذه الصفحة مفتوحة. ابحث مجددًا على جهاز PS5 واختر Save Garage."
+"Keep this page open. Search again on the PS5 and select Save Garage.": "أبقِ هذه الصفحة مفتوحة. ابحث مجددًا على جهاز PS5 واختر Save Garage.",
+"When this page asks, hold the PS5 power button for about one second, then let go.": "عندما تطلب هذه الصفحة ذلك، اضغط مطولًا على زر التشغيل في جهاز PS5 لمدة ثانية تقريبًا، ثم اتركه.",
+"It beeps after you let go.": "يصدر الجهاز صفيرًا بعد أن تترك الزر.",
+"Hold the PS5 power button for about one second": "اضغط مطولًا على زر التشغيل في جهاز PS5 لمدة ثانية تقريبًا",
+"Then let go.": "ثم اتركه.",
+"The PS5 beeps and restarts into transfer mode.": "يصدر جهاز PS5 صفيرًا ويُعاد تشغيله في وضع النقل.",
+"Holding it longer turns the PS5 off.": "إذا ضغطت عليه مدة أطول، ينطفئ جهاز PS5.",
+"Windows couldn’t list this computer’s network adapters.": "تعذّر على Windows عرض محولات الشبكة في هذا الكمبيوتر.",
+"Unzip the whole Save Garage download into a new folder and start it from there.": "فك ضغط تنزيل Save Garage بالكامل في مجلد جديد، ثم شغّل Save Garage من هناك.",
+"When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "عندما تطلب هذه الصفحة ذلك، اضغط مطولًا على زر التشغيل في جهاز PS5 لمدة ثانية تقريبًا، ثم اتركه. يصدر الجهاز صفيرًا بعد أن تترك الزر.",
+"Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "ثم اتركه. يصدر جهاز PS5 صفيرًا ويُعاد تشغيله في وضع النقل. إذا ضغطت عليه مدة أطول، ينطفئ جهاز PS5. لديك نحو {0} دقائق.",
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "تعذّر على Windows عرض محولات الشبكة في هذا الكمبيوتر. فك ضغط تنزيل Save Garage بالكامل في مجلد جديد، ثم شغّل Save Garage من هناك."
 }

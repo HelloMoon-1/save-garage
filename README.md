@@ -61,9 +61,10 @@ your original save, and the original is backed up on your computer before anythi
    Software, then Data Transfer, and pick **Save Garage Pairing**. The PS5 says it can't transfer data. That's
    expected: pairing has already happened.
 5. **Download.** In GTA VI, save your game and go back to the PS5 home screen. Click Download save. When the app
-   asks, press the PS5 power button once and let go at the beep. The console restarts into transfer mode, and
-   again when the download is done. If more than one account on the PS5 has a GTA VI save, the app asks which
-   account's save to edit; pick one straight away, while the PS5 waits in transfer mode.
+   asks, hold the PS5 power button for about one second, then let go (it beeps after you let go; holding it longer
+   turns the PS5 off). The console restarts into transfer mode, and again when the download is done. If more than one
+   account on the PS5 has a GTA VI save, the app asks which account's save to edit; pick one straight away, while the
+   PS5 waits in transfer mode.
 6. **Edit.** Pick a save (the autosave is what Continue loads), change what you want and click Save edits.
 7. **Send back.** Delete the GTA VI save on the PS5 (it won't overwrite an existing one): Settings, then Saved
    Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete. Then click Send save to
@@ -255,7 +256,7 @@ backups or GarlicSaves sign-in.
 | Signing in says the code expired | Click Sign in to GarlicSaves again for a new code, and enter it on GarlicSaves before the time shown runs out. |
 | Version 1.29.1 or older stops with "GarlicSaves isn't accepting key requests from Save Garage's shared key" | GarlicSaves revoked that key. Update to 1.30.0 or newer and sign in to GarlicSaves. |
 | A download stops with "The PS5 didn't answer" | Go back to the PS5 home screen, close any other save-transfer tool so Data Transfer is free, and try again. |
-| A download stops with "The power-button wait timed out" | Download again, and when the app asks, press the PS5 power button once within about 5 minutes and let go at the beep. |
+| A download stops with "The power-button wait timed out" | Download again, and when the app asks, hold the PS5 power button for about one second within about 5 minutes, then let go. It beeps after you let go; holding it longer turns the PS5 off. |
 | The bottom of the page says "Update failed" | Nothing changed: Save Garage stays on the version you have. A download that didn't finish or failed a check is tried again at the next check (or click Check for updates); a version that didn't start isn't tried again. You can always download the new version yourself from [Releases](../../releases/latest). `update/update.log` in the data folder says what happened. |
 | The Linux `SaveGarage` folder is gone after a power cut during an update | Rename `.SaveGarage.backup` (named after your folder), next to where it was, back to `SaveGarage`. |
 

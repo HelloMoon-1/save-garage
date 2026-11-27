@@ -1480,5 +1480,16 @@
 "Press Win + R, open ncpa.cpl, open the adapter properties and check Internet Protocol Version {0} (TCP/IPv6).": "按 Win + R，输入 ncpa.cpl 并回车。右键这张网卡，打开「属性」，勾选「Internet 协议版本 {0} (TCP/IPv6)」并确定。",
 "Open System Settings → Network → your connection → Details → TCP/IP.": "打开「系统设置 → 网络」，选择当前连接，进入「详细信息 → TCP/IP」。",
 "Set Configure IPv6 to Automatically or Link-local only.": "将「配置 IPv6」设为「自动」或「仅本地链路」。",
-"Search again on the PS5 and select Save Garage.": "在 PS5 的「数据传输」里退一页，重新搜索并选择 Save Garage。"
+"Search again on the PS5 and select Save Garage.": "在 PS5 的「数据传输」里退一页，重新搜索并选择 Save Garage。",
+"When this page asks, hold the PS5 power button for about one second, then let go.": "页面提示时，按住 PS5 电源键约一秒，然后松手。",
+"It beeps after you let go.": "松手后会听到“嘀”一声。",
+"Hold the PS5 power button for about one second": "按住 PS5 电源键约一秒",
+"Then let go.": "然后松手。",
+"The PS5 beeps and restarts into transfer mode.": "PS5 会“嘀”一声，并重启进入传输模式。",
+"Holding it longer turns the PS5 off.": "按得更久会让 PS5 关机。",
+"Windows couldn’t list this computer’s network adapters.": "Windows 未能列出这台电脑的网卡。",
+"Unzip the whole Save Garage download into a new folder and start it from there.": "请把完整的 Save Garage 下载解压到新文件夹，然后从那里启动 Save Garage。",
+"When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "页面提示时，按住 PS5 电源键约一秒，然后松手。松手后会听到“嘀”一声。",
+"Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "然后松手。PS5 会“嘀”一声，并重启进入传输模式。按得更久会让 PS5 关机。你大约有 {0} 分钟时间。",
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows 未能列出这台电脑的网卡。请把完整的 Save Garage 下载解压到新文件夹，然后从那里启动 Save Garage。"
 }

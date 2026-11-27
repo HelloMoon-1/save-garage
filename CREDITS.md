@@ -26,7 +26,8 @@ Modified from the projects above, November 2026:
 - Renamed and rebranded; new default port 7283; comments translated to English.
 - Sending back to consoles that ask for the newer console information and IPv6 data (1.31.0, GitHub issue #7),
   ported by HelloMoon-1 (pull request #10) from ImNotTom's findings on a PS5 Pro, and the help that names the
-  network adapter when it has no IPv6 address (1.31.1, pull request #14, also by HelloMoon-1).
+  network adapter when it has no IPv6 address (1.31.1, pull request #14), and the Windows adapter lookup without psutil
+  with the launchers adding missing packages (1.31.2, pull request #18), both also by HelloMoon-1.
 
 ## Services and assets
 

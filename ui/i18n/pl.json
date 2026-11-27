@@ -1478,5 +1478,16 @@
 "Open the settings for this network connection and enable automatic or link-local IPv6.": "Otwórz ustawienia tego połączenia sieciowego i włącz IPv6 automatycznie lub tylko dla łącza lokalnego.",
 "Search again on the PS5 and select Save Garage.": "Wyszukaj ponownie na PS5 i wybierz Save Garage.",
 "Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "Otwórz Ustawienia systemowe → Sieć → swoje połączenie → Szczegóły → TCP/IP. Ustaw „Konfiguruj IPv6” na „Automatycznie” lub „Tylko łącze lokalne”.",
-"Keep this page open. Search again on the PS5 and select Save Garage.": "Nie zamykaj tej strony. Wyszukaj ponownie na PS5 i wybierz Save Garage."
+"Keep this page open. Search again on the PS5 and select Save Garage.": "Nie zamykaj tej strony. Wyszukaj ponownie na PS5 i wybierz Save Garage.",
+"When this page asks, hold the PS5 power button for about one second, then let go.": "Gdy ta strona o to poprosi, przytrzymaj przycisk zasilania PS5 przez około sekundę, a potem go puść.",
+"It beeps after you let go.": "PS5 wyda sygnał, gdy puścisz przycisk.",
+"Hold the PS5 power button for about one second": "Przytrzymaj przycisk zasilania PS5 przez około sekundę",
+"Then let go.": "Potem go puść.",
+"The PS5 beeps and restarts into transfer mode.": "PS5 wyda sygnał i uruchomi się ponownie w trybie transferu.",
+"Holding it longer turns the PS5 off.": "Jeśli przytrzymasz go dłużej, PS5 się wyłączy.",
+"Windows couldn’t list this computer’s network adapters.": "Windows nie mógł wyświetlić kart sieciowych tego komputera.",
+"Unzip the whole Save Garage download into a new folder and start it from there.": "Rozpakuj całe pobrane archiwum Save Garage do nowego folderu i uruchom Save Garage stamtąd.",
+"When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "Gdy ta strona o to poprosi, przytrzymaj przycisk zasilania PS5 przez około sekundę, a potem go puść. PS5 wyda sygnał, gdy puścisz przycisk.",
+"Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "Potem go puść. PS5 wyda sygnał i uruchomi się ponownie w trybie transferu. Jeśli przytrzymasz go dłużej, PS5 się wyłączy. Masz około {0} min.",
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows nie mógł wyświetlić kart sieciowych tego komputera. Rozpakuj całe pobrane archiwum Save Garage do nowego folderu i uruchom Save Garage stamtąd."
 }

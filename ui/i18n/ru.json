@@ -1478,5 +1478,16 @@
 "Open the settings for this network connection and enable automatic or link-local IPv6.": "Открой настройки этого сетевого подключения и включи IPv6 в автоматическом режиме или только для локальной связи.",
 "Search again on the PS5 and select Save Garage.": "Снова выполни поиск на PS5 и выбери Save Garage.",
 "Open System Settings → Network → your connection → Details → TCP/IP. Set Configure IPv6 to Automatically or Link-local only.": "Открой «Системные настройки» → «Сеть» → твоё подключение → «Подробнее» → TCP/IP. Установи «Конфигурация IPv6» на «Автоматически» или «Только локальная связь».",
-"Keep this page open. Search again on the PS5 and select Save Garage.": "Не закрывай эту страницу. Снова выполни поиск на PS5 и выбери Save Garage."
+"Keep this page open. Search again on the PS5 and select Save Garage.": "Не закрывай эту страницу. Снова выполни поиск на PS5 и выбери Save Garage.",
+"When this page asks, hold the PS5 power button for about one second, then let go.": "Когда эта страница попросит, удерживай кнопку питания PS5 около секунды, затем отпусти.",
+"It beeps after you let go.": "PS5 подаст звуковой сигнал после того, как ты отпустишь кнопку.",
+"Hold the PS5 power button for about one second": "Удерживай кнопку питания PS5 около секунды",
+"Then let go.": "Затем отпусти.",
+"The PS5 beeps and restarts into transfer mode.": "PS5 подаст сигнал и перезагрузится в режим передачи.",
+"Holding it longer turns the PS5 off.": "Если держать дольше, PS5 выключится.",
+"Windows couldn’t list this computer’s network adapters.": "Windows не удалось получить список сетевых адаптеров этого компьютера.",
+"Unzip the whole Save Garage download into a new folder and start it from there.": "Распакуй весь архив Save Garage в новую папку и запусти Save Garage оттуда.",
+"When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.": "Когда эта страница попросит, удерживай кнопку питания PS5 около секунды, затем отпусти. PS5 подаст звуковой сигнал после того, как ты отпустишь кнопку.",
+"Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about {0} minutes.": "Затем отпусти. PS5 подаст сигнал и перезагрузится в режим передачи. Если держать дольше, PS5 выключится. У тебя есть примерно {0} мин.",
+"Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.": "Windows не удалось получить список сетевых адаптеров этого компьютера. Распакуй весь архив Save Garage в новую папку и запусти Save Garage оттуда."
 }

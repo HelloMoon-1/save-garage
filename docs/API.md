@@ -190,6 +190,9 @@ to the PS5 unchanged. When no story save can be read the download ends with `dec
 bytes 52-55 of its power request, issue #7) when the computer's network adapter for it has no link-local IPv6 address
 sets `job.hint` to `{"code": "local_ipv6", "adapter": "<adapter name, or empty>", "platform": "win32" | "darwin" | "linux"}`
 (pull request #14); the job keeps waiting (stage `waiting_console`), and the next connection from the PS5 clears it.
+The adapter's addresses come from psutil; on Windows, when psutil can't be loaded, from Windows itself (PowerShell's
+`Get-NetIPAddress`, pull request #18). Sending back ends with `adapter_query_failed` when that fails too, and with
+`tool_failed` when psutil is missing on another system.
 
 The details (`job.log`, `job.error.detail`) show the data folder as `<data>`, the home folder as `~` and a PS5's ID in a
 path as `<console>`, since they get pasted into bug reports.

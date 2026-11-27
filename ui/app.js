@@ -80,7 +80,8 @@
     port_in_use: 'Ports 1004 to 1006 are already in use. Close any other save-transfer tool or another copy of Save Garage.',
     upload_failed: 'Sending failed. Check the PS5 and the network, then try again.',
     download_failed: 'The download failed. Go back to the PS5 home screen and try again.',
-    adapter_query_failed: 'Windows could not list the network adapters. Extract the complete Windows package into a new folder and start the editor there.',
+    // the PS5 asked for IPv6 data, psutil couldn't be loaded and Windows' own adapter list couldn't be read (PR #18)
+    adapter_query_failed: 'Windows couldn’t list this computer’s network adapters. Unzip the whole Save Garage download into a new folder and start it from there.',
     tool_failed: 'Save processing failed. Open the details below.',
     internal: 'Something went wrong. Open the details below.',
     busy: 'Another task is running. Wait for it to finish.',
@@ -490,7 +491,7 @@
         <ol class="how">
           <li><strong>In GTA VI, save your game, then go back to the PS5 home screen.</strong></li>
           <li><strong>Click Download save.</strong></li>
-          <li><strong>When this page asks, press the PS5 power button once and let go at the beep.</strong></li>
+          <li><strong>When this page asks, hold the PS5 power button for about one second, then let go. It beeps after you let go.</strong></li>
         </ol>
         <div class="row"><button class="btn primary" data-act="download" ${running() ? 'disabled' : ''}>Download save</button></div>
         ${jobBox('download')}
@@ -1601,7 +1602,7 @@
             ${job.stage === 'key_rate_wait' && job.wait != null ? `<div class="detail">Trying again in ${esc(job.wait)} s</div>` : ''}
             <div class="bar ${pct != null ? 'fixed' : ''}"><span ${pct != null ? `style="width:${pct}%"` : ''}></span></div>
             ${job.needPower ? `<div class="power"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 12a16 16 0 1 0 18 0"/><line x1="24" y1="5" x2="24" y2="22"/></svg>
-              <div><strong>Press the PS5 power button once</strong>Let go when it beeps. The PS5 restarts into transfer mode. You have about 5 minutes.</div></div>` : ''}
+              <div><strong>Hold the PS5 power button for about one second</strong>Then let go. The PS5 beeps and restarts into transfer mode. Holding it longer turns the PS5 off. You have about 5 minutes.</div></div>` : ''}
             ${job.stage === 'choose_account' && job.accounts ? `<div class="accounts"><strong>Which account’s save do you want to edit?</strong>
               <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}

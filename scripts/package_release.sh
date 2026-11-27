@@ -130,12 +130,22 @@ if [ -z "$PY" ]; then
   read -n 1 -s -r -p "Press any key to close."; exit 1
 fi
 mkdir -p "$SUPPORT"
+# the Python setup is kept between versions, so a version that needs a new package adds it here (issue #17)
+FRESH=""
 if [ ! -x "$VENV/bin/python" ]; then
   echo "Setting up Save Garage for the first time. This takes a minute."
-  "$PY" -m venv "$VENV" || exit 1
+  "$PY" -m venv "$VENV" || { echo "Setup failed. Check your internet connection and try again."; rm -rf "$VENV"; read -n 1 -s -r -p "Press any key to close."; exit 1; }
+  FRESH=1
 fi
 if ! "$VENV/bin/python" -c 'import psutil, cryptography' 2>/dev/null; then
-  "$VENV/bin/python" -m pip install -q -r requirements.txt || { echo "Dependency setup failed. Check your connection and start again."; read -n 1 -s -r -p "Press any key to close."; exit 1; }
+  [ -n "$FRESH" ] || echo "Adding what this version of Save Garage needs. This takes a minute."
+  if ! "$VENV/bin/python" -m pip install -q -r requirements.txt; then
+    if [ -n "$FRESH" ] || ! "$VENV/bin/python" -c 'import cryptography' 2>/dev/null; then
+      echo "Setup failed. Check your internet connection and try again."; rm -rf "$VENV"; read -n 1 -s -r -p "Press any key to close."; exit 1
+    fi
+    # only psutil is missing: everything but sending back to consoles that ask for IPv6 data still works
+    echo "Save Garage couldn't add a package it needs (check your internet connection). It starts anyway; start it again once you're online."
+  fi
 fi
 echo "Save Garage is running. Keep this window open while you use it. Close it, or click Quit in the page, to stop."
 SAVEGARAGE_DESKTOP=1 exec "$VENV/bin/python" engine/main.py --open
