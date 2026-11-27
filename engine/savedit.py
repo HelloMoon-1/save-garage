@@ -161,7 +161,8 @@ LIFETIME_EARNED = 0xd5188146
 EARN_SOURCES = {joaat(q) for q in ('tasks', 'robberies', 'safe', 'till', 'pickups')}
 
 
-def _apply_stats(txt, changes):
+def _apply_stats(txt, changes, *, level_targets=None):
+    import physique
     groups, tables = stat_rows(txt)
     final, explicit_total, log = {}, set(), []
     for ch in changes:
@@ -177,6 +178,13 @@ def _apply_stats(txt, changes):
         if is_protected(g, G['base'][r]):
             raise SaveError('protected_stat')
         nv = coerce(G['type'], ch['newValue'])
+        if level_targets is not None and tables['base'][G['base'][r]] == physique.CURRENT_LEVEL:
+            identity = (tables['qual'][G['qual'][r]], tables['owner'][G['owner'][r]])
+            target = physique.STAT_KEYS.get(identity)
+            if target is not None:
+                if G['type'] != 'int32' or (target in level_targets and level_targets[target] != nv):
+                    raise SaveError('physique_layout')
+                level_targets[target] = nv
         if _same(G['type'], nv, G['value'][r]):
             continue
         final[(g, r)] = nv
@@ -414,7 +422,11 @@ def _apply_core(b, edits):
             log += alog
         if edits.get('stats'):
             i = money._sec(ents, money.SEC_STAT)
-            secs[i], slog = _apply_stats(secs[i], edits['stats'])
+            import physique
+            levels = {}
+            secs[i], slog = _apply_stats(secs[i], edits['stats'], level_targets=levels)
+            if levels:
+                slog += physique.sync(ents, secs, levels)
             log += slog
         return money._rebuild(head, ents, secs, gaps, tail, len(b)), log
     except (KeyError, ValueError, IndexError, TypeError) as e:

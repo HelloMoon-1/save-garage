@@ -1,4 +1,13 @@
 {
+"Character levels": "角色属性等级",
+"Strength level": "力量等级",
+"Cardio level": "有氧等级",
+"Focus level": "专注等级",
+"Saved stat level": "统计值",
+"Physique level": "体格值",
+"Use saved stat level": "按统计值同步",
+"Save values start at zero. Editing a level updates both records for that character.": "存档从 0 级计数。修改后，统计值和体格值会按所选角色一起保存。",
+"The character could not be identified in the physique section of this save.": "无法核对此存档的角色体格记录，请检查槽位或存档版本。",
 "Windows could not list the network adapters. Extract the complete Windows package into a new folder and start the editor there.": "Windows 未能读取网卡列表。请把完整 Windows 安装包解压到新文件夹，从那里启动编辑器。",
 "Changing the score also updates the relationship level.": "输入 0–100 的整数，保存时会一起写入亲密度和关系等级。",
 "Set to 100": "填入 100",

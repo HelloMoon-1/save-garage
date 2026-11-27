@@ -58,6 +58,7 @@
     adapter_query_failed: 'Windows could not list the network adapters. Extract the complete Windows package into a new folder and start the editor there.',
     ipv6_needed: 'This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.',
     pair_failed: 'Pairing failed or timed out. Start pairing again.',
+    save_physique_layout: 'The character could not be identified in the physique section of this save.',
     save_layout_changed: 'The save layout is different from what this editor knows. Download again. If it still fails, the editor needs an update.',
     save_verify_failed: 'A value in the save didn’t match what was expected. Download again and redo the edit.',
     save_stale_item: 'Some values changed since this page loaded them. Reload the page and redo the edit.',
@@ -1406,7 +1407,16 @@
           <button class="btn small" data-act="growth-fill" data-growth="${key}">Max</button></div>`).join('')}
         <button class="btn small" data-act="growth-fill" data-growth="${player}">Max available capacities</button></div>`;
     }).join('');
-    return `<h2>Player attributes</h2>${characterGroups(s)}
+    const levels = (w.attributeLevels || []).map(e => {
+      const label = T(e.who) + ' / ' + T(e.label);
+      const key = e.group + ':' + e.row;
+      const input = cell({kind: 'stat', key, label, unit: 'count', type: 'int', min: 0, max: e.maximum,
+        value: e.value, display: String(e.value), attrs: `data-group="${esc(e.group)}" data-row="${e.row}" data-base="${e.base}" data-qual="${e.qual}" data-owner="${e.owner}" data-label="${esc(label)}"`});
+      const repair = e.physique !== e.value && e.value >= 0 && e.value <= e.maximum
+        ? `<button class="btn small" data-act="sync-level" data-key="${esc(key)}">${draftOf(s.file).stats[key]?.newValue === e.value ? 'Undo' : 'Use saved stat level'}</button>` : '';
+      return `<div class="field"><div>${input}</div><div><span>Saved stat level</span> · ${e.value} / <span>Physique level</span> · ${e.physique} ${repair}</div></div>`;
+    }).join('');
+    return `<h2>Player attributes</h2>${levels ? `<div class="group"><h3>Character levels</h3><p>Save values start at zero. Editing a level updates both records for that character.</p>${levels}</div>` : ''}${characterGroups(s)}
       <div class="fields">
         <h3>Current condition</h3><button class="btn small" data-act="condition-fill">Fill health and armour</button>
         <div class="field"><div class="name">Health<span class="help">Now ${nf2.format(w.health)}. Up to ${nf.format(w.healthMax)}; above 100 is overpowered health.</span></div>
@@ -1794,7 +1804,8 @@
     n.trophies = d.completion.awards?.ids?.length || 0;
     n.completion = compCount(d.completion) - (n.trophies ? 1 : 0); n.world = ['time', 'fog'].filter(k => d.world?.[k] != null).length;
     n.personal = worldCount(Object.fromEntries(Object.entries(d.world || {}).filter(([k]) => !['time', 'fog'].includes(k) && !k.startsWith('research_')))); n.data = Object.keys(d.raw || {}).length;
-    for (const k of Object.keys(d.stats)) n[stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
+    const levelKeys = new Set((S.world[S.slot]?.attributeLevels || []).map(e => e.group + ':' + e.row));
+    for (const k of Object.keys(d.stats)) n[levelKeys.has(k) ? 'personal' : stunt.has(k) ? 'completion' : feat.has(k) ? 'stats' : 'all']++;
     const known = S.known[S.slot]?.rows || [];
     n.known = Object.keys(d.world || {}).filter(k=>k.startsWith('research_')).length
       + known.filter(x=>x.stat && d.stats[x.stat.group + ':' + x.stat.row]).reduce((set,x)=>set.add(x.stat.group+':'+x.stat.row),new Set()).size;
@@ -2039,7 +2050,12 @@
       cp.cheats && {label: 'Cheat trackers', value: '', newValue: `${cp.cheats.trackers.length} completed`}].filter(Boolean);
     const gunList = Object.entries(d.guns || {}).filter(([, v]) => (v || []).length)
       .map(([k, v]) => ({label: `Guns added (${k === 'lucia' ? 'Lucia' : 'Jason'})`, value: '', newValue: v.length}));
-    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...gunList, ...Object.values(d.stats), ...worldList, ...Object.values(d.raw || {}), ...compList];
+    const statList = Object.values(d.stats).map(change => {
+      if (change.value !== change.newValue) return change;
+      const level = now?.attributeLevels?.find(e => e.group === change.group && e.row === change.row);
+      return level ? {...change, label: change.label + ' / ' + T('Physique level'), value: level.physique} : change;
+    });
+    const list = [...Object.values(d.money), ...Object.values(d.ammo), ...gunList, ...statList, ...worldList, ...Object.values(d.raw || {}), ...compList];
     const html = !n && !s.modified ? '' : !n && s.modified && !isDirty
       ? `<div class="sum">Edits waiting to be sent<small><span data-no-i18n>${esc(missionName(s))}.</span> They were saved earlier. Send them to the PS5, or undo them on the Send back step.</small></div>
          <div class="row"><button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`
@@ -2346,6 +2362,15 @@
       onWorld(input);
       return;
     }
+    if (a === 'sync-level') {
+      const row = S.world[S.slot]?.attributeLevels?.find(x => x.group + ':' + x.row === b.dataset.key);
+      if (!row) return;
+      const stats = draftOf(S.slot).stats;
+      if (stats[b.dataset.key]?.newValue === row.value) delete stats[b.dataset.key];
+      else stats[b.dataset.key] = {group: row.group, row: row.row, base: row.base, qual: row.qual,
+        owner: row.owner, value: row.value, newValue: row.value, label: T(row.who) + ' / ' + T(row.label)};
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts(); return;
+    }
     if (a === 'growth-fill' || a === 'condition-fill') {
       const w = S.world[S.slot], draft = draftOf(S.slot).world;
       if (a === 'condition-fill') {
@@ -2428,7 +2453,8 @@
       }
       if (mustSignIn(S.state)) { goSignIn('edit'); return; }   // the drafts stay here while signing in
       const stuntKeys = S.stuntKeys[s.file] || new Set();
-      const risky = d.stats.some(c => !stuntKeys.has(`${c.group}:${c.row}`) && !(S.detail[s.file]?.featured || []).some(f => f.entries.some(e => e.group === c.group && e.row === c.row)));
+      const levels = new Set((S.world[s.file]?.attributeLevels || []).map(e => e.group + ':' + e.row));
+      const risky = d.stats.some(c => !levels.has(c.group + ':' + c.row) && !stuntKeys.has(`${c.group}:${c.row}`) && !(S.detail[s.file]?.featured || []).some(f => f.entries.some(e => e.group === c.group && e.row === c.row)));
       if (risky && !confirm(T('Some of these edits come from All stats, where most values have unknown meanings and can break the save. Keep the originals backed up and check the save loads. Continue?'))) return;
       act('/api/patch', {slot: s.file, ...d});
     }

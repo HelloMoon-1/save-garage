@@ -26,7 +26,7 @@ else:
 DATA = APP_SUPPORT / 'MoonSlot' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.31.1'
+VERSION = '1.31.2'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -956,7 +956,7 @@ def summarize(plog):
         elif w == 'ammo':
             out.append({'kind': 'ammo', 'label': '%s (%s)' % (x.get('label') or x['type'] + ' ammo', 'Lucia' if x['inv'] == 0 else 'Jason'),
                         'from': x['from'], 'to': x['to']})
-        elif w in ('world', 'raw', 'completion', 'guns'):
+        elif w in ('world', 'raw', 'completion', 'guns', 'physique'):
             label = str(x.get('label') or _completion_label(x))
             same = next((c for c in out if c.get('kind') == 'stat' and c['label'] == label), None)
             if same and w == 'completion':

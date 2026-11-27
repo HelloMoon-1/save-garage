@@ -17,6 +17,7 @@ import featurelib as fl
 
 import jsonedit as je
 import money
+import physique
 
 CODE, SCRIPT = '$0x7a47cb05', '$0x24d043f2'
 SIMPLE, PERSIST, SPAWN, PED, LOOKS = 0x765fb4e3, 0x5399d3f4, 0xec2a7ce9, 0xe528fe31, 0x9653b39d
@@ -87,7 +88,9 @@ def read(b):
                           'max': _num(je.get(looks, base + [MAX_ARMOUR]))})
     stats = fl.Stats(sec(fl.STATS))
     capacities = growth_rows(sec(CHARACTER), stats)
-    return {'capacities': {k: {'value': v[0], 'label': v[1]} for k, v in capacities.items()}, 'clock': clock, 'health': health, 'healthMax': HEALTH_MAX,
+    parts_phys = [secs[i] for i, entry in enumerate(ents) if entry[0] == physique.SECTION]
+    levels = physique.read(parts_phys[0], stats) if len(parts_phys) == 1 else []
+    return {'attributeLevels': levels, 'capacities': {k: {'value': v[0], 'label': v[1]} for k, v in capacities.items()}, 'clock': clock, 'health': health, 'healthMax': HEALTH_MAX,
             'armour': sum(x['armour'] for x in parts), 'armourMax': sum(x['max'] for x in parts)}
 
 
