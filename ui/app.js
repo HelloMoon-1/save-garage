@@ -352,7 +352,8 @@
     const key = [view, st.console?.host, st.paired, st.hasSession, S.sig, st.readyToUpload,
       view === 'edit' ? [S.slot, S.tab, S.detail[S.slot] ? 1 : 0, S.stats[S.slot] ? 1 : 0, s?.modified, JSON.stringify(s?.applied || null)].join(',') : '',
       view === 'connect' ? [S.searching, JSON.stringify(S.consoles)].join(',') : '',
-      view === 'send' ? [job.kind === 'upload' && job.stage === 'uploaded', (st.slots || []).map(x => x.modified).join('')].join(',') : '',
+      view === 'send' ? [job.kind === 'upload' && job.stage === 'uploaded', (st.slots || []).map(x => x.modified).join(''),
+        (st.users || []).map(u => u.id).join(' '), S.sendTo || ''].join(',') : '',
       ['signin', 'pair', 'download'].includes(view) ? signinKey(st) : ''].join('|');
     if (key === S.mainKey) return;
     const codeShown = !!main.querySelector('[data-signin-code]');
