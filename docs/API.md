@@ -105,7 +105,8 @@ and `errors` says why:
   `skills` (the values of slots 9, 10, 13, 14, 15, 19, 20 and 35), `profile` (the criminal profile score),
   `attributesProblem` (a refusal code when the attributes can't be edited) and `vest`
   (`{"state": "can_add" | "worn" | "no_vest" | "unknown", "armour", "max", "owned"}`); `relationship` (`value`,
-  `lowerCap` and `cap`, the range the story allows now, `level`, `locked`, `disabled` and `problem`, a refusal code
+  `lowerCap` and `cap` from the script, `scoreMin` (0), `scoreMax` (100), estimated `levelStarts`,
+  `level`, `locked`, `disabled` and `problem`, a refusal code
   while it can't be changed); and the limits: `meterFull` (100), `skillMin` and `skillMax` (1 and 99),
   `skillChoices` (60 and 99), `profileMin` and `profileMax` (-100 and 0.25), `profileNewGame` (-25), `vestArmour` (150).
 - `fog`: the map's fog of war. `regions` uncovered in the save (`named` and `cells`), `known` (the 722 regions Save
@@ -119,7 +120,7 @@ With `section` and a JSON `path`: up to 200 members of that object or list, each
 `raw` value, or `count` for an object or list. `means` names what a value stands for when it is the ID of something
 known (`{"kind": "Item", "text": "…"}`), and `readOnly` or `min` and `max` mark single fields with their own rule,
 the same limits the World tab keeps to: maximum health is read-only; health is 1 to 250; the criminal profile is -100
-to 0.25; the relationship stays within the story's caps and is read-only while the story has it locked or switched
+to 0.25; the relationship uses 0–100 and updates its estimated level. It is read-only while the story has it locked or switched
 off, and those caps and flags are read-only themselves; the skill slots of a character's attributes go up to 99 and
 slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmour up to 150. FogOfWar is read-only
 (the World tab reveals the map).
@@ -203,7 +204,7 @@ counts and reasons only: never the worker key, key material, the client or serve
   "fog": "known",                           // reveal every map region Save Garage knows
   "lucia": {"meter": "full", "skills": 99, "profile": -25.0, "vest": true},
   "jason": {"skills": 60},                  // any of the four, for either character
-  "relationship": 69                        // within the story's caps
+  "relationship": 69                        // 0–100, updates the stored level
 }
 ```
 
@@ -220,7 +221,7 @@ Every key may be left out, and every edit is checked against the save before any
   and the outfit's cached-armour flag true. Refused when the character has no vest in the wardrobe (`no_vest`); a
   character who already wears armour is left as is.
 - `relationship` is refused while the story has it locked (`relationship_locked`) or switched off
-  (`relationship_disabled`), and outside its caps (`out_of_range`). Its level isn't changed.
+  (`relationship_disabled`), and outside 0–100 (`out_of_range`). The editor writes the score and level together using the estimated thresholds in `player.relationship.levelStarts`. The script bounds are preserved.
 
 Out-of-range values are `out_of_range`, wrong types `bad_value`, and unknown keys in a character's object
 `bad_request` (other keys of `world` are ignored); in the job's error they carry the `save_` prefix. Applying the

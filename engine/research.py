@@ -9,6 +9,7 @@ import fog_regions
 import hashnames
 import jsonedit as je
 import money
+import player
 import savekeys
 import savedit
 
@@ -33,23 +34,22 @@ def ped_fields(s, add):
 def player_fields(s, add):
     ch = fl.payload(s.text(CHARACTER), CHARACTER)
     cp = [fl.CODE, fl.key(CHARACTER)]
-    lo, hi = (ch.get(fl.key(k)) for k in ('relationshipScriptLowerCap', 'relationshipScriptCap'))
     for name in ('relationship', 'relationshipLevel', 'relationshipJason', 'relationshipLucia',
                  'relationshipLocked', 'relationshipDisabled', 'relationshipScriptLowerCap', 'relationshipScriptCap'):
         k = fl.key(name)
         if k not in ch:
             continue
-        if (name == 'relationship' and type(lo) is int and type(hi) is int and lo <= ch[k] <= hi
+        if (name == 'relationship' and type(ch[k]) is int
                 and not ch.get(fl.key('relationshipLocked')) and not ch.get(fl.key('relationshipDisabled'))):
-            add('Relationship', name, ch[k], 'research_relationship', lo, hi, (CHARACTER, cp + [k]))
+            add('Relationship', name, ch[k], 'research_relationship', 0, player.REL_MAX, (CHARACTER, cp + [k]))
         else:
             add('Relationship', name, ch[k])
-    for player in ch.get(fl.key('attributeSet'), []):
-        name = PLAYERS.get(player.get(fl.key('Name'), {}).get('$data'))
-        if name and '$0x177caa16' in player:
-            add('Criminal profile', name + ' · 0x177CAA16', player['$0x177caa16'])
+    for attributes in ch.get(fl.key('attributeSet'), []):
+        name = PLAYERS.get(attributes.get(fl.key('Name'), {}).get('$data'))
+        if name and '$0x177caa16' in attributes:
+            add('Criminal profile', name + ' · 0x177CAA16', attributes['$0x177caa16'])
         if name:
-            for i, n in enumerate(player.get(fl.key('attributes'), {}).get('$data', [])):
+            for i, n in enumerate(attributes.get(fl.key('attributes'), {}).get('$data', [])):
                 add('Player attributes', name + ' · [' + str(i) + ']', n)
 
 
@@ -176,6 +176,12 @@ def apply(b, edits):
         row, (sec, path) = writes[key]
         if type(value) is not int or not row['min'] <= value <= row['max']:
             raise ValueError('out_of_range')
+        if key == 'research_relationship':
+            text, changes = player.edit_relationship(s.text(CHARACTER), value)
+            if changes:
+                s.set_text(CHARACTER, text)
+                log.extend(changes)
+            continue
         if value == row['value']:
             continue
         if sec == 'fog':

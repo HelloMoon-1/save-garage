@@ -15,8 +15,8 @@ WHAT IT CHANGES (each value is replaced in place after its old token is checked;
   * Special meter: attribute slot 24 raised to 100. Raise only.
   * Skills: attribute slots 9, 10, 13, 14, 15, 19, 20 and 35 raised to a chosen value up to 99. Raise only.
   * Criminal profile: set to a value from -100 to 0.25, written as the game writes it (float32, six decimals).
-  * Relationship: set within relationshipScriptLowerCap..relationshipScriptCap, only while relationshipLocked and
-    relationshipDisabled are false. relationshipLevel is left as it is.
+  * Relationship: write a 0–100 score and its estimated level together while both story switches are off.
+    The stored script bounds are retained as metadata.
   * Vest: for a character whose six armour parts are all 0/0 and who owns the vest garment, part 1 becomes 150/150
     and bCachedArmourValues true. A character who already wears armour is left as is (Fill armour tops it up).
 
@@ -79,6 +79,11 @@ KEYS = ('lucia', 'jason', 'relationship')                      # the World tab's
 CHAR_KEYS = ('meter', 'skills', 'profile', 'vest')
 # why the Save data browser keeps the relationship's own fields read-only (see raw_rules)
 STORY_LIMIT = 'set by the story to limit the relationship'
+# Local saves have (15,0), (25,1), (69,2), (72,2) and (81,2).
+# Estimate transitions halfway across the unsampled gaps, using 100 as the
+# endpoint for the fourth tier. These are editor estimates, not game constants.
+REL_LEVEL_STARTS = (0, 20, 47, 91)
+REL_MAX = 100
 REL_LOCKED = 'the story has locked the relationship at this point'
 REL_OFF = 'the story has switched the relationship off at this point'
 
@@ -169,8 +174,6 @@ def _relationship(t, root):
         if tok not in (b'true', b'false'):
             raise fl.FeatureError('layout_changed')
         out[name] = tok == b'true'
-    if out['lowerCap'] > out['cap']:
-        raise fl.FeatureError('layout_changed')
     return out, root[K_REL]
 
 
@@ -280,6 +283,7 @@ def read(b):
         try:
             rel, _ = _relationship(t, root)
             rel['problem'] = _rel_problem(rel)
+            rel.update(scoreMin=0, scoreMax=REL_MAX, levelStarts=list(REL_LEVEL_STARTS))
         except fl.FeatureError as e:
             rel = {'problem': str(e)}
     return {'feature': FEATURE, 'characters': chars, 'relationship': rel,
@@ -302,7 +306,7 @@ def _number(v, whole):
 
 
 def _checked(edit):
-    """The edit with its types and fixed ranges checked (the relationship's range comes from the save)."""
+    """Check requested field types and editor ranges."""
     if not isinstance(edit, dict) or set(edit) - set(KEYS):
         raise fl.FeatureError('bad_request')
     out = {}
@@ -331,7 +335,15 @@ def _checked(edit):
             cc['vest'] = True
         out[who] = cc
     if edit.get('relationship') is not None:
-        out['relationship'] = _number(edit['relationship'], True)
+        target = edit['relationship']
+        if isinstance(target, dict):  # presets saved by earlier builds
+            if set(target) != {'value', 'level'}:
+                raise fl.FeatureError('bad_request')
+            level = _number(target['level'], True)
+            if not 0 <= level < len(REL_LEVEL_STARTS):
+                raise fl.FeatureError('out_of_range')
+            target = target['value']
+        out['relationship'] = _number(target, True)
     return out
 
 
@@ -343,6 +355,27 @@ def profile_token(v):
     """The criminal profile as the game writes it: the float32 value with six decimals ('-45.450001')."""
     v = fl.f32(v)
     return b'%.6f' % (v if v else 0.0)
+
+
+def edit_relationship(text, score):
+    """Apply the same score-to-level rule for the player, research and raw editors."""
+    score = _number(score, True)
+    if not 0 <= score <= REL_MAX:
+        raise fl.FeatureError('out_of_range')
+    root = _root(text)
+    rel, _ = _relationship(text, root)
+    problem = _rel_problem(rel)
+    if problem:
+        raise fl.FeatureError(problem)
+    level = sum(score >= start for start in REL_LEVEL_STARTS) - 1
+    updates = [(root[K_REL], rel['value'], score, 'Relationship'),
+               (root[K_REL_LEVEL], rel['level'], level, 'Relationship level')]
+    log = []
+    for (start, end), old, new, label in sorted(updates, reverse=True):
+        if old != new:
+            text = text[:start] + str(new).encode() + text[end:]
+            log.append({'what': 'world', 'label': label, 'from': old, 'to': new})
+    return text, log
 
 
 def apply(b, edit):
@@ -378,17 +411,8 @@ def apply(b, edit):
                 t = t[:vs] + new + t[ve:]
                 log.append({'what': 'world', 'label': 'Criminal profile (%s)' % name, 'from': float(tok), 'to': float(new)})
     if edit.get('relationship') is not None:
-        rel, (vs, ve) = _relationship(t, _root(t))
-        if _rel_problem(rel):
-            raise fl.FeatureError(_rel_problem(rel))
-        v = edit['relationship']
-        if not rel['lowerCap'] <= v <= rel['cap']:
-            raise fl.FeatureError('out_of_range')
-        if v != rel['value']:
-            if t[vs:ve] != b'%d' % rel['value']:
-                raise fl.FeatureError('verify_failed')
-            t = t[:vs] + b'%d' % v + t[ve:]
-            log.append({'what': 'world', 'label': 'Relationship', 'from': rel['value'], 'to': v})
+        t, changes = edit_relationship(t, edit['relationship'])
+        log.extend(changes)
     if t != s.text(CHAR):
         s.set_text(CHAR, t)
     vests = [who for who, _ in CHARACTERS if (edit.get(who) or {}).get('vest')]
@@ -419,7 +443,7 @@ def apply(b, edit):
 
 # ---------------------------------------------------------------- the Save data browser's rules for the same fields
 def relationship_rule(txt, path):
-    """The relationship value: within the story's caps, read-only while the story has it locked or switched off."""
+    """The relationship value: from 0 to 100, read-only while the story has it locked or switched off."""
     try:
         rel, _ = _relationship(txt, _root(txt))
     except (fl.FeatureError, KeyError, IndexError, ValueError):
@@ -428,7 +452,7 @@ def relationship_rule(txt, path):
         return REL_OFF
     if rel['locked']:
         return REL_LOCKED
-    return (rel['lowerCap'], rel['cap'])
+    return (0, REL_MAX)
 
 
 def attribute_rule(txt, path):

@@ -184,6 +184,13 @@ def apply(b, edits):
         if rule and not (isinstance(e['newValue'], (int, float)) and not isinstance(e['newValue'], bool) and rule[0] <= e['newValue'] <= rule[1]):
             raise BrowseError('out_of_range')
         tok = _token(cur, e['newValue'])
+        if h == player.CHAR and path == [player.fl.CODE, player.fl.key(h), player.K_REL]:
+            try:
+                secs[i], changes = player.edit_relationship(secs[i], e['newValue'])
+            except player.fl.FeatureError as exc:
+                raise BrowseError(str(exc)) from exc
+            log.extend(dict(change, what='raw') for change in changes)
+            continue
         if tok != cur:
             secs[i] = je.put(secs[i], path, tok)
             log.append({'what': 'raw', 'label': e.get('label') or '/'.join(str(label(p)) for p in path[-2:]),

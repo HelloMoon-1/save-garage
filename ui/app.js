@@ -610,7 +610,7 @@
     if (S.drafts[s.file]) return;
     const d = {money: {}, ammo: {}, stats: {}, world: {}, raw: {}, completion: {}, guns: {}, stacksOn: {}};
     const a = s.applied || {};
-    if (a.world) d.world = JSON.parse(JSON.stringify(a.world));
+    if (a.world) d.world = normalizeWorld(JSON.parse(JSON.stringify(a.world)));
     if (a.completion) d.completion = JSON.parse(JSON.stringify(a.completion));
     if (a.guns) d.guns = JSON.parse(JSON.stringify(a.guns));
     for (const c of a.raw || []) d.raw[rawKey(c.section, c.path)] = c;
@@ -637,7 +637,16 @@
   const editCount = d => Object.keys(d.money).length + Object.keys(d.ammo).length + Object.keys(d.stats).length + worldCount(d.world)
                          + Object.keys(d.raw || {}).length + compCount(d.completion) + gunCount(d.guns);
   const stable = v => v && typeof v === 'object' && !Array.isArray(v) ? `{${Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',')}}` : JSON.stringify(v);
-  const worldKey = w => stable(w || {});
+  function normalizeWorld(world) {
+    const w = {...world};
+    if (w.research_relationship != null) {
+      w.relationship ??= w.research_relationship;
+      delete w.research_relationship;
+    }
+    if (w.relationship?.value != null) w.relationship = w.relationship.value;
+    return w;
+  }
+  const worldKey = w => stable(normalizeWorld(w));
   const gunsKey = g => stable(Object.fromEntries(Object.entries(g || {}).filter(([, v]) => (v || []).length).map(([k, v]) => [k, [...v].sort()])));
   const norm = e => JSON.stringify(['money', 'ammo', 'stats'].map(k => (e?.[k] || []).map(c => [c.inv, c.idx, c.group, c.row, c.newValue]).sort())) + worldKey(e?.world)
     + JSON.stringify((e?.raw || []).map(c => [rawKey(c.section, c.path), c.newValue]).sort()) + worldKey(e?.completion) + gunsKey(e?.guns);
@@ -1459,7 +1468,7 @@
   function characterGroups(s) {
     const P = S.world[s.file].player, d = draftOf(s.file).world;
     if (!P) return '<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="callout">This part of the save can’t be read yet.</div></div>';
-    return P.characters.map(c => characterGroup(P, c, d[c.key] || {})).join('') + relationshipGroup(P, d);
+    return relationshipGroup(P, d) + P.characters.map(c => characterGroup(P, c, d[c.key] || {})).join('');
   }
 
   function characterGroup(P, c, dc) {
@@ -1468,16 +1477,16 @@
     if (c.attributesProblem || !c.skills) rows += worldField('Special meter and skills', 'experimental', ERR['save_' + c.attributesProblem] || ERR.save_layout_changed, '');
     else {
       const full = c.meter >= P.meterFull, lo = Math.min(...c.skills), hi = Math.max(...c.skills), now = lo === hi ? String(lo) : `${lo} to ${hi}`;
-      rows += worldField('Special meter', 'untested', `Now ${c.meter}. Attribute slot ${P.meterSlot}, which other editors call the special ability meter; the game’s own name for it isn’t known. Filling it sets ${P.meterFull}, a value the game writes there itself.`,
+      rows += worldField('Special meter', 'untested', T('Saved meter') + ' ' + c.meter + ' / ' + P.meterFull,
         dc.meter ? pending('meter', 'Will be filled.') : `<button class="btn small" data-act="world-fill" data-what="meter" data-who="${c.key}" ${full ? 'disabled' : ''}>${full ? 'Already full' : `Fill to ${P.meterFull}`}</button>`);
-      rows += worldField('Skills', 'experimental', `Now ${now}. Attribute slots ${P.skillSlots.slice(0, -1).join(', ')} and ${P.skillSlots.at(-1)}, which other editors call skills. Each is raised to the value you pick and never lowered. In the game’s own saves none is above ${P.skillChoices[0]}; GarlicSaves writes ${P.skillChoices[1]} and says it was tested in the game.`,
+      rows += worldField('Skills', 'experimental', T('Raises skills below the target. Higher skills keep their current values.') + ' ' + T('Current skill values') + ' ' + lo + '–' + hi,
         worldCell({what: 'skills', who: c.key, label: 'Raise to', min: P.skillMin, max: P.skillMax, step: 1, value: dc.skills ?? lo, init: lo, was: now, changed: dc.skills != null,
           extra: P.skillChoices.map(v => `<button class="btn small" data-act="world-fill" data-what="skills" data-who="${c.key}" data-to="${v}">${v}</button>`).join('')}));
     }
     if (c.profile != null) {
-      const was = nf2.format(c.profile);
-      rows += worldField('Criminal profile', 'experimental', `Now ${was}. The game calls it the criminal profile: a temperament score behind the Professional, Hardened, Violent, Psycho and Irredeemable profiles in the Jason & Lucia menu. Which score gives which profile isn’t known yet. Lucia starts a new game at ${nf.format(P.profileNewGame)}; saves written by the game hold ${nf.format(P.profileMin)} to ${nf2.format(P.profileMax)}.`,
-        worldCell({what: 'profile', who: c.key, label: 'Score', min: P.profileMin, max: P.profileMax, step: 'any', value: dc.profile ?? Number(c.profile.toFixed(2)), init: Number(c.profile.toFixed(2)), was, changed: dc.profile != null}));
+      const was = String(c.profile);
+      rows += worldField('Criminal profile', 'experimental', T('Each character has a separate criminal profile. Check it under Jason and Lucia in the game. The score thresholds for each profile are unknown.') + ' ' + T('Editable range') + ' ' + P.profileMin + '–' + P.profileMax,
+        worldCell({what: 'profile', who: c.key, label: 'Profile score', min: P.profileMin, max: P.profileMax, step: 'any', value: dc.profile ?? c.profile, init: c.profile, was, changed: dc.profile != null}));
     }
     const V = c.vest || {};
     const vhelp = {can_add: `Wears no armour, and a vest is in the wardrobe. Adding it puts it on the way the game records a worn vest: armour ${nf.format(P.vestArmour)} of ${nf.format(P.vestArmour)}.`,
@@ -1488,15 +1497,28 @@
     return `<div class="group"><div class="section-head"><h3>${esc(c.name)}</h3></div><div class="fields">${rows}</div></div>`;
   }
 
+  function affinityLevel(r, score) {
+    return r.levelStarts.filter(start => score >= start).length - 1;
+  }
+
   function relationshipGroup(P, d) {
     const R = P.relationship || {};
-    let help, ctl = '';
-    if (R.problem) help = (R.value != null ? `Now ${R.value}. ` : '') + (ERR['save_' + R.problem] || ERR.save_layout_changed);
+    const staged = d.relationship, score = staged?.value ?? staged ?? R.value;
+    const level = staged == null || R.problem ? R.level : affinityLevel(R, score);
+    const facts = R.value == null ? '' : `<p><span>Saved affinity</span> <b>${R.value}</b> · <span>Stored relationship level</span> <b>${R.level}</b></p>`;
+    let controls = '';
+    if (R.problem) controls = `<p>${esc(T(ERR['save_' + R.problem] || ERR.save_layout_changed))}</p>`;
     else {
-      help = `Now ${R.value}. At this point in the story the game keeps it from ${R.lowerCap} to ${R.cap}, so that is the range here. The relationship level the game shows is stored on its own and isn’t changed.`;
-      ctl = worldCell({what: 'relationship', label: 'Score', min: R.lowerCap, max: R.cap, step: 1, value: d.relationship ?? R.value, init: R.value, was: String(R.value), changed: d.relationship != null});
+      controls = `<div class="field"><div class="name">Edit affinity score<span class="help">Changing the score also updates the relationship level.</span></div>
+        <div class="inputs">${worldCell({what:'relationship', label:'Affinity score', min:R.scoreMin, max:R.scoreMax, step:1, value:score, init:R.value, was:String(R.value), changed:staged != null})}
+        <button class="btn small" data-act="affinity-max" ${score === R.scoreMax && level === affinityLevel(R, score) ? 'disabled' : ''}>Set to 100</button></div></div>
+        <span id="affinity-error" role="status" hidden>${esc(T('Enter a whole number in this range'))} · ${R.scoreMin}–${R.scoreMax}</span>
+        <p><span>Level after saving (estimated)</span> <b id="affinity-level">${level}</b></p>
+        <details><summary>How the editor estimates levels</summary><p>These ranges are estimates based on save samples.</p>
+          <ul>${R.levelStarts.map((start, index) => `<li>${start}–${index + 1 < R.levelStarts.length ? R.levelStarts[index + 1] - 1 : R.scoreMax} · ${esc(T('Relationship level'))} ${index}</li>`).join('')}</ul>
+        </details>`;
     }
-    return `<div class="group"><div class="section-head"><h3>Jason and Lucia</h3></div><div class="fields">${worldField('Relationship', 'experimental', help, ctl)}</div></div>`;
+    return `<div class="group"><div class="section-head"><h3>Relationship</h3></div>${facts}${controls}</div>`;
   }
 
   function onWorld(el) {
@@ -1525,8 +1547,13 @@
       const ok = el.value.trim() !== '' && Number.isFinite(v) && (what === 'profile' || Number.isInteger(v)) && v >= Number(el.min) && v <= Number(el.max);
       el.setAttribute('aria-invalid', ok ? 'false' : 'true');
       // skills are only ever raised, so a value at or below the lowest one changes nothing; the profile is a float32 in the save
-      const same = what === 'skills' ? v <= Math.min(...c.skills) : what === 'profile' ? Math.fround(v) === Math.fround(c.profile) : v === w.player.relationship.value;
-      if (what === 'relationship') { if (!ok || same) delete d.relationship; else d.relationship = v; }
+      const same = what === 'skills' ? v <= Math.min(...c.skills) : what === 'profile' ? Math.fround(v) === Math.fround(c.profile) : (v === w.player.relationship.value && affinityLevel(w.player.relationship, v) === w.player.relationship.level);
+      if (what === 'relationship') {
+        if (!ok || same) delete d.relationship; else d.relationship = v;
+        $('#affinity-level').textContent = ok ? String(affinityLevel(w.player.relationship, v)) : '—';
+        $('#affinity-error').hidden = ok;
+        $('[data-act="affinity-max"]').disabled = ok && v === w.player.relationship.scoreMax;
+      }
       else {
         const ch = d[who] || {};
         if (!ok || same) delete ch[what]; else ch[what] = v;
@@ -1571,6 +1598,7 @@
     const rows = topicRows(file, topic).filter(x => !q || [x.label,T(x.label),x.value].join(' ').toLowerCase().includes(q));
     const at = Math.min(k.page * 60, Math.max(0, Math.floor((rows.length - 1) / 60) * 60));
     function control(x) {
+      if (x.key === 'research_relationship') return `<span>${esc(x.value)}</span> <button class="btn small" data-act="tab" data-tab="personal">Edit affinity</button>`;
       if (x.stat) {
         const e=x.stat;
         return cell({kind:'stat',key:e.group+':'+e.row,label:T('Value'),value:e.value,display:String(e.value),
@@ -1598,8 +1626,8 @@
     if (!k || !S.comp[s.file]) return '<div class="empty">Reading this save…</div>';
     if (k.failed) return '<button class="btn" data-act="reload">Try again</button>';
     const options=[...new Set(k.rows.map(x=>x.group)),...Object.keys(researchTopics)];
-    const notes={'Map fog':'Fill adds only region IDs observed in compatible saves.', 'Criminal profile':'Candidate field. The in-game label is unconfirmed.',
-                 'Trunk contents':'Quantities refer to existing stacks in a vehicle trunk.', 'Relationship':'The shared score uses the script limits saved in this slot.'};
+    const notes={'Map fog':'Fill adds only region IDs observed in compatible saves.', 'Criminal profile':'Edit each character’s profile score in Player attributes.',
+                 'Trunk contents':'Quantities refer to existing stacks in a vehicle trunk.', 'Relationship':'Changing the score also updates the relationship level.'};
     return `<div class="section-head"><h2>Known save fields</h2></div>
       <div class="inputs">${researchLinks.map(([tab,name])=>`<button class="btn small" data-act="tab" data-tab="${tab}">${T(name)}</button>`).join('')}</div>
       <div class="inputs"><select id="research-topic" aria-label="Category">${options.map(x=>`<option value="${esc(x)}" ${x===k.topic?'selected':''}>${esc(T(researchTopics[x]||x))}</option>`).join('')}</select>
@@ -1980,7 +2008,8 @@
           e.profile != null && {label: `Criminal profile (${name})`, value: c?.profile ?? '', newValue: e.profile},
           e.vest && {label: `Vest (${name})`, value: c?.vest?.armour ?? '', newValue: P?.vestArmour ?? 150}];
       }),
-      w.relationship != null && {label: 'Relationship', value: P?.relationship?.value ?? '', newValue: w.relationship}].filter(Boolean);
+      w.relationship != null && {label: 'Relationship', value: P?.relationship?.value ?? '', newValue: w.relationship?.value ?? w.relationship},
+      w.relationship != null && P?.relationship?.levelStarts && {label: 'Relationship level', value: P.relationship.level, newValue: affinityLevel(P.relationship, w.relationship?.value ?? w.relationship)}].filter(Boolean);
     for (const [key,v] of Object.entries(w).filter(([key])=>key.startsWith('research_'))) {
       const row=S.known[s.file]?.rows?.find(x=>x.key===key);
       worldList.push({label:row?T(row.label):key, value:row?.value??'',newValue:v});
@@ -2009,7 +2038,7 @@
       ? `<div class="sum">${n === 1 ? '1 change not saved yet' : `${n} changes not saved yet`}<small><span data-no-i18n>${esc(missionName(s))}.</span> Saving encrypts the save through GarlicSaves and gets it ready to send.</small></div>
          <div class="row"><button class="btn small" data-act="review">${S.reviewOpen ? 'Hide list' : 'Review'}</button>
            <button class="btn small" data-act="discard">Discard</button>
-           <button class="btn primary" data-act="save" ${busy ? 'disabled' : ''}>${busy && st.job.kind === 'patch' ? 'Saving…' : 'Save edits to this save'}</button></div>`
+           <button class="btn primary" data-act="save" ${busy || $('#w-relationship-both[aria-invalid="true"]') ? 'disabled' : ''}>${busy && st.job.kind === 'patch' ? 'Saving…' : 'Save edits to this save'}</button></div>`
       : `<div class="sum">Edits saved<small><span data-no-i18n>${esc(missionName(s))}.</span> ${n === 1 ? '1 change.' : `${n} changes.`} Edit another save, or send them back to the PS5.</small></div>
          <div class="row"><button class="btn small" data-act="review">${S.reviewOpen ? 'Hide list' : 'Review'}</button>
            <button class="btn primary" data-act="go" data-view="send">Go to send back</button></div>`;
@@ -2302,6 +2331,12 @@
     if (a === 'sd-home') { S.sd[S.slot].cur = null; S.sd[S.slot].node = null; S.mainKey = ''; renderMain(); return; }
     if (a === 'sd-open') { sdOpen(S.slot, b.dataset.section, JSON.parse(b.dataset.path), b.dataset.label, false); return; }
     if (a === 'sd-more') { const c = S.sd[S.slot].cur; sdOpen(S.slot, c.section, c.path, null, true); return; }
+    if (a === 'affinity-max') {
+      const input = $('#w-relationship-both');
+      input.value = input.max;
+      onWorld(input);
+      return;
+    }
     if (a === 'growth-fill' || a === 'condition-fill') {
       const w = S.world[S.slot], draft = draftOf(S.slot).world;
       if (a === 'condition-fill') {
@@ -2373,6 +2408,7 @@
       delete S.drafts[s.file]; delete S.stuntSel[s.file]; delete S.stuntKeys[s.file]; seedDraft(s); S.mainKey = ''; renderMain(); renderPending(); return;
     }
     if (a === 'save') {
+      if ($('#w-relationship-both[aria-invalid="true"]')) return;
       const s = slotOf(S.slot);
       const d = draftList(draftOf(s.file));
       const none = !d.money.length && !d.ammo.length && !d.stats.length && !Object.keys(d.world).length && !d.raw.length && !compCount(d.completion) && !gunCount(d.guns);
