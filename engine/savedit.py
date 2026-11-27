@@ -347,7 +347,7 @@ def apply(b, edits, *, task_reference=None):
         steps = [(compendium.apply, comp.get('compendium')), (discovery.apply, comp.get('discovery')), (challenges.apply, comp.get('challenges')),
                  (challenges.apply_cheats, comp.get('cheats')), (gyms.apply, comp.get('gyms')),
                  (activities.apply, comp.get('activities')), (robberies.apply, comp.get('robberies')), (fencing.apply, comp.get('fencing')),
-                 (activities2.apply, comp.get('activities2')), (hoops.apply, comp.get('hoops')), (vehicles_compendium.apply, comp.get('vehicles')),
+                 (activities2.apply, comp.get('activities2')), (activities2.apply_range_access, comp.get('rangeAccess')), (hoops.apply, comp.get('hoops')), (vehicles_compendium.apply, comp.get('vehicles')),
                  (collectibles.apply, comp.get('collectibles')), (awards.apply, comp.get('awards'))]
         if comp.get('skipTask'):
             import taskskip
@@ -680,7 +680,7 @@ STUNT_GROUPS = (
     ('bridges', 'Under the bridge and knife flights', completiondata.BRIDGES_AND_KNIFE_FLIGHTS, (('underthebridge', 202), ('knifeflights', 40)), 242),
 )
 STUNTS_FOR_100 = 300            # the 100% checklist asks for any 300 of the game's 397 stunts
-COMPLETION_PARTS = ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'skipTask')
+COMPLETION_PARTS = ('compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'skipTask', 'rangeAccess')
 # Every key a Completion edit may hold. The cheat trackers are counted by no 100% line, so 'cheats' alone doesn't make
 # the 100% figure be worked out again (COMPLETION_PARTS and the stunts do).
 COMPLETION_KEYS = COMPLETION_PARTS + ('stuntDiscovery', 'cheats', 'awards')

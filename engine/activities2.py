@@ -286,8 +286,163 @@ def _read_shootingranges(st):
                 'bestScore': st.value('bestscore', t, r)} for v, r, t in _courses()]
     gold = st.value('shootingrangegoldmedals', 0, ST)
     return {'items': courses, 'done': gold, 'itemsTotal': len(courses),
+            'access': range_access(st),
             'venues': [{'id': v, 'label': lab, 'medals': st.value(TOTAL_MEDALS, 0, v), 'rangesUnlocked': st.value('shootingrangecoursesunlocked', 0, v)}
                        for v, lab in VENUES]}
+
+
+def gold_recipe(st):
+    """Resolve observed medal codes using course and venue/difficulty totals in this save."""
+    from itertools import permutations
+    records = []
+    groups = {}
+    for v, r, t in _courses():
+        code = st.value('highestmedal', t, r)
+        if type(code) is not int or not 0 <= code <= 255:
+            return None
+        records.append((v, r, t, code))
+        for group in ((0, r), (t, v)):
+            groups.setdefault(group, []).append(code)
+    codes = sorted({row[3] for row in records} - {0})
+    if not 1 <= len(codes) <= 3:
+        return None
+    solutions = []
+    for levels in permutations((1, 2, 3), len(codes)):
+        mapping = {0: 0, **dict(zip(codes, levels))}
+        if 3 not in levels:
+            continue
+        for (qual, owner), rows in groups.items():
+            if any(sum(mapping[c] >= rank for c in rows) != st.value('shootingrange' + name + 'medals', qual, owner)
+                   for rank, name in enumerate(('bronze', 'silver', 'gold'), 1)):
+                break
+        else:
+            solutions.append(mapping)
+    if len(solutions) != 1:
+        return None
+    ranks = solutions[0]
+    for v, _ in VENUES:
+        subset = [row for row in records if row[0] == v]
+        groups[(0, v)] = [row[3] for row in subset]
+    groups[(0, ST)] = [row[3] for row in records]
+    for (qual, owner), rows in groups.items():
+        if sum(ranks[c] for c in rows) != st.value(TOTAL_MEDALS, qual, owner):
+            return None
+        for rank, name in enumerate(('bronze', 'silver', 'gold'), 1):
+            if (qual, owner, rank) == (0, ST, 3):
+                continue  # the older preset changed only this gold total
+            if sum(ranks[c] >= rank for c in rows) != st.value('shootingrange' + name + 'medals', qual, owner):
+                return None
+    missing = [row for row in records if ranks[row[3]] < 3]
+    # Prefer a beginner challenge the player can immediately play.
+    keep = next((row for row in missing if row[2] == 'beginner' and st.value('unlocked', row[2], row[1]) is True), None)
+    if not keep:
+        keep = next((row for row in missing if st.value('unlocked', row[2], row[1]) is True), None)
+    if not keep:
+        return None
+    return ranks, [row for row in missing if row != keep], keep
+
+
+def prepare_gold(ed, recipe):
+    ranks, targets, keep = recipe
+    gold_code = next(c for c, rank in ranks.items() if rank == 3)
+    for venue, course, tier, old in targets:
+        if ed.get('unlocked', tier, course) is not True:
+            raise fl.FeatureError('range_access')
+        ed.put('highestmedal', tier, course, gold_code, course + ' / ' + tier)
+        if ed.get('timescompleted', tier, course) == 0:
+            ed.put('timescompleted', tier, course, 1, course)
+            for owner in (course, venue):
+                ed.add('uniquechallengescompleted', 0, owner, 1, course)
+        for rank, name in enumerate(('bronze', 'silver', 'gold'), 1):
+            if rank <= ranks[old]:
+                continue
+            stat = 'shootingrange' + name + 'medals'
+            for qual, owner in ((0, course), (tier, venue), (0, venue), (0, ST)):
+                ed.add(stat, qual, owner, 1, course)
+                ed.add(TOTAL_MEDALS, qual, owner, 1, course)
+    _percent(ed, 'shootingranges', ed.get('shootingrangegoldmedals'))
+    if ed.get('shootingrangegoldmedals') != 41 or ed.get('highestmedal', keep[2], keep[1]) != keep[3]:
+        raise fl.FeatureError('verify_failed')
+
+
+def range_access(st):
+    venues = []
+    for venue, label in VENUES:
+        tiers = [(r, t) for v, r, t in _courses() if v == venue]
+        flags = [st.value('unlocked', t, r) for r, t in tiers]
+        venues.append({'id': venue, 'label': label, 'open': st.value('unlocked', 0, venue) is True,
+                       'available': sum(x is True for x in flags), 'total': len(flags),
+                       'valid': all(type(x) is bool for x in flags)})
+    # The old checklist preset changed the global gold count and percentage only.
+    # Cross-check three independent breakdowns before offering a repair.
+    gold = 'shootingrangegoldmedals'
+    counts = []
+    for venue, _ in VENUES:
+        courses = [(v + r + 'range', len(tiers)) for v, r, tiers in RANGES if v == venue]
+        detailed = [st.value(gold, 0, r) for r, _ in courses]
+        grouped = [st.value(gold, t, venue) for t in RANGE_TIERS]
+        caps = [sum(t in tiers for v, r, tiers in RANGES if v == venue) for t in RANGE_TIERS]
+        if (not all(type(x) is int and 0 <= x <= cap for x, (_, cap) in zip(detailed, courses))
+                or not all(type(x) is int and 0 <= x <= cap for x, cap in zip(grouped, caps))
+                or sum(detailed) != sum(grouped) or sum(detailed) != st.value(gold, 0, venue)):
+            break
+        counts.append(sum(detailed))
+    recorded = sum(counts) if len(counts) == len(VENUES) else None
+    recipe = gold_recipe(st) if recorded and recorded < 42 and all(v['open'] and v['valid'] for v in venues) else None
+    last = list(recipe[2][:3]) if recipe else None
+    return {'venues': venues, 'recorded': recorded, 'checklist': st.value(gold, 0, ST), 'last': last}
+
+
+def apply_range_access(b, choice):
+    if not isinstance(choice, dict) or set(choice) != {'venues', 'repair', 'prepare'}:
+        raise fl.FeatureError('bad_request')
+    venues, repair = choice['venues'], choice['repair']
+    if (not isinstance(venues, list) or any(v not in ('griffin', 'rodgers') for v in venues)
+            or type(repair) is not bool or type(choice['prepare']) is not bool):
+        raise fl.FeatureError('bad_request')
+    s = fl.Save(b)
+    st = fl.Stats(s.text(fl.STATS))
+    ed = Edit(st)
+    info = range_access(st)
+    recipe = None
+    if choice['prepare']:
+        if not info['last'] or info['checklist'] is None or info['checklist'] < info['recorded']:
+            raise fl.FeatureError('range_access')
+        recipe = gold_recipe(st)
+        if not recipe[1] and info['recorded'] == info['checklist']:
+            return b, []
+        venues = [v for v, _ in VENUES]
+    for item in info['venues']:
+        venue = item['id']
+        if venue not in venues:
+            continue
+        if not item['open'] or not item['valid']:
+            raise fl.FeatureError('range_access')
+        for v, name, tiers in RANGES:
+            if v != venue:
+                continue
+            course = venue + name + 'range'
+            ed.put('unlocked', 0, course, True, course)
+            for tier in tiers:
+                ed.put('unlocked', tier, course, True, course + ' / ' + tier)
+            ed.put('challengesunlocked', 0, course, len(tiers), course)
+        ed.put('challengesunlocked', 0, venue, item['total'], venue)
+        ed.put('shootingrangecoursesunlocked', 0, venue, sum(v == venue for v, _, _ in RANGES), venue)
+    if venues:
+        for global_key, local_key in [('shootingrangechallengesunlocked', 'challengesunlocked'),
+                                      ('shootingrangecoursesunlocked', 'shootingrangecoursesunlocked')]:
+            ed.put(global_key, 0, ST, sum(ed.get(local_key, 0, v) for v, _ in VENUES), global_key)
+    if repair or recipe:
+        recorded = info['recorded']
+        if recorded is None or info['checklist'] is None or info['checklist'] < recorded:
+            raise fl.FeatureError('range_access')
+        ed.put('shootingrangegoldmedals', 0, ST, recorded, 'Shooting range gold medals')
+        _percent(ed, 'shootingranges', recorded)
+    if recipe:
+        prepare_gold(ed, recipe)
+    if not ed.moved:
+        return b, []
+    return finish(s, st, ed.moved, [])
 
 
 def _read_pool(st):

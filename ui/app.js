@@ -61,6 +61,7 @@
     save_out_of_range: 'One of the new values is outside the allowed range.',
     save_bad_time: 'The time of day needs an hour from 0 to 23 and a minute from 0 to 59.',
     save_fog_reference: 'Choose a decrypted save with all 889 compatible map regions.',
+    save_range_access: 'Recheck the venue access and medal records for this save.',
     save_task_layout: 'The task or reference slot no longer matches the supported state.',
     save_award_layout: 'The award records could not be read for this slot.',
     save_fog_version: 'This save’s map data has a version Save Garage doesn’t know yet, so the map is left alone.',
@@ -626,7 +627,7 @@
   const stacksOn = (file, key) => !!draftOf(file).stacksOn?.[key];
   const draftList = d => ({money: Object.values(d.money), ammo: Object.values(d.ammo), stats: Object.values(d.stats), world: {...(d.world || {})},
                            raw: Object.values(d.raw || {}), completion: JSON.parse(JSON.stringify(d.completion || {})), guns: JSON.parse(JSON.stringify(d.guns || {}))});
-  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'cheats', 'awards', 'skipTask'].filter(k => c && c[k]).length;
+  const compCount = c => ['compendium', 'discovery', 'challenges', 'gyms', 'activities', 'robberies', 'fencing', 'activities2', 'hoops', 'vehicles', 'collectibles', 'cheats', 'awards', 'skipTask', 'rangeAccess'].filter(k => c && c[k]).length;
   // World edits: each key is one change, except a character's object ({meter, skills, profile, vest}), where each counts
   const worldCount = w => Object.entries(w || {}).reduce((n, [k, v]) => n + (k === 'lucia' || k === 'jason' ? Object.keys(v || {}).length : 1), 0);
   // guns to add: {lucia: [weapon ids], jason: [...]}, each gun one change
@@ -820,7 +821,7 @@
         return `<div class="field"><div class="name">${esc(title)}<span class="help">${T(x.unlocked ? 'Unlocked' : 'Locked')} · ${T('Completions')} ${x.played ?? '—'}</span></div><div class="inputs">${score(x.best, 'Best score', title)}${score(x.recent, 'Latest score', title)}</div></div>`;
       }).join('')}</details>`;
     }).join('');
-    return '<h2>Shooting range scores</h2><p>Editing scores leaves medals and unlocks as saved. Best score must be at least the latest score.</p>' + venues;
+    return '<h2>Shooting range scores</h2><p>Editing scores leaves medals and unlocks as saved. Best score must be at least the latest score.</p><button class="btn small" data-act="tab" data-tab="completion">View shooting range rewards</button>' + venues;
   }
 
   function panelStats(s, d) {
@@ -1029,7 +1030,7 @@
     const C = S.comp[file], lines = C.checklist?.lines || [];
     for (const l of lines) {
       const p = LINE_PICK[l.key];
-      if (!p || p[0] === 'stunts' || l.done || (l.percent ?? 0) >= 100 || (EXP_LINES.has(l.key) && !withExp)) continue;
+      if (!p || l.key === 'shootingranges' || p[0] === 'stunts' || l.done || (l.percent ?? 0) >= 100 || (EXP_LINES.has(l.key) && !withExp)) continue;
       setLine(file, l.key, true);
     }
     if (C.discovery) pickFeat(file, 'discovery', true);
@@ -1102,7 +1103,8 @@
     const p = LINE_PICK[l.key], picked = linePicked(s.file, l.key), exp = EXP_LINES.has(l.key);
     const full = l.done || (l.percent ?? 0) >= 100;
     let act;
-    if (full) act = '<span class="done-mark">Done</span>';
+    if (l.key === 'shootingranges' && !picked) act = '<span>See shooting range progress above.</span>';
+    else if (full) act = '<span class="done-mark">Done</span>';
     else if (!p) act = `<span class="why">${esc(LINE_WHY[l.key] || 'Not possible from the save yet.')}</span>`;
     else if (!lineReady(s.file, l.key)) act = '<span class="why">This part of the save can’t be read yet.</span>';
     else act = `<button class="btn small pick${picked ? ' on' : ''}" data-act="line-pick" data-line="${esc(l.key)}" aria-pressed="${picked}">${picked ? 'Picked' : exp ? 'Try it' : 'Complete'}</button>${exp ? '<small>Experiment</small>' : TESTED_LINES.has(l.key) ? '<small class="tested">Tested on PS5</small>' : ''}`;
@@ -1145,6 +1147,23 @@
         <div class="fields">${c.groups.map(row).join('')}</div></div>`;
   }
 
+  function rangeRewards(s, C) {
+    const data = C.activities2?.lines?.find(l => l.key === 'shootingranges')?.access;
+    if (!data) return '';
+    const choice = draftOf(s.file).completion.rangeAccess;
+    const control = (action, label, on, disabled) => `<button class="btn small" data-act="range-access" data-value="${action}" aria-pressed="${!!on}" ${disabled ? 'disabled' : ''}>${esc(T(on ? 'Undo' : label))}</button>`;
+    const repair = data.recorded != null && data.checklist > data.recorded;
+    const last = data.last;
+    const venues = data.venues.map(v => `<div class="field"><div class="name">${esc(v.label)} <small>${v.available} / ${v.total}</small></div>
+      ${v.open ? control(v.id, 'Open all difficulties here', choice?.venues.includes(v.id), !v.valid || v.available === v.total || choice?.prepare) : '<span>Buy the waiver at this range in game.</span>'}</div>`).join('');
+    return `<div class="group"><div class="section-head"><h3>Hillinger M306 TMR</h3>${riskTag('experimental')}</div>
+      <p><span>Gold medals by course</span> <strong>${data.recorded ?? '—'} / 42</strong> · <span>Checklist</span> ${data.checklist ?? '—'} / 42</p>${venues}
+      ${repair ? control('repair', 'Repair checklist from course medals', choice?.repair, choice?.prepare) : ''}
+      ${last ? `<p><span>Earn the final gold in game</span> · <strong>${esc(last[0] === 'griffin' ? 'Griffin' : 'Rodgers')} / ${esc(last[1].slice(last[0].length, -5))} / ${esc(T(last[2]))}</strong></p>${data.recorded < 41 ? control('prepare', 'Prepare 41 gold medals', choice?.prepare, data.checklist == null || data.checklist < data.recorded) : ''}`
+      : data.recorded === 42 ? '<p>All course golds are recorded. Check the shop in game.</p>' : data.recorded === 41 ? '<p>One course gold remains. Earn it in game and check the shop.</p>' : '<p>To prepare 41 golds, open both venues and earn a gold in game. The editor checks the medal encoding against your course records.</p>'}
+      <p>Shop availability after the final gold still needs console testing.</p></div>`;
+  }
+
   function panelCompletion(s) {
     const C = S.comp[s.file];
     const missing = Object.keys(C.errors || {});
@@ -1154,6 +1173,7 @@
       ${compSummary(s)}
       ${missing.length ? `<div class="callout">Some parts can’t be read in this save yet, usually because it’s early in the story: ${missing.map(esc).join(', ')}. Everything else works.</div>` : ''}
       ${taskSkipControl(s, C.tasks?.skip)}
+      ${rangeRewards(s, C)}
       ${checklistSections(s)}
       <details class="more-opts" data-keep="compMore" ${S.keep.compMore ? 'open' : ''}><summary>Every option, part by part</summary>
         <p class="note">The same edits in finer steps, plus extras the checklist doesn’t count: map discoveries, gym memberships, convenience-store robberies, single challenge categories, and the experiments.</p>
@@ -1252,10 +1272,10 @@
     const label = t => t.charAt(0) + t.slice(1).toLowerCase().replace(/bret's/, 'Bret’s');
     const chosen = new Set(d.activities2?.lines || []);
     const lines = C.activities2.lines;
-    const open = lines.filter(l => !l.done_line && l.counter < l.of && !chosen.has(l.key) && l.key !== 'bret');
+    const open = lines.filter(l => !l.done_line && l.counter < l.of && !chosen.has(l.key) && !['bret', 'shootingranges'].includes(l.key));
     const help = l => l.confidence === 'verified' ? 'Marks each one played.' : l.key === 'bret' ? 'Sets the count only: deck progress isn’t in the save.' : 'Sets the checklist count; the individual results aren’t written, since no save has one played to copy.';
     const acts = `<div class="group"><div class="section-head"><h3>Activities</h3>${open.length > 1 ? '<button class="btn small" data-act="act-line" data-value="all">Complete all</button>' : ''}<p>Races, ranges, video games, pool, mini golf, drone trials and Bret’s target decks. Prize money, rewards and trophies for them aren’t given.</p></div>
-      <div class="fields">${lines.map(l => `<div class="field"><div class="name">${esc(label(l.label))}<span class="help">${nf.format(l.counter)} of ${nf.format(l.of)}. ${help(l)}</span></div>
+      <div class="fields">${lines.filter(l => l.key !== 'shootingranges' || chosen.has(l.key)).map(l => `<div class="field"><div class="name">${esc(label(l.label))}<span class="help">${nf.format(l.counter)} of ${nf.format(l.of)}. ${help(l)}</span></div>
         <div class="inputs">${chosen.has(l.key) ? `<span class="note">Will be completed. Save edits to apply it.</span> <button class="btn small" data-act="act-line-undo" data-value="${l.key}">Undo</button>`
           : `<button class="btn small" data-act="act-line" data-value="${l.key}" ${l.counter >= l.of ? 'disabled' : ''}>${l.counter >= l.of ? 'Done' : 'Complete'}</button>`}</div></div>`).join('')}</div></div>`;
     const h = C.hoops, ht = h.countyTotals || {};
@@ -1923,7 +1943,7 @@
       worldList.push({label:row?T(row.label):key, value:row?.value??'',newValue:v});
     }
     const cp = d.completion || {};
-    const compList = [cp.skipTask && {label: T('Optional task') + ' 0xad8c8a22', value: '', newValue: T('Complete')}, cp.awards && {label: T('Award records'), value: '', newValue: cp.awards.ids.length}, cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
+    const compList = [cp.rangeAccess && {label: T('Shooting range progress'), value: '', newValue: [cp.rangeAccess.prepare && T('Prepare 41 gold medals'), ...cp.rangeAccess.venues, cp.rangeAccess.repair && T('Repair checklist from course medals')].filter(Boolean).join(' · ')}, cp.skipTask && {label: T('Optional task') + ' 0xad8c8a22', value: '', newValue: T('Complete')}, cp.awards && {label: T('Award records'), value: '', newValue: cp.awards.ids.length}, cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
       cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
       cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
@@ -2111,6 +2131,18 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'range-access') {
+      const d = draftOf(S.slot).completion;
+      const edit = d.rangeAccess || {venues: [], repair: false, prepare: false};
+      const value = b.dataset.value;
+      if (value === 'prepare') edit.prepare = !edit.prepare;
+      else if (value === 'repair') edit.repair = !edit.repair;
+      else if (edit.venues.includes(value)) edit.venues = edit.venues.filter(v => v !== value);
+      else edit.venues.push(value);
+      if (edit.venues.length || edit.repair || edit.prepare) d.rangeAccess = edit;
+      else delete d.rangeAccess;
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts(); return;
+    }
     if (a === 'task-skip' || a === 'task-undo') {
       const d = draftOf(S.slot).completion, info = S.comp[S.slot]?.tasks?.skip;
       if (a === 'task-undo') delete d.skipTask;
@@ -2157,7 +2189,7 @@
       const s = slotOf(S.slot), d = draftOf(s.file).completion, C = S.comp[s.file];
       const lines = C.activities2.lines, v = b.dataset.value;
       const cur = new Set(d.activities2?.lines || []);
-      if (a === 'act-line') { if (v === 'all') lines.filter(l => l.counter < l.of && l.key !== 'bret').forEach(l => cur.add(l.key)); else cur.add(v); } else cur.delete(v);
+      if (a === 'act-line') { if (v === 'all') lines.filter(l => l.counter < l.of && !['bret', 'shootingranges'].includes(l.key)).forEach(l => cur.add(l.key)); else cur.add(v); } else cur.delete(v);
       if (cur.size) {
         const level = {};
         for (const k of cur) level[k] = (lines.find(l => l.key === k) || {}).confidence === 'verified' ? 'full' : 'counter';
