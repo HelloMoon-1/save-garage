@@ -95,16 +95,16 @@ mkdir -p "$WIN/app/python/Lib/site-packages"
 for w in "$WHEELS"/*.whl; do python3 -c "import zipfile, sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$w" "$WIN/app/python/Lib/site-packages"; done
 # cmd.exe reads a batch file a line at a time, so the line that runs MoonSlot also ends the file: an update can then
 # replace this launcher while it is running
-printf '%s\r\n' '@echo off' 'title MoonSlot' \
-  'echo MoonSlot is starting. Your browser opens in a moment.' \
-  'echo Keep this window open while you use MoonSlot. Close it, or click Quit in the page, to stop.' \
+printf '%s\r\n' '@echo off' 'title GTA6 Story Save Editor' \
+  'echo GTA6 Story Save Editor is starting. Your browser opens in a moment.' \
+  'echo Keep this window open while you use the editor. Close it, or click Quit in the page, to stop.' \
   'set SAVEGARAGE_DESKTOP=1' \
   'if not exist "%~dp0app\engine\main.py" if exist "%~dp0.update\backup\app\engine\main.py" move "%~dp0.update\backup\app\engine" "%~dp0app\engine" >nul' \
   '"%~dp0app\python\python.exe" "%~dp0app\engine\main.py" --open %* || pause & exit /b' > "$WIN/Start MoonSlot.bat"
-printf '%s\r\n' 'MoonSlot for Windows 10 and 11' '' \
+printf '%s\r\n' 'GTA6 Story Save Editor for Windows 10 and 11' '' \
   '1. Double-click "Start MoonSlot.bat". If Windows SmartScreen appears, click More info, then Run anyway.' \
   '2. When Windows Firewall asks about Python, allow it on private networks. Your PS5 needs to reach this PC.' \
-  '3. Your browser opens MoonSlot. Follow the steps on screen.' '' \
+  '3. Your browser opens the editor. Follow the steps on screen.' '' \
   'Saves and backups are kept in the saves folder beside the launcher.' \
   'Full guide: see app\README.md or the project page.' > "$WIN/README.txt"
 build_json "$WIN/app/build.json" windows "$WIN/app/python" "Start MoonSlot.bat" README.txt
@@ -126,26 +126,26 @@ for c in python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 python
   if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then PY="$c"; break; fi
 done
 if [ -z "$PY" ]; then
-  echo "MoonSlot needs Python 3.9 or newer. Install it from https://www.python.org/downloads/macos/ and open this again."
+  echo "The editor needs Python 3.9 or newer. Install it from https://www.python.org/downloads/macos/ and open this again."
   read -n 1 -s -r -p "Press any key to close."; exit 1
 fi
 mkdir -p "$SUPPORT"
 if [ ! -x "$VENV/bin/python" ]; then
-  echo "Setting up MoonSlot for the first time. This takes a minute."
+  echo "Setting up the editor for the first time. This takes a minute."
   "$PY" -m venv "$VENV" && "$VENV/bin/python" -m pip install -q -r requirements.txt || { echo "Setup failed. Check your internet connection and try again."; rm -rf "$VENV"; read -n 1 -s -r -p "Press any key to close."; exit 1; }
 fi
-echo "MoonSlot is running. Keep this window open while you use it. Close it, or click Quit in the page, to stop."
+echo "GTA6 Story Save Editor is running. Keep this window open while you use it. Close it, or click Quit in the page, to stop."
 SAVEGARAGE_DESKTOP=1 exec "$VENV/bin/python" engine/main.py --open
 SH
 chmod +x "$MAC/Start MoonSlot.command"
 cat > "$MAC/README.txt" <<'TXT'
-MoonSlot for macOS
+GTA6 Story Save Editor for macOS
 
 1. Double-click "Start MoonSlot.command". If macOS says it can't check the developer, right-click it, choose Open,
    then Open again. You only do this once.
-2. The first start sets up MoonSlot (needs Python 3.9 or newer and an internet connection).
+2. The first start sets up the editor (needs Python 3.9 or newer and an internet connection).
 3. Allow access to devices on your local network when asked. Your PS5 needs to reach this Mac.
-4. Your browser opens MoonSlot. Follow the steps on screen.
+4. Your browser opens the editor. Follow the steps on screen.
 
 Saves and backups are kept in the saves folder beside the launcher.
 TXT
@@ -158,10 +158,10 @@ cp LICENSE NOTICE CREDITS.md README.md README.zh-CN.md build_out/dist/MoonSlot/
 mkdir -p build_out/dist/MoonSlot/docs
 cp -R docs/releases build_out/dist/MoonSlot/docs/
 cat > build_out/dist/MoonSlot/README.txt <<'TXT'
-MoonSlot for Linux
+GTA6 Story Save Editor for Linux
 
 Run ./MoonSlot --open (or ./MoonSlot --help for options). curl must be installed.
-The PS5 protocol uses ports 1004 to 1006, which Linux keeps for root. Allow them while you use MoonSlot:
+The PS5 protocol uses ports 1004 to 1006, which Linux keeps for root. Allow them while you use the editor:
   sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1004
 and set it back afterwards with ...=1024. Saves and backups are kept in the saves folder beside the launcher.
 TXT

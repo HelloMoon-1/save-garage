@@ -1,4 +1,4 @@
-name: Build and publish MoonSlot
+name: Build and publish GTA6 Story Save Editor
 
 on:
   workflow_dispatch:
@@ -73,7 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          MoonSlot 简体中文构建，包含中英文界面和中文使用指南。
+          GTA6 剧情存档编辑器简体中文构建，包含中英文界面和中文使用指南。
 
           - Windows x64：解压后运行 `Start MoonSlot.bat`。
           - macOS：解压后运行 `Start MoonSlot.command`，首次启动会安装 Python 依赖。
@@ -86,5 +86,5 @@ jobs:
             cp "docs/releases/$RELEASE_TAG.md" "$RUNNER_TEMP/release-notes.md"
           fi
           gh release create "$RELEASE_TAG" build_out/release/* \
-            --latest --target "$GITHUB_SHA" --title "MoonSlot $RELEASE_TAG" \
+            --latest --target "$GITHUB_SHA" --title "GTA6 剧情存档编辑器 $RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

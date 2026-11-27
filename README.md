@@ -1,6 +1,10 @@
-# MoonSlot
+# GTA6 剧情存档编辑器 · GTA6 Story Save Editor
 
 [简体中文使用指南](README.zh-CN.md)
+
+如果这个工具帮到了你，欢迎给原作者 NotHGM 的 [Save Garage 原仓库点个 Star ⭐](https://github.com/NotHGM/save-garage)。
+
+If this editor helped you, please [star NotHGM’s original Save Garage project](https://github.com/NotHGM/save-garage).
 
 > **This is a modified Chinese build of [Save Garage](https://github.com/NotHGM/save-garage) by NotHGM. It is not the official version.** Official releases: https://github.com/NotHGM/save-garage/releases
 
@@ -9,9 +13,9 @@
   &nbsp;&nbsp;|&nbsp;&nbsp; Windows, macOS and Linux &nbsp;&nbsp;|&nbsp;&nbsp; Free and open source (GPL-3.0)
 </p>
 
-MoonSlot uses its own release channel and signing key. Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage).
+This editor (formerly MoonSlot) uses its own release channel and signing key. Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage).
 
-Save Garage edits your **GTA VI story-mode save on PS5**: money, ammo and stats. It needs no jailbreak and installs
+This editor lets you change your **GTA VI story-mode save on PS5**: money, ammo and stats. It needs no jailbreak and installs
 nothing on the console. Your PS5 sends the save to your computer through its own Data Transfer feature, you edit it in
 your browser, and the PS5 takes it back the same way.
 

@@ -16,7 +16,7 @@ NOWIN = 0x08000000 if os.name == 'nt' else 0
 RATE_WINDOW = 60
 
 # The sign-in: GarlicSaves' device authorisation, adapted from GarlicTransfer 0.4.0 (electron/device_auth.cjs, GPL-3.0).
-DEVICE_NAME = 'MoonSlot'     # what GarlicSaves calls this installation: the app's name, nothing about the computer
+DEVICE_NAME = 'GTA6 Story Save Editor'     # what GarlicSaves calls this installation: the app's name, nothing about the computer
 SIGNIN_LIMIT = 600              # seconds a sign-in waits for the user at most (less when its code expires sooner)
 SIGNIN_EVERY = 3                # the fewest seconds between two checks, whatever interval GarlicSaves asks for
 SIGNIN_SLOWER = 5               # seconds added to the interval each time GarlicSaves asks to slow down (HTTP 429)

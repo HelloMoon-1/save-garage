@@ -136,7 +136,7 @@
     document.documentElement.dir = RTL.has(code) ? 'rtl' : 'ltr';
     const sel = document.getElementById('lang');
     if (sel && sel.value !== code) sel.value = code;
-    busy = true; try { walk(document.body); document.title = 'MoonSlot'; } finally { obs.takeRecords(); busy = false; }
+    busy = true; try { walk(document.body); document.title = document.querySelector('.brand-name').textContent; } finally { obs.takeRecords(); busy = false; }
   }
 
   function start() {

@@ -1,10 +1,12 @@
-# MoonSlot 简体中文指南
+# GTA6 剧情存档编辑器（PS5）
 
 [English](README.md) · [下载最新版](../../releases/latest) · [GPL-3.0 许可证](LICENSE)
 
+如果这个工具帮到了你，欢迎给原作者 NotHGM 的 [Save Garage 原仓库点个 Star ⭐](https://github.com/NotHGM/save-garage)，支持他的存档研究与开发。
+
 > **这是 NotHGM 的 [Save Garage](https://github.com/NotHGM/save-garage) 的简体中文修改版，并非官方版本。** 官方版本发布于 https://github.com/NotHGM/save-garage/releases
 
-Save Garage 是 PS5 版 GTA VI 的故事模式存档编辑器。通过 PS5 的“数据传输”功能将存档下载到电脑，在浏览器中编辑，再传回主机。浏览器使用简体中文时会自动显示中文，也可以在编辑器右上方手动切换语言。
+本工具原名 MoonSlot，用于编辑 PS5 版 GTA VI 的剧情存档。通过 PS5 的“数据传输”功能将存档下载到电脑，在浏览器中编辑，再传回主机。浏览器使用简体中文时会自动显示中文，也可以在编辑器右上方手动切换语言。
 
 本版同步原作者的 `1.30.1`，支持游戏编号 `PPSA01547`、`PPSA38500` 和 `PPSA29660`。[查看 1.30.1 中文更新日志](docs/releases/v1.30.1.md)
 
@@ -28,14 +30,14 @@ Based on Save Garage by NotHGM (https://github.com/NotHGM/save-garage)
 
 ## 使用步骤
 
-首次使用时点击「登录 GarlicSaves」，在官网登录自己的账号，核对页面显示的设备码后批准 MoonSlot，再回到编辑器。可以在账号菜单退出或切换账号。官网队列详情所需的浏览器会话与设备授权分别管理。
+首次使用时点击「登录 GarlicSaves」，在官网登录自己的账号，核对页面显示的设备码后批准 GTA6 Story Save Editor，再回到编辑器。可以在账号菜单退出或切换账号。官网队列详情所需的浏览器会话与设备授权分别管理。
 
 
 点击「下载存档」后，多个剧情槽位会分批解密。同一批共享一个服务器排位，最多 64 个槽位、通常不超过 64 MiB。返回结果会按槽位核对。保存修改仍按当前选中的槽位加密。编辑页的「存档时间」来自游戏写入的时间戳，按电脑时区显示，精确到秒。
 
 排队时可以点「在 GarlicSaves 官网查看排位」。请先在同一浏览器登录官网，再点这个链接。官网的 `position` 是当前任务的排位，`total` 是全站排队任务数。若要在编辑器内自动显示数字，可将仅含 GarlicSaves 登录会话的 Netscape 格式 Cookie 文件保存在本机，在启动前将环境变量 `GARLIC_QUEUE_COOKIE_FILE` 设为该文件的完整路径。Windows PowerShell 示例为 `$env:GARLIC_QUEUE_COOKIE_FILE = 'C:\Private\garlicsaves-cookies.txt'`，然后在同一窗口运行启动脚本。请将该文件保存在私人目录。编辑器约每 15 秒向官网查询一次；未登录或数字不可用时会显示提示。
 
-1. 在与 PS5 连接同一家庭网络的电脑上启动 MoonSlot。编辑器默认打开在 `http://127.0.0.1:7283`，使用期间请保持启动窗口打开。
+1. 在与 PS5 连接同一家庭网络的电脑上启动编辑器。编辑器默认打开在 `http://127.0.0.1:7283`，使用期间请保持启动窗口打开。
 2. 点“查找我的 PS5”，或手动输入主机的 IP 地址。
 3. 每台主机首次使用时点击“开始配对”。在 PS5 打开“设置 → 系统 → 系统软件 → 数据传输”，选择 **Save Garage Pairing**。出现无法传输的提示后，可返回编辑器查看配对状态。
 4. 在游戏中保存进度，返回 PS5 主界面。点击“下载存档”，根据提示按一次 PS5 电源键，听到提示音后松开。主机会为传输重启。
