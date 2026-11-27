@@ -29,7 +29,7 @@ The whole app state, polled about once a second by the UI.
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": []},
   "skipped": [{"file": "sdimg_SAVEDATASARC0003", "subtitle": "Mission name", "why": "damaged"}],   // story saves left out: "damaged" or "layout"
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
-  "version": "1.31.1",
+  "version": "1.31.2",
   "canQuit": false,                                   // true in the desktop builds
   "update": {"auto": true, "mode": "install", "why": null, "flavour": "windows", "status": "ready", "current": "1.30.0",
              "latest": "1.30.1", "error": null, "progress": null, "total": null, "checked": 1795651200, "installed": null,
