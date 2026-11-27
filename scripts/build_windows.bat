@@ -12,4 +12,4 @@ python -m PyInstaller "%ROOT%\engine\main.py" --name SaveGarage --noconsole --on
   --hidden-import sqlite3 --hidden-import ipaddress --hidden-import select --hidden-import uuid --hidden-import hashlib ^
   --hidden-import tempfile --hidden-import argparse --hidden-import contextlib --hidden-import stat --hidden-import zipfile ^
   --hidden-import runpy --hidden-import urllib.parse ^
-  --collect-all cryptography
+  --collect-all cryptography --collect-all psutil
