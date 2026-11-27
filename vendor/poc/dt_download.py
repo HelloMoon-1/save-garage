@@ -116,7 +116,7 @@ class DtChannel:
 def download_metadata(channel, output):
     """Download console catalogue."""
     sub = channel.request(0xA0, struct.pack("<Q", 11))
-    deadline = time.monotonic() + 120
+    deadline = time.monotonic() + 300  # large game libraries can take several minutes
     while True:
         result, _ = channel.response(0xA0, sub)
         if result == 0:
