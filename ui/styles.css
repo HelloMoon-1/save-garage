@@ -154,6 +154,8 @@ p { margin: 0; }
 .signin-code a.btn { text-decoration: none; }
 .callout.signin-first { align-items: center; }
 .callout.signin-first .btn { flex: none; margin-inline-start: auto; }
+.callout.skipped { margin-top: 12px; }
+.skipped-list { margin: 8px 0 0; padding-inline-start: 18px; }
 details.log { margin-top: 10px; }
 details.log summary { cursor: pointer; color: var(--text-2); font-size: 14px; }
 details.log pre { max-height: 220px; overflow: auto; background: var(--field); padding: 10px; border-radius: var(--r-input); font-size: 12px; white-space: pre-wrap; color: var(--text-2); }

@@ -253,7 +253,18 @@ def discovery_server(port, ipv6=False):
         sock.sendto(response, address)
 
 
-def console_info(hardware, product_code, np_env, version_a, version_b, data_address=None):
+# A console that sends 01000000 at bytes 52-55 of its power request (0x91/0x93) reads the newer console-info layout and
+# connects for data over IPv6; so far only hardware-3 consoles on 14.23 have sent it (issue #7: a PS5 Pro and a PS5 Slim).
+# A console that sends 00000000 gets the original reply, byte for byte: a hardware-3 PS5 Pro sending 00000000 sends
+# back with it.
+EXTENDED_FLAG = b"\x01\x00\x00\x00"
+
+
+def wants_extended(body):
+    return len(body) == 88 and struct.unpack_from("<I", body, 44)[0] == 3 and body[52:56] == EXTENDED_FLAG
+
+
+def console_info(hardware, product_code, np_env, version_a, version_b, data_address=None, extended=False):
     body = bytearray(72)
     body[:6] = bytes.fromhex(HOST_ID.decode())
     body[6] = 1
@@ -266,7 +277,7 @@ def console_info(hardware, product_code, np_env, version_a, version_b, data_addr
     address = data_address if data_address is not None else DATA_ADDRESS
     if len(address) != 16:
         raise ValueError("data address must contain 16 bytes")
-    if hardware == 3:
+    if extended:
         struct.pack_into("<H", body, 16, 0)
         struct.pack_into("<I", body, 40, version_a)
         struct.pack_into("<I", body, 48, 1)
@@ -369,7 +380,10 @@ def cache_pairing_prefix(body):
 
 def local_link_local(sock):
     """Pick the IPv6 address on the interface carrying this command connection."""
-    import psutil
+    try:
+        import psutil
+    except ImportError:
+        raise ValueError("no IPv6 data channel: the psutil package is missing (pip install -r requirements.txt)")
     local = ipaddress.ip_address(sock.getsockname()[0].split("%")[0])
     local = getattr(local, "ipv4_mapped", None) or local
     matches = []
@@ -381,7 +395,8 @@ def local_link_local(sock):
         matches = sorted({a for a in ips if a.version == 6 and a.is_link_local}, key=int)
         break
     if not matches:
-        raise ValueError("PS5 hardware 3 needs IPv6 on the network adapter used by this connection; enable IPv6 and retry")
+        raise ValueError("no IPv6 address on the network adapter used by this connection; the PS5 asked for IPv6 data, "
+                         "so turn on IPv6 for that adapter and try again")
     return matches[0].packed
 
 
@@ -415,16 +430,17 @@ def serve_command(sock, oracle_host, oracle_port, prepare_ipv6=None):
             product_code = struct.unpack_from("<I", body, 48)[0]
             version_a = struct.unpack_from("<I", body, 76)[0]
             version_b = struct.unpack_from("<I", body, 84)[0]
-            if hardware == 3:
+            extended = wants_extended(body)
+            if extended:
                 address = local_link_local(sock)
                 if prepare_ipv6 is None:
                     raise ValueError("IPv6 data listener was not configured")
                 prepare_ipv6()
-                print("[compat] hardware 3: extended console info, IPv6 data, oracle keys", flush=True)
+                print("[compat] the PS5 asked for the newer console info: IPv6 data, oracle keys", flush=True)
             else:
                 address = DATA_ADDRESS
                 print("[compat] legacy console info and data listener", flush=True)
-            response_body = console_info(hardware, product_code, body[56:73], version_a, version_b, address)
+            response_body = console_info(hardware, product_code, body[56:73], version_a, version_b, address, extended)
             result = 0
             if cmd == 0x91:
                 cache_pairing_prefix(body)

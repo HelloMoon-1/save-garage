@@ -164,7 +164,7 @@ RESTART = threading.Event()                                 # set by /api/update
 SRV = {'s': None}
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
-         'slots': [], 'readyToUpload': False, 'network': None}
+         'slots': [], 'skipped': [], 'readyToUpload': False, 'network': None}
 JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None,
        'wait': None, 'log': []}
 CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
@@ -173,9 +173,23 @@ PROC = {'p': None}
 RELAY = {'r': None}
 
 
+HOME = os.path.expanduser('~')
+CONSOLE_DIR_RE = re.compile(r'(consoles[\\/])[0-9A-Fa-f]{12}(?![0-9A-Fa-f])')
+
+
+def scrub(msg):
+    """Text for the details, which people paste into bug reports: the data folder becomes <data>, the home folder (it
+    holds the computer's user name) ~, and a PS5's ID in a consoles/ path <console>."""
+    s = str(msg)
+    for path, short in ((str(DATA), '<data>'), (HOME, '~')):
+        if len(path) > 3:
+            s = s.replace(path, short)
+    return CONSOLE_DIR_RE.sub(r'\1<console>', s)
+
+
 def log(msg):
     with LOCK:
-        JOB['log'].append({'t': round(time.time(), 1), 'm': str(msg)[:300]})
+        JOB['log'].append({'t': round(time.time(), 1), 'm': scrub(msg)[:300]})
         del JOB['log'][:-200]
 
 
@@ -234,7 +248,7 @@ def start_job(kind, fn):
     def failed(code, detail):
         log('FAIL %s %s' % (code, detail))
         with LOCK:
-            JOB.update(status='error', error={'code': code, 'detail': str(detail)[:300]}, needPower=False, accounts=None, wait=None)
+            JOB.update(status='error', error={'code': code, 'detail': scrub(detail)[:300]}, needPower=False, accounts=None, wait=None)
 
     def run():
         try:
@@ -250,7 +264,7 @@ def start_job(kind, fn):
         except Exception as e:
             log(traceback.format_exc()[-600:])
             with LOCK:
-                JOB.update(status='error', error={'code': 'internal', 'detail': repr(e)[:300]}, needPower=False, accounts=None)
+                JOB.update(status='error', error={'code': 'internal', 'detail': scrub(repr(e))[:300]}, needPower=False, accounts=None)
         finally:
             kill_proc()
     threading.Thread(target=run, daemon=True).start()
@@ -517,11 +531,63 @@ def sfo_fields(path):
     return out
 
 
+DECRYPT_TRIES = 3                       # decrypts of one slot, in all, before it is left out as unreadable
+
+
+class Unreadable(Exception):
+    """A story slot that can't be read: why is 'damaged' (GarlicSaves kept sending back a copy that isn't a save) or
+    'layout' (a save, but not laid out the way Save Garage knows)."""
+
+    def __init__(self, name, why, detail=''):
+        super().__init__('%s: %s %s' % (name, why, detail))
+        self.why = why
+
+
+def inner_name(name):
+    return 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.replace('sdimg_SAVEDATA', '')
+
+
+def damaged(name, top):
+    """Why a decrypted slot folder isn't a readable save copy, or None. GarlicSaves has sent back a damaged copy now and
+    then (issue #11: the slot's save file replaced by a 450 KB file starting with ASAV and its chives.dat missing), while
+    the same image decrypted fine before and after."""
+    f = top / inner_name(name)
+    if not f.is_file():
+        return 'no %s in it' % inner_name(name)
+    if not (top / 'sce_sys' / 'param.sfo').is_file():
+        return 'no param.sfo in it'
+    with open(f, 'rb') as fh:
+        head = fh.read(4)
+    if head != b'JSAV':
+        return 'its save file starts with %r, not JSAV' % head
+    return None
+
+
 def load_slot(sess, name, enc_path):
-    """Decrypt one save slot and read its balances."""
+    """Decrypt one save slot and read its balances. A damaged copy is asked for again, up to DECRYPT_TRIES decrypts in all;
+    raises Unreadable when the slot still can't be read."""
     dec_root = sess / 'dec'
-    top = Path(G.decrypt(str(enc_path), str(dec_root), on_status=lambda s: log('decrypt %s: %s' % (name, s))))
-    return read_slot(name, top)
+    for n in range(1, DECRYPT_TRIES + 1):
+        top = Path(G.decrypt(str(enc_path), str(dec_root), on_status=lambda s: log('decrypt %s: %s' % (name, s))))
+        problem = damaged(name, top)
+        if not problem:
+            try:
+                return read_slot(name, top)
+            except Exception as e:              # a JSAV copy laid out in a way the reader doesn't know
+                raise Unreadable(name, 'layout', repr(e))
+        log('decrypt %s: GarlicSaves sent back a damaged copy (%s)%s' % (name, problem, '; asking again' if n < DECRYPT_TRIES else ''))
+        if top.parent == dec_root and top.is_dir():
+            shutil.rmtree(top)              # so the next copy isn't mixed with this one's files
+    raise Unreadable(name, 'damaged')
+
+
+def skipped_slot(sess, name, why):
+    """How the page lists a slot left out: its file, and its title when the copy's param.sfo can be read."""
+    try:
+        subtitle = sfo_fields(sess / 'dec' / name / 'sce_sys' / 'param.sfo').get('SUBTITLE', '')
+    except Exception:
+        subtitle = ''
+    return {'file': name, 'subtitle': subtitle if isinstance(subtitle, str) else '', 'why': why}
 
 
 # sce_sdmemory is the game's autosave (what Continue loads); its memory.dat has the same format as manual saves
@@ -530,7 +596,7 @@ SLOT_RE = re.compile(r'sdimg_(SAVEDATASARC\d+|sce_sdmemory)')
 
 def read_slot(name, top):
     """Read a save slot's balances from its decrypted folder."""
-    inner = 'memory.dat' if name == 'sdimg_sce_sdmemory' else name.replace('sdimg_SAVEDATA', '')
+    inner = inner_name(name)
     f = top / inner
     if not f.is_file():
         raise Fail('unexpected_save_layout', name)
@@ -731,11 +797,19 @@ def restore_session():
             break
     else:
         return
-    slots = []
+    slots, skipped = [], []
     for f in sorted((lib / 'Saves' / owner / title).glob('sdimg_*')):
         top = sess / 'dec' / f.name
         if SLOT_RE.fullmatch(f.name) and top.is_dir():
-            s = read_slot(f.name, top)
+            why = 'damaged' if damaged(f.name, top) else None
+            if not why:
+                try:
+                    s = read_slot(f.name, top)
+                except Exception:
+                    why = 'layout'
+            if why:                             # left out when it was downloaded, as job_download does
+                skipped.append(skipped_slot(sess, f.name, why))
+                continue
             orig = sess / 'orig' / f.name
             s['modified'] = orig.is_file() and orig.read_bytes() != f.read_bytes()   # the transfer library already holds an edited save
             ed = sess / 'mod' / (f.name + '.edits.json')                  # edits applied before a restart
@@ -749,7 +823,8 @@ def restore_session():
         return
     with LOCK:
         STATE.update(session=str(sess), user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
-                     slots=slots, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
+                     slots=slots, skipped=skipped, readyToUpload=any(s['modified'] for s in slots),
+                     fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
 
@@ -908,15 +983,23 @@ def job_download():
     for f in imgs:
         shutil.copyfile(f, sess / 'orig' / f.name)
     stage('decrypting')
-    slots = []
+    slots, skipped = [], []
     for f in imgs:
         if SLOT_RE.fullmatch(f.name):
-            slots.append(load_slot(sess, f.name, f))
+            try:
+                slots.append(load_slot(sess, f.name, f))
+            except Unreadable as u:             # left as it is: the PS5 gets its own copy back unchanged
+                log('%s: left out, it can\'t be read (%s)' % (f.name, u))
+                skipped.append(skipped_slot(sess, f.name, u.why))
     if not slots:
+        if skipped:
+            raise Fail('decrypt_bad' if any(s['why'] == 'damaged' for s in skipped) else 'save_layout_changed',
+                       ', '.join(s['file'] for s in skipped))
         raise Fail('no_story_slot')
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, readyToUpload=False, fileCount=len(imgs))
+        STATE.update(session=str(sess), user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, skipped=skipped,
+                     readyToUpload=False, fileCount=len(imgs))
     stage('ready')
 
 
@@ -1006,6 +1089,10 @@ def job_upload():
             continue
         if 'session ended' in low or 'connection ended' in low or 'traceback' in low or 'error' in low:
             refused_key_request(t0)             # a channel closed because GarlicSaves turned its key request down
+        if 'no ipv6 address on the network adapter' in low:
+            raise Fail('ipv6_needed', line)     # the PS5 asked for IPv6 data (issue #7) and this adapter has none
+        if 'psutil package is missing' in low:
+            raise Fail('tool_failed', line)     # a source checkout that predates the psutil requirement
         if '[tcp] connection from' in low:
             stage('console_connected', hint=None)
         elif 'gfp5 id=' in low and files == 0:
@@ -1192,7 +1279,7 @@ class H(BaseHTTPRequestHandler):
                     raise Fail('console_not_found')
                 with LOCK:
                     STATE['console'] = {'host': c['host'], 'name': c['name'], 'hostId': c['hostId'], 'firmware': c['firmware']}
-                    STATE.update(session=None, slots=[], readyToUpload=False, user=None, entryId=None)
+                    STATE.update(session=None, slots=[], skipped=[], readyToUpload=False, user=None, entryId=None)
                     refresh_paired()
                     try:
                         restore_session()

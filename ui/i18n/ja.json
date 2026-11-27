@@ -1458,5 +1458,16 @@
 "The bank will be set to ${0}, all in its own money boxes, when you save edits.": "編集を保存すると、銀行の残高は${0}になり、全額が銀行専用のマネーボックスに入ります。",
 "Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "最大${0}：ストーリーの現時点で、銀行専用のマネーボックスに入る額です。その全額をショップで使えます。上限はストーリーの進行とともに増えます。",
 "${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "銀行の${1}のうち${0}は追加の束に入っていて、ゲーム内で使えない可能性があります。銀行の残高を${2}以下にすれば、全額を使える状態に保てます。",
-"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "最大${0}。${1}を超える分は追加の束に入り、ゲーム内で使えない可能性があります。あるプレイヤーは、この束のお金で電話での支払いができませんでした。それで問題ない場合にだけ使ってください。"
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "最大${0}。${1}を超える分は追加の束に入り、ゲーム内で使えない可能性があります。あるプレイヤーは、この束のお金で電話での支払いができませんでした。それで問題ない場合にだけ使ってください。",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again.": "GarlicSavesにもう一度復号を依頼しても、このダウンロードのセーブデータはどれも読み込めませんでした。",
+"The saves on your PS5 are fine.": "PS5のセーブデータは無事です。",
+"Wait a few minutes, then download again.": "数分待ってから、もう一度ダウンロードしてください。",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5.": "このPS5はIPv6でセーブデータを送り返しますが、このコンピューターがPS5との通信に使っているネットワークアダプターにはIPv6アドレスがありません。",
+"Turn on IPv6 for that adapter, then send the save again.": "そのアダプターでIPv6を有効にしてから、もう一度セーブデータを送ってください。",
+"Save Garage couldn’t read these saves, so they can’t be edited this time.": "Save Garageはこれらのセーブデータを読み込めなかったため、今回は編集できません。",
+"They stay on the PS5 as they are, and you can edit the other saves as usual.": "PS5上ではそのまま残り、ほかのセーブデータはいつもどおり編集できます。",
+"Downloading again later may help.": "あとでもう一度ダウンロードすると直ることがあります。",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "GarlicSavesにもう一度復号を依頼しても、このダウンロードのセーブデータはどれも読み込めませんでした。PS5のセーブデータは無事です。数分待ってから、もう一度ダウンロードしてください。",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "このPS5はIPv6でセーブデータを送り返しますが、このコンピューターがPS5との通信に使っているネットワークアダプターにはIPv6アドレスがありません。そのアダプターでIPv6を有効にしてから、もう一度セーブデータを送ってください。",
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garageはこれらのセーブデータを読み込めなかったため、今回は編集できません。PS5上ではそのまま残り、ほかのセーブデータはいつもどおり編集できます。あとでもう一度ダウンロードすると直ることがあります。"
 }

@@ -1458,5 +1458,16 @@
 "The bank will be set to ${0}, all in its own money boxes, when you save edits.": "保存修改时，银行余额会设为 ${0}，全部放在银行自己的资金箱里。",
 "Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "最多 ${0}：即剧情当前阶段银行自己的资金箱能容纳的金额。这些钱都可以在商店里花。上限会随剧情推进而提高。",
 "${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "银行里的 ${1} 中，有 ${0} 位于额外的资金叠里，游戏可能不让你花。把银行余额设为 ${2} 或更少，所有钱都能花。",
-"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "最多 ${0}。超过 ${1} 的部分会放进额外的资金叠，游戏可能不让你花：有玩家用这些钱无法完成电话付款。只有在你能接受这一点时才使用。"
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "最多 ${0}。超过 ${1} 的部分会放进额外的资金叠，游戏可能不让你花：有玩家用这些钱无法完成电话付款。只有在你能接受这一点时才使用。",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again.": "即使再次请 GarlicSaves 解密，这次下载中的存档仍然都无法读取。",
+"The saves on your PS5 are fine.": "你 PS5 上的存档没有问题。",
+"Wait a few minutes, then download again.": "请等几分钟，然后重新下载。",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5.": "这台 PS5 通过 IPv6 传回存档，但这台电脑用来连接 PS5 的网络适配器没有 IPv6 地址。",
+"Turn on IPv6 for that adapter, then send the save again.": "请为该适配器开启 IPv6，然后重新传回存档。",
+"Save Garage couldn’t read these saves, so they can’t be edited this time.": "Save Garage 无法读取这些存档，所以这次不能编辑它们。",
+"They stay on the PS5 as they are, and you can edit the other saves as usual.": "它们会原样保留在 PS5 上，其他存档可以照常编辑。",
+"Downloading again later may help.": "稍后重新下载可能会解决。",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "即使再次请 GarlicSaves 解密，这次下载中的存档仍然都无法读取。你 PS5 上的存档没有问题。请等几分钟，然后重新下载。",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "这台 PS5 通过 IPv6 传回存档，但这台电脑用来连接 PS5 的网络适配器没有 IPv6 地址。请为该适配器开启 IPv6，然后重新传回存档。",
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage 无法读取这些存档，所以这次不能编辑它们。它们会原样保留在 PS5 上，其他存档可以照常编辑。稍后重新下载可能会解决。"
 }

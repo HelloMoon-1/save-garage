@@ -1458,5 +1458,16 @@
 "The bank will be set to ${0}, all in its own money boxes, when you save edits.": "수정 사항을 저장하면 은행 금액을 ${0}에 맞추고, 전부 은행 자체 돈 상자에 넣어요.",
 "Up to ${0}: what the bank’s own money boxes hold at this point in the story. Shops can spend all of it. The limit grows as the story goes on.": "최대 ${0}: 스토리의 현재 시점에서 은행 자체 돈 상자에 들어가는 금액이에요. 이 돈은 모두 상점에서 쓸 수 있어요. 한도는 스토리가 진행될수록 늘어나요.",
 "${0} of the ${1} in the bank sits in extra stacks the game may not let you spend. Setting the bank to ${2} or less keeps everything spendable.": "은행에 있는 ${1} 중 ${0}만큼은 추가 묶음에 들어 있어서 게임에서 쓰지 못할 수도 있어요. 은행 금액을 ${2} 이하로 설정하면 모든 돈을 쓸 수 있어요.",
-"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "최대 ${0}. ${1} 초과 금액은 추가 묶음에 들어가서 게임에서 쓰지 못할 수도 있어요. 한 플레이어는 이 돈으로 전화 결제를 하지 못했어요. 괜찮은 경우에만 사용하세요."
+"Up to ${0}. Amounts above ${1} go into extra stacks the game may not let you spend: a player couldn’t make a phone payment with them. Use it only if you’re fine with that.": "최대 ${0}. ${1} 초과 금액은 추가 묶음에 들어가서 게임에서 쓰지 못할 수도 있어요. 한 플레이어는 이 돈으로 전화 결제를 하지 못했어요. 괜찮은 경우에만 사용하세요.",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again.": "GarlicSaves에 다시 복호화를 요청했지만 이 다운로드의 세이브를 하나도 읽지 못했어요.",
+"The saves on your PS5 are fine.": "PS5에 있는 세이브는 안전해요.",
+"Wait a few minutes, then download again.": "몇 분 기다린 뒤 다시 다운로드하세요.",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5.": "이 PS5는 IPv6로 세이브를 돌려보내는데, 이 컴퓨터가 PS5와 통신할 때 쓰는 네트워크 어댑터에 IPv6 주소가 없어요.",
+"Turn on IPv6 for that adapter, then send the save again.": "그 어댑터에서 IPv6를 켠 뒤 세이브를 다시 보내세요.",
+"Save Garage couldn’t read these saves, so they can’t be edited this time.": "Save Garage가 이 세이브들을 읽지 못해서 이번에는 편집할 수 없어요.",
+"They stay on the PS5 as they are, and you can edit the other saves as usual.": "PS5에는 그대로 남아 있고, 다른 세이브는 평소처럼 편집할 수 있어요.",
+"Downloading again later may help.": "나중에 다시 다운로드하면 해결될 수 있어요.",
+"None of the saves in this download could be read, even after asking GarlicSaves to decrypt them again. The saves on your PS5 are fine. Wait a few minutes, then download again.": "GarlicSaves에 다시 복호화를 요청했지만 이 다운로드의 세이브를 하나도 읽지 못했어요. PS5에 있는 세이브는 안전해요. 몇 분 기다린 뒤 다시 다운로드하세요.",
+"This PS5 sends saves back over IPv6, but this computer has no IPv6 address on the network adapter it uses for the PS5. Turn on IPv6 for that adapter, then send the save again.": "이 PS5는 IPv6로 세이브를 돌려보내는데, 이 컴퓨터가 PS5와 통신할 때 쓰는 네트워크 어댑터에 IPv6 주소가 없어요. 그 어댑터에서 IPv6를 켠 뒤 세이브를 다시 보내세요.",
+"Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.": "Save Garage가 이 세이브들을 읽지 못해서 이번에는 편집할 수 없어요. PS5에는 그대로 남아 있고, 다른 세이브는 평소처럼 편집할 수 있어요. 나중에 다시 다운로드하면 해결될 수 있어요."
 }
