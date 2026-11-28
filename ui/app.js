@@ -52,6 +52,11 @@
     console_timeout: 'The PS5 didn’t answer. Go back to the PS5 home screen, make sure no other tool is using Data Transfer, and try again.',
     console_rejected: 'The PS5 refused the request. Sign in with the account you paired with, or pair again.',
     no_gta_save: 'No GTA VI save was found on the PS5. Save once in the game, then try again.',
+    invalid_recovery_file: 'Select a complete, compatible decrypted story file (SARC or memory.dat), up to 32 MiB.',
+    incomplete_backup: 'The local backup is incomplete. Keep the saves on your PS5 and download them again.',
+    recovery_import_failed: 'The recovered image failed verification. Your previous local session is still available.',
+    recovery_interrupted: 'Recovery stopped before the new session was saved.',
+    upload_incomplete: 'Only part of the transfer was confirmed. Keep your local backup and retry the transfer.',
     no_story_slot: 'No story save was found. Save once in story mode, then try again.',
     // sending to another account on the PS5: GarlicSaves' resign failed, or the copy didn't check out (nothing was sent)
     resign_failed: 'GarlicSaves couldn’t sign the saves for the other account, so nothing was sent. Try again in a minute.',
@@ -128,7 +133,7 @@
     internal: 'Something went wrong while signing in. Try again.'};
   const signinError = s => (SIGNIN_ERR[s.error] || SIGNIN_ERR.internal).replace('{0}', Number.isInteger(s.http) ? s.http : '?');
   // the step to come back to after signing in, for a job that needs the sign-in
-  const SIGNIN_BACK = {pair: 'pair', download: 'download', patch: 'edit', upload: 'send', restore: 'send'};
+  const SIGNIN_BACK = {pair: 'pair', download: 'download', patch: 'edit', recover: 'edit', upload: 'send', restore: 'send'};
   // a sign-in link GarlicSaves gave (the server only passes on http and https addresses; checked again here)
   const webLink = v => typeof v === 'string' && /^https?:\/\/[!-~]+$/i.test(v) ? v : null;
 
@@ -150,8 +155,9 @@
   // ------------------------------------------------------------ api
   async function api(path, body) {
     const post = body !== undefined;
+    const binary = body instanceof Blob;
     const r = await fetch(path, post
-      ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: AbortSignal.timeout(90000)}
+      ? {method: 'POST', headers: {'Content-Type': binary ? 'application/octet-stream' : 'application/json'}, body: binary ? body : JSON.stringify(body), signal: AbortSignal.timeout(90000)}
       : {cache: 'no-store', signal: AbortSignal.timeout(30000)});
     let data = null;
     try { data = await r.json(); } catch { /* empty body */ }
@@ -183,7 +189,7 @@
   }
 
   // ------------------------------------------------------------ state
-  const slotsSig = st => (st.slots || []).map(s => s.file + ':' + s.revision).join('|') + '|' + st.entryId;
+  const slotsSig = st => (st.slots || []).map(s => s.file + ':' + s.revision).join('|') + '|' + st.entryId + '|' + st.selectionId;
   const slotOf = file => (S.state?.slots || []).find(s => s.file === file);
   const running = () => S.state?.job?.status === 'running';
   const label = s => s.file === 'sdimg_sce_sdmemory' ? 'Autosave' : 'Manual save';
@@ -227,7 +233,8 @@
     if (sig !== S.sig) {                         // new download: forget per-save data
       S.sig = sig; S.known = {}; S.detail = {}; S.stats = {}; S.comp = {}; S.world = {}; S.sd = {}; S.stuntSel = {}; S.stuntKeys = {}; S.drafts = {};
       const slots = sortedSlots(st);
-      S.slot = slots.length ? slots[0].file : null;
+      S.deleted = false;
+      S.slot = job.kind === 'recover' && slots.some(x => x.file === S.slot) ? S.slot : slots[0]?.file || null;
     }
     S.state = st;
     if (!S.loginStep && st.garlic?.signedIn) showLoginStep();
@@ -268,7 +275,8 @@
     const msg = {pair: 'PS5 paired. Next: download your save.', download: 'Save downloaded. Pick what to change.',
                  patch: 'Edits saved. Send the save back when you’re done.',
                  restore: 'Originals are back in place. Send them to the PS5 to undo your edits.', upload: 'Save sent to the PS5.'}[job.kind];
-    if (job.kind === 'patch') passed('Edits saved', 'Ready to send back to your PS5');
+    if (job.kind === 'recover') toast(T('The recovered slot is ready. Review the transfer before deleting anything on your PS5.'));
+    else if (job.kind === 'patch') passed('Edits saved', 'Ready to send back to your PS5');
     else if (job.kind === 'upload') passed('Save delivered', 'Load it in GTA VI to check your changes');
     else if (msg) toast(msg);
     if (job.kind === 'pair' || job.kind === 'download') S.manualView = null;
@@ -370,7 +378,7 @@
     const view = viewFor(st);
     const job = st.job || {};
     const s = slotOf(S.slot);
-    const key = [view, st.console?.host, st.paired, st.hasSession, S.sig, st.selectionId, (st.slots || []).map(x => +!!x.excluded).join(''), st.readyToUpload, st.resumeDownload, running(),
+    const key = [view, st.console?.host, st.paired, st.hasSession, st.backupReady, S.sig, st.selectionId, (st.slots || []).map(x => +!!x.excluded).join(''), st.readyToUpload, st.resumeDownload, running(),
       view === 'edit' ? [S.slot, S.tab, S.detail[S.slot] ? 1 : 0, S.stats[S.slot] ? 1 : 0, s?.modified, JSON.stringify(s?.applied || null)].join(',') : '',
       view === 'connect' ? [S.searching, JSON.stringify(S.consoles)].join(',') : '',
       view === 'send' ? [job.kind === 'upload' && job.stage === 'uploaded', (st.slots || []).map(x => x.modified).join(''),
@@ -521,6 +529,7 @@
         <p>The PS5 restarts into transfer mode during the download and restarts again when it’s done.</p></section>
       <div class="stack">
         ${signinFirst('download')}
+        <details><summary>Recover a decrypted story save</summary><p>Keep a separate copy of your decrypted file. If your PS5 has no story slots, create a new manual save on the receiving account and download it here first.</p></details>
         ${again ? '<div class="callout">You already have a save downloaded. Downloading again replaces it here, and edits you haven’t sent are lost.</div>' : ''}
         <ol class="how">
           <li><strong>In GTA VI, save your game, then go back to the PS5 home screen.</strong></li>
@@ -583,9 +592,13 @@
         <p>${moneySummary(s) || 'No money balances in this save'}.${overallOf(s) != null ? ` 100% completion: <strong>${nf2.format(overallOf(s))}%</strong>${afterOf(s) != null ? `, <strong class="gold">${nf2.format(afterOf(s))}%</strong> after your edits` : ''}.` : ''}${s.file === 'sdimg_sce_sdmemory' ? ' Continue in the game loads this save.' : ''}${s.modified ? ' This save has edits waiting to be sent.' : ''}</p></section>
       <div class="saves" role="group" aria-label="Choose a save">${sortedSlots(st).map(x => `
         <button class="save" data-act="slot" data-file="${esc(x.file)}" aria-pressed="${x.file === s.file}">
-          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span><small>${saveTime(x) || '<span>Save time unavailable</span>'}</small>${x.excluded ? '<span class="m">Marked for deletion</span>' : x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
+          <span class="k">${label(x)}</span><span class="t" data-no-i18n>${esc(missionName(x))}</span><small>${saveTime(x) || '<span>Save time unavailable</span>'}</small>${x.excluded ? '<span class="m">Marked for deletion</span>' : x.recovered ? '<span class="m">Recovered story progress</span>' : x.modified ? '<span class="m">Edited</span>' : ''}</button>`).join('')}</div>
       <div class="row"><button class="btn" data-act="exclude-slot" ${running() ? 'disabled' : ''}>${s.excluded ? 'Undo slot deletion' : 'Delete this slot on next transfer'}</button>
         ${st.readyToUpload ? '<button class="link" data-act="go" data-view="send">Review transfer</button>' : ''}</div>
+      <details><summary>Recover a decrypted story save</summary>
+        <p>Choose the SARC0000, SARC0001 or memory.dat file from your old dec folder. GarlicSaves will package its story progress for the selected slot. The slot label may still show the template mission.</p>
+        <label><span>Choose a decrypted file</span> <input type="file" data-recover-slot="${esc(s.file)}" data-selection="${esc(st.selectionId)}" ${running() || s.excluded ? 'disabled' : ''}></label></details>
+      ${jobBox('recover')}
       ${(st.skipped || []).length ? `<div class="callout skipped"><div>Save Garage couldn’t read these saves, so they can’t be edited this time. They stay on the PS5 as they are, and you can edit the other saves as usual. Downloading again later may help.<ul class="skipped-list">${st.skipped.map(x => `
         <li><span>${label(x)}</span>: <span data-no-i18n>${esc(skippedName(x))}</span></li>`).join('')}</ul></div></div>` : ''}
       <div class="editor">
@@ -1879,19 +1892,23 @@
     const total = Math.max(st.fileCount || 0, all.length);
     const allList = all.length ? `<div class="panel"><h3>Files in this transfer</h3>
       <p class="detail" style="margin:6px 0 10px">Slots marked for deletion will be omitted. The original backups stay on this computer.</p>
-      <ul class="review" style="max-height:none;margin-top:8px">${all.map(x => `<li><span>${esc(label(x))}: ${esc(missionName(x))}</span><span>${x.excluded ? T('Marked for deletion') : x.modified ? 'edited' : 'unchanged'}</span></li>`).join('')}${total > all.length ? `<li><span>${total - all.length} other file${total - all.length > 1 ? 's' : ''}</span><span>unchanged</span></li>` : ''}</ul></div>` : '';
+      <ul class="review" style="max-height:none;margin-top:8px">${all.map(x => `<li><span>${esc(label(x))}: ${esc(missionName(x))}</span><span>${x.excluded ? T('Marked for deletion') : x.recovered ? T('Recovered story progress') : x.modified ? 'edited' : 'unchanged'}</span></li>`).join('')}${total > all.length ? `<li><span>${total - all.length} other file${total - all.length > 1 ? 's' : ''}</span><span>unchanged</span></li>` : ''}</ul></div>` : '';
+    if (st.backupReady === false) return `<section class="title-card"><h1>Send your save back</h1><p>${esc(T(ERR.incomplete_backup))}</p><button class="btn" data-act="go" data-view="download">Download save</button></section>`;
     if (done) {
       return `<section class="title-card"><span class="chip">Done</span><h1>Your save is back on the PS5</h1>
           <p>Start GTA VI and load the save you edited. Check the values in the game before you play on.</p></section>
         <div class="stack">
           <div class="panel stack"><h3>If the save won’t load</h3>
-            <ol class="how"><li><strong>Delete the GTA VI save on the PS5 again.</strong><span class="path">${PS5_DELETE}.</span></li>
+            <ol class="how"><li><strong>Prepare the originals on this computer first.</strong></li>
               <li><strong>Click Put the originals back.</strong><span class="path">This swaps your untouched saves back in.</span></li>
-              <li><strong>Send the save to the PS5 again from this page.</strong></li></ol>
+              <li><strong>After the originals are ready, follow the transfer checklist.</strong></li></ol>
             <div class="row"><button class="btn danger" data-act="restore" ${running() ? 'disabled' : ''}>Put the originals back</button>
               <button class="btn" data-act="go" data-view="edit">Edit more</button></div></div>
           ${jobBox('restore')}
         </div>`;
+    }
+    if (job.kind === 'upload' && job.status === 'running') {
+      return `<section class="title-card"><h1>Send your save back</h1></section>${jobBox('upload')}`;
     }
     if (!st.readyToUpload && !target) {
       return `<section class="title-card"><span class="chip">Step ${stepNo('send', st)}</span><h1>Nothing to send yet</h1><p>Save some edits first. They’ll wait here until you send them.</p></section>
@@ -1902,6 +1919,7 @@
         <p>Check which slots will be sent before deleting the GTA VI save on your PS5.</p></section>
       <div class="stack">
         ${accountChoice(st)}
+        ${target ? '<div class="callout">Before deleting anything on the receiving account, back up its own GTA VI saves separately. This download contains the source account’s saves.</div>' : ''}
         ${summary}
         ${allList}
         <ol class="how">
@@ -2031,7 +2049,7 @@
               <div class="row">${job.accounts.map(a => `<button class="btn primary" data-act="choose-account" data-owner="${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
               <div class="detail">These accounts each have a GTA VI save on this PS5.</div></div>` : ''}
             ${uploadNetworkHelp(job.hint)}
-            ${job.hint === 'console_has_save' ? '<div class="callout" style="margin-top:12px">The PS5 still has a GTA VI save, so it has nothing to receive. Delete the save on the PS5, then open Data Transfer again.</div>' : ''}
+            ${job.hint === 'upload_no_files_yet' ? '<div class="callout" role="status"><strong>The PS5 ended the transfer session before the first save file finished.</strong><div>If the PS5 shows transfer progress, let it finish. Otherwise, open Data Transfer again on the receiving account, select Save Garage, then select User Data and start the transfer.</div></div>' : ''}
             ${['waiting_console', 'pair_waiting_console', 'connecting', 'key_retry', 'key_rate_wait', 'need_power', 'choose_account'].includes(job.stage) ? '<div class="row" style="margin-top:10px"><button class="link" data-act="cancel">Cancel</button></div>' : ''}
             ${serviceQueue(job)}${logBlock(job)}</div>`;
         } else if (job.status === 'error') {
@@ -2555,6 +2573,19 @@
 
   document.addEventListener('change', e => {
     const el = e.target;
+    if (el.hasAttribute('data-recover-slot')) {
+      const file = el.files[0];
+      el.value = '';
+      if (!file) return;
+      if (mustSignIn(S.state)) { goSignIn('edit'); return; }
+      if (!file.size || file.size > 32 * 1024 * 1024) { toast(T(ERR.invalid_recovery_file)); return; }
+      const name = el.dataset.recoverSlot;
+      const slot = slotOf(name);
+      if (!slot || !confirm(file.name + ' → ' + missionName(slot) + ' (' + name + ')\n' +
+          T('Import this file into the selected slot in a separate local copy? Unsaved editor changes will be cleared. Your PS5 is only updated when you send the save.'))) return;
+      act('/api/recover-slot?' + new URLSearchParams({file: name, selectionId: el.dataset.selection}), file);
+      return;
+    }
     if (el.hasAttribute('data-map-reference')) { importMapReference(S.slot, el.files[0]); el.value = ''; return; }
     if (el.dataset.gun && el.type === 'checkbox') onGun(el);
     if (el.dataset.stacks && el.type === 'checkbox') onStacks(el);

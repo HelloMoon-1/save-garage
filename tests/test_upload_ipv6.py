@@ -62,31 +62,65 @@ class LocalIPv6Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'could not read Windows network adapters'):
                 dt_source.local_link_local(self.sock)
 
-    def test_repeated_control_disconnects_then_data_connection(self):
-        retry = ['[tcp] connection from console', '[compat] the PS5 asked for the newer console info',
-                 '[cmd] session ended: connection closed after 0/24 bytes']
-        lines = retry * 2 + ['[data] connection from console'] + retry * 2
-        lines += ['GFP5 file complete', 'response complete cmd=0xb3', 'response complete cmd=0x94']
+    def upload_stages(self, lines, ended=True, error='upload_failed', count=1):
         with TemporaryDirectory() as directory, ExitStack() as stack:
             upload = Path(directory) / 'upload'
             upload.mkdir()
-            (upload / 'generated-upload-manifest.json').write_text('{"slot":{"files":["test"]}}')
+            records = [{'path': 'save' + str(i), 'size': 8} for i in range(count)]
+            (upload / 'generated-upload-manifest.json').write_text(json.dumps({'1': {'files': records}}))
             state = {'session': directory, 'console': {'hostId': 'id', 'host': 'example', 'firmware': '0'},
-                     'slots': [], 'user': {'name': 'example', 'id': '1'}, 'entryId': 1}
+                     'title': 'game', 'slots': [], 'user': {'name': 'example', 'id': '1'}, 'entryId': 1}
             stack.enter_context(patch.dict(app.STATE, state))
             stack.enter_context(patch.dict(app.JOB))
-            for name in ('run_tool', 'prefix_path', 'relay', 'refused_key_request', 'log'):
+            for name in ('run_tool', 'backup_ready', 'prefix_path', 'relay', 'refused_key_request', 'log'):
                 stack.enter_context(patch.object(app, name))
             stack.enter_context(patch.object(app.time, 'sleep'))
             stack.enter_context(patch.object(app, 'spawn', return_value=SimpleNamespace(stdout=lines)))
-            stages = stack.enter_context(patch.object(app, 'stage'))
-            app.job_upload()
-        calls = stages.call_args_list
-        warnings = [i for i, call in enumerate(calls) if (call.kwargs.get('hint') or {}).get('code') == 'ipv6_data_unreached']
+            stages = stack.enter_context(patch.object(app, 'stage', wraps=app.stage))
+            if ended:
+                app.job_upload()
+            else:
+                with self.assertRaises(app.Fail) as failure:
+                    app.job_upload()
+                self.assertEqual(failure.exception.code, error)
+                self.assertFalse((Path(directory) / 'uploaded').exists())
+        return stages.call_args_list
+
+    def test_empty_control_close_waits_without_prompting_to_delete(self):
+        close = '[cmd] response complete cmd=0x94'
+        calls = self.upload_stages([close], ended=False)
+        self.assertEqual(calls[-1].args, ('waiting_console',))
+        self.assertEqual(calls[-1].kwargs, {'hint': 'upload_no_files_yet'})
+
+    def test_file_activity_clears_empty_close_hint_on_retry(self):
+        lines = ['[cmd] response complete cmd=0x94', '[data] GFP5 id=1 type=0 path=save size=8',
+                 '[data] GFP5 file complete id=1 bytes=8 path=save0', '[cmd] response complete cmd=0xb3',
+                 '[cmd] response complete cmd=0x94']
+        calls = self.upload_stages(lines)
+        self.assertTrue(any(c.args == ('transferring',) and c.kwargs == {'hint': None} for c in calls))
+        self.assertEqual(calls[-1].args, ('uploaded',))
+
+    def test_repeated_control_disconnects_then_data_connection(self):
+        retry = ['[tcp] connection from console', '[compat] the PS5 asked for the newer console info',
+                 '[cmd] session ended: connection closed after 0/24 bytes']
+        lines = retry * 2 + ['[cmd] response complete cmd=0x94', '[data] connection from console'] + retry * 2
+        lines += ['GFP5 file complete id=1 bytes=8 path=save0', 'response complete cmd=0xb3', 'response complete cmd=0x94']
+        calls = self.upload_stages(lines)
+        warnings = [i for i, call in enumerate(calls) if isinstance(call.kwargs.get('hint'), dict)
+                    and call.kwargs['hint'].get('code') == 'ipv6_data_unreached']
         self.assertEqual(len(warnings), 1)
+        self.assertFalse(any(call.kwargs.get('hint') == 'upload_no_files_yet' for call in calls))
         self.assertTrue(any(call.args == ('console_connected',) and call.kwargs == {'hint': None}
                             for call in calls[warnings[0]+1:]))
         self.assertEqual(calls[-1].args, ('uploaded',))
+
+    def test_duplicate_completion_cannot_cover_a_missing_slot(self):
+        complete = 'GFP5 file complete id=1 bytes=8 path=save0'
+        self.upload_stages([complete, complete, 'response complete cmd=0xb3', 'response complete cmd=0x94'],
+                           ended=False, error='upload_incomplete', count=2)
+
+    def test_short_file_cannot_complete_transfer(self):
+        self.upload_stages(['GFP5 file complete id=1 bytes=7 path=save0'], ended=False, error='upload_incomplete')
 
     def test_unknown_interface_and_unrelated_messages(self):
         with patch('psutil.net_if_addrs', return_value={}):

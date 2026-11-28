@@ -345,7 +345,7 @@ def send_save_chunks(sock, key, nonce, sequence, file_type, file_id):
                             sequence += 1
                             sent += len(chunk)
                             print(f"[data] GFP5 chunk id={file_id} offset={sent} bytes={len(chunk)}", flush=True)
-                    print(f"[data] GFP5 file complete id={file_id} bytes={sent}", flush=True)
+                    print(f"[data] GFP5 file complete id={file_id} bytes={sent} path={entry['path']}", flush=True)
                 except Exception as exc:
                     print(f"[data] GFP5 stream error id={file_id} offset={sent} error={exc}", flush=True)
                     raise

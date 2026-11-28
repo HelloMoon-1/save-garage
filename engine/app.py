@@ -7,6 +7,7 @@ from pathlib import Path
 from contextlib import contextmanager, ExitStack
 from urllib.parse import urlsplit, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import tempfile, filecmp
 import money, garlic, savedit, service_rank, updater
 
 FROZEN = getattr(sys, 'frozen', False)
@@ -26,7 +27,8 @@ else:
 DATA = APP_SUPPORT / 'MoonSlot' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.32.1'
+VERSION = '1.32.2'
+MAX_RECOVERY = 32 * 1024 * 1024
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -1216,6 +1218,8 @@ def restore_session(resume=False):
                 continue
             orig = sess / 'orig' / f.name
             s['modified'] = orig.is_file() and orig.read_bytes() != f.read_bytes()   # the transfer library already holds an edited save
+            s['recovered'] = (sess / 'before-recovery' / f.name).is_file()
+            s['modified'] |= s['recovered']
             ed = sess / 'mod' / (f.name + '.edits.json')                  # edits applied before a restart
             if s['modified'] and ed.is_file():
                 try:
@@ -1404,6 +1408,7 @@ def job_download():
     (sess / 'orig').mkdir()
     for f in imgs:
         shutil.copyfile(f, sess / 'orig' / f.name)
+    (sess / 'orig' / 'sizes.json').write_text(json.dumps({f.name: f.stat().st_size for f in imgs}), 'utf-8')
     (sess / 'download-entry.txt').write_text(str(e['id']), 'utf-8')
     images = [f for f in imgs if SLOT_RE.fullmatch(f.name)]
     with LOCK:
@@ -1460,6 +1465,16 @@ def job_patch(slot_file, edits):
         shutil.rmtree(mod)
     shutil.copytree(slot['dir'], mod)
     (mod / slot['inner']).write_bytes(data)
+    encrypt_and_import(sess, slot, mod)
+    (sess / 'mod' / (slot['file'] + '.edits.json')).write_text(json.dumps(edits), 'utf-8')
+    with LOCK:
+        slot['modified'] = True; slot['applied'] = edits; slot['changes'] = summarize(plog)
+        STATE['readyToUpload'] = True
+    stage('ready_to_upload')
+
+
+def encrypt_and_import(sess, slot, mod):
+    (sess / 'mod').mkdir(exist_ok=True)
     z = sess / 'mod' / (slot['file'] + '.zip')
     with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for root, ds, fs in os.walk(mod):
@@ -1476,10 +1491,108 @@ def job_patch(slot_file, edits):
                         on_job=lambda jid: remember_service_job(slot['file'], jid))
     stage('importing')
     run_tool(['poc.dt_local_saves', 'import', str(sess / 'lib'), str(STATE['entryId']), slot['file'], out])
-    (sess / 'mod' / (slot['file'] + '.edits.json')).write_text(json.dumps(edits), 'utf-8')
+    return Path(out)
+
+
+def backup_ready(sess, user, title, entry_id):
+    """Check the working set and local originals against the download manifest before suggesting deletion."""
+    try:
+        manifest = json.loads((sess / 'lib/Transfer-Metadata/manifest.json').read_text('utf-8'))
+        records = manifest[str(entry_id)]['files']
+        live = sess / 'lib/Saves' / user / title
+        sizes_path = sess / 'orig/sizes.json'
+        original_sizes = json.loads(sizes_path.read_text('utf-8')) if sizes_path.is_file() else {}
+        names = set()
+        for row in records:
+            name = row['file']
+            if not name.startswith('sdimg_') or Path(name).name != name or name in names:
+                return False
+            names.add(name)
+            size = int(row['size'])
+            backup_size = int(original_sizes.get(name, size))
+            if min(size, backup_size) <= 0 or (live / name).stat().st_size != size or (sess / 'orig' / name).stat().st_size != backup_size:
+                return False
+        if original_sizes and names != set(original_sizes):
+            return False
+        return bool(names) and names == {p.name for p in live.glob('sdimg_*')} == {p.name for p in (sess / 'orig').glob('sdimg_*')}
+    except (OSError, KeyError, ValueError, TypeError):
+        return False
+
+
+def validate_recovery(data, template):
+    try:
+        if not 16 <= len(data) <= MAX_RECOVERY or data[:4] != b'JSAV' or data[:8] != template[:8]:
+            raise ValueError
+        count = sum(struct.unpack_from('<II', data, 8))
+        end = 16 + count * 20
+        if not 0 < count <= 4096 or end > len(data):
+            raise ValueError
+        ids = set()
+        for section, _, _, start, size in struct.iter_unpack('<IIIII', data[16:end]):
+            if section in ids or start < end or not size or start + size > len(data):
+                raise ValueError
+            ids.add(section)
+            end = start + size
+            json.loads(data[start:end])
+        tail = money._load(template)[4]
+        if not {money.SEC_INV, money.SEC_LEDGER, money.SEC_STAT} <= ids or data[end:end+len(tail)] != tail:
+            raise ValueError
+        money.scan(data)
+    except (ValueError, KeyError, IndexError, TypeError, RecursionError, money.SaveError) as exc:
+        raise Fail('invalid_recovery_file') from exc
+
+
+def job_recover(name, selection_id, data):
     with LOCK:
-        slot['modified'] = True; slot['applied'] = edits; slot['changes'] = summarize(plog)
-        STATE['readyToUpload'] = True
+        slot = slot_by_file(name)
+        if not STATE['session'] or selection_id != STATE.get('selectionId'):
+            raise Fail('no_session')
+        if not slot or slot.get('excluded'):
+            raise Fail('bad_slot')
+        sess = Path(STATE['session'])
+        owner, title, entry_id = STATE['user']['id'], STATE['title'], STATE['entryId']
+    stage('preparing')
+    validate_recovery(data, slot_bytes(slot))
+    if not backup_ready(sess, owner, title, entry_id):
+        raise Fail('incomplete_backup')
+    with tempfile.TemporaryDirectory(prefix='.recovery-', dir=sess.parent) as scratch:
+        dest = Path(scratch) / 'session'
+        dest.mkdir()
+        for folder in ('lib', 'dec', 'orig', 'before-recovery'):
+            if (sess / folder).exists():
+                shutil.copytree(sess / folder, dest / folder)
+        for meta in ('download-entry.txt', 'unreadable-slots.json', 'excluded-slots.json'):
+            if (sess / meta).exists():
+                shutil.copyfile(sess / meta, dest / meta)
+        (dest / 'mod').mkdir()
+        for meta in (sess / 'mod').glob('*.edits.json'):
+            if meta.name != name + '.edits.json':
+                shutil.copyfile(meta, dest / 'mod' / meta.name)
+        folder = dest / 'dec' / name
+        before = dest / 'before-recovery' / name
+        before.parent.mkdir(exist_ok=True)
+        if not before.exists():
+            shutil.copyfile(folder / slot['inner'], before)
+        (folder / slot['inner']).write_bytes(data)
+        recovered = read_slot(name, folder)
+        output = encrypt_and_import(dest, recovered, folder)
+        image = dest / 'lib/Saves' / owner / title / name
+        if not output.stat().st_size or not filecmp.cmp(output, image, shallow=False) or not backup_ready(dest, owner, title, entry_id):
+            raise Fail('recovery_import_failed')
+        with LOCK:
+            if CANCEL.is_set() or selection_id != STATE.get('selectionId'):
+                raise Fail('recovery_interrupted')
+            timestamp = max(time.time(), time.mktime(time.strptime(sess.name, '%Y%m%d-%H%M%S')))
+            final = sess
+            while final.exists():
+                final = sess.parent / time.strftime('%Y%m%d-%H%M%S', time.localtime(timestamp))
+                timestamp += 1
+            slots = [dict(recovered, modified=True, recovered=True) if s['file'] == name else dict(s) for s in STATE['slots']]
+            for s in slots:
+                s['dir'] = str(final / 'dec' / s['file'])
+            dest.rename(final)
+            CACHE.clear()
+            STATE.update(session=str(final), slots=slots, selectionId=secrets.token_hex(12), readyToUpload=True)
     stage('ready_to_upload')
 
 
@@ -1524,6 +1637,15 @@ def job_restore():
         if s['modified']:
             run_tool(['poc.dt_local_saves', 'import', str(sess / 'lib'), str(STATE['entryId']), s['file'], str(sess / 'orig' / s['file'])])
             (sess / 'mod' / (s['file'] + '.edits.json')).unlink(missing_ok=True)
+            before = sess / 'before-recovery' / s['file']
+            if before.is_file():
+                shutil.copyfile(before, Path(s['dir']) / s['inner'])
+                original = read_slot(s['file'], Path(s['dir']))
+                with LOCK:
+                    s.update(original, recovered=False)
+                    STATE['selectionId'] = secrets.token_hex(12)
+                    CACHE.clear()
+                before.unlink()
             with LOCK:
                 s['modified'] = False; s['changes'] = []; s['applied'] = None
     with LOCK:
@@ -1556,6 +1678,8 @@ def job_upload(target=None):
     an 8-hex user ID), as that account's saves, signed for it first (copy_to_user)."""
     c = STATE['console']; sess = Path(STATE['session']); lib = sess / 'lib'; up = sess / 'upload'; up.mkdir(exist_ok=True)
     stage('preparing')
+    if not backup_ready(sess, STATE['user']['id'], STATE['title'], STATE['entryId']):
+        raise Fail('incomplete_backup')
     excludes = []
     for slot in STATE['slots']:
         if slot.get('excluded'):
@@ -1568,7 +1692,11 @@ def job_upload(target=None):
               '--user-name', user['name'], '--manifest-output', str(up / 'generated-upload-manifest.json'),
               '--source', str(lib / 'Transfer-Metadata' / 'metadata.db'), '--entry-id', str(entry_id), *excludes])
     manifest = json.loads((up / 'generated-upload-manifest.json').read_text('utf-8'))
-    total = sum(len(entry['files']) for entry in manifest.values())
+    expected = {(str(key), row['path']): int(row['size']) for key, entry in manifest.items() for row in entry['files']}
+    total = len(expected)
+    completed = set()
+    if not total:
+        raise Fail('incomplete_backup')
     env = {'DT_METADATA': str(up / 'generated-metadata.db'), 'DT_ASSETS': str(lib), 'DT_MANIFEST': str(up / 'generated-upload-manifest.json'),
            'DT_UPLOAD_KIND': 'save', 'DT_LOG': str(up / 'dt-source.log'), 'DT_PAIRING_PREFIX': str(prefix_path()), 'DT_EXPECTED_HOST_ID': c['hostId'],
            'DT_AUTO_POWER': '1', 'DT_PORT': '1004', 'DT_DATA_PORT': '1005', 'DT_DISCOVERY_PORT': '1006', "DT_HOST_NAME": "Save Garage",
@@ -1614,27 +1742,43 @@ def job_upload(target=None):
         if '[tcp] connection from' in low:
             if disconnects < 2:
                 stage('console_connected', hint=None)
-        elif 'gfp5 id=' in low and files == 0:
-            stage('transferring')
+        elif 'gfp5 id=' in low and ' path=' in low and files == 0:
+            stage('transferring', hint=None)
         elif 'gfp5 file complete' in low:
-            files += 1
+            match = re.search(r'GFP5 file complete id=(\d+) bytes=(\d+) path=(.+)$', line)
+            if not match:
+                continue
+            key = (match[1], match[3])
+            if expected.get(key) != int(match[2]):
+                raise Fail('upload_incomplete')
+            completed.add(key)
+            files = len(completed)
             with LOCK:
+                if files == 1:
+                    JOB.update(stage='transferring', hint=None)
                 JOB['progress'] = {'files': files, 'total': total}
         elif 'response complete cmd=0xb3' in low:
             finished = True
         elif 'response complete cmd=0x94' in low:
-            if finished and files:
+            if files:
+                if files != total or not finished:
+                    raise Fail('upload_incomplete', f'{files}/{total}')
                 break
+            finished = False
             if files == 0:
-                # the console read the list and left: usually a save with the same name is still on it
+                # A control-session close does not report what is on the destination console.
                 with LOCK:
-                    JOB['hint'] = 'console_has_save'
-                stage('waiting_console')
+                    network_hint = isinstance(JOB.get('hint'), dict)
+                if not network_hint:
+                    stage('waiting_console', hint='upload_no_files_yet')
+                    log('Control session ended before the first file completed (0 of %d).' % total)
         elif 'address already in use' in low or 'winerror 10048' in low:
             raise Fail('port_in_use', line)
         elif 'traceback' in low or 'error' in low:
             log(line)
-    if not (finished and files):
+    if files and files != total:
+        raise Fail('upload_incomplete', f'{files}/{total}')
+    if not (finished and files == total):
         refused_key_request(t0)
         raise Fail('upload_failed', 'process ended')
     time.sleep(3)
@@ -1666,6 +1810,7 @@ def public_state():
             for it in sl['items']:
                 it.pop('type', None)
         s['readyToUpload'] = s['readyToUpload'] or pending_slot_changes()
+        s['backupReady'] = bool(s['session'] and s['user'] and backup_ready(Path(s['session']), s['user']['id'], s['title'], s['entryId']))
         s.pop('session', None)
         s['hasSession'] = bool(STATE['session'])
         if s['console']:
@@ -1805,6 +1950,20 @@ class H(BaseHTTPRequestHandler):
             return self._send(403, {'error': 'forbidden'})
         try:
             n = int(self.headers.get('Content-Length') or 0)
+            if urlsplit(self.path).path == '/api/recover-slot':
+                if not G.key:
+                    raise Fail('not_signed_in')
+                if self.headers.get_content_type() != 'application/octet-stream' or not 0 < n <= MAX_RECOVERY:
+                    raise Fail('invalid_recovery_file')
+                query = parse_qs(urlsplit(self.path).query)
+                name = query.get('file', [''])[0]
+                selection = query.get('selectionId', [''])[0]
+                if not selection or selection != STATE.get('selectionId') or not slot_by_file(name):
+                    raise Fail('no_session')
+                data = self.rfile.read(n)
+                if len(data) != n:
+                    raise Fail('invalid_recovery_file')
+                return self._send(200, {'job': start_job('recover', lambda: job_recover(name, selection, data))})
             body = json.loads(self.rfile.read(n) or b'{}') if n else {}
             path = self.path.split('?')[0]
             if path == '/api/discover':
