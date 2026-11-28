@@ -233,14 +233,8 @@ backups or GarlicSaves sign-in.
   added to it too, as the game does, which can raise STANDARD ISSUE WEAPONS and the 100% figure. Nothing a character
   has is changed, each gun takes a few inventory slots (300 are always left free), and an inventory that already
   breaks one of the game's rules is left alone. Tested on a PS5: the guns show up in the loadout, as guns you buy do.
-- **Cheats can't be unlocked yet.** GTA VI keeps a tracker for each of its 62 cheats in the save. Completing the
-  trackers the way the game does when you meet a cheat's condition was tested on a PS5 and isn't enough: the cheats
-  didn't unlock. When the game unlocks a cheat it also marks it in an unlock list, and that entry is known for only one
-  cheat so far. Until the others are, the Completion tab lists the cheats and which ones the save has, without
-  changing them.
-- **The map reveal is partial.** Save Garage knows 722 of the map's 889 regions: the 52 named regions and the 670
-  smaller areas found in game saves. The rest stay covered until you explore them. Regions are only ever added, and
-  none the save already has is changed.
+- **Cheat unlock experiments.** Prepare the final action for a supported tracker or earn the 25th qualifying range medal in game. A separate manual slot can test one catalog candidate for Unlimited Focus and Fast Cash. Check the Cheats menu after loading.
+- **Map reveal.** The World tab includes all 889 regions from compatible version-9 story saves.
 - **Skills, the criminal profile, the vest and the relationship are experimental.** No save the game wrote has more
   than 60 in a skill; 99 is what GarlicSaves writes and reports working in the game. Skills and the special meter are
   only ever raised. The criminal profile is the game's temperament score (Professional, Hardened, Violent, Psycho,

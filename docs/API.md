@@ -298,8 +298,7 @@ Each chosen cheat tracker that isn't complete is completed the way the game comp
 `isComplete` true and the empty parameter, nothing else. No counter or 100% line counts these trackers, so the
 checklist and the 100% figure stay as they are; the profile-wide awards, the goals and the unlock catalogs aren't
 touched. Tested on a PS5, that doesn't unlock the cheats: when the game unlocks one it also sets the cheat's entry in
-the unlock catalog (block 6df5d2cf) from 0 to 2, and that entry is known for only one cheat so far. So the page lists
-the cheats read-only and doesn't send this edit; the API keeps it for research. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
+the unlock catalog (block 6df5d2cf) from 0 to 2, and that entry is known for only one cheat so far. The experimental Completion controls also accept `cheats: {"prepare": "<tracker id>"}` to synchronize an active tracker and its verified source counter one unit below the threshold. The advanced option `cheats: {"candidate": "<catalog item id>"}` completes the two reference trackers and sets a single existing candidate byte to 2. The candidate must belong to the observed list. Range rewards `maxAmmo`, `infiniteAmmo` and `noReload` in `rangeAccess.reward` prepare 24 qualifying medals for an in-game trigger. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
 record isn't shaped as the game writes it), `not_editable` (a record of another challenge set), `unknown_challenge`,
 `bad_request`, `verify_failed`. Errors carry the `save_` prefix in the job's error.
 

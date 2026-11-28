@@ -63,7 +63,7 @@ CHEATS (read_cheats, apply_cheats: the Completion tab's cheat list)
   Completing a tracker writes what the game writes when a condition is met: isComplete true and the empty parameter,
   nothing else. No counter or 100% line counts these trackers (challengescompleted equals the menu challenges done in
   every save), so the checklist is unchanged. Whether the cheat then shows in the game's Progress menu, or also needs
-  its unlock-catalog byte, isn't known. The profile-wide awards, the goals and the unlock catalogs are never changed.
+  its unlock-catalog byte, isn't known. The profile-wide awards, the goals and the unlock catalogs are unchanged by the tracker-only edit.
   Using a cheat in the game turns off trophies and saving for that session (the game's own warning).
   REFUSED: cheats_layout (the set isn't the 62 known trackers, or a record has keys other than the game writes, or a
   parameter that isn't an object), not_editable (a record of another set), unknown_challenge, bad_request,
@@ -399,25 +399,133 @@ def _cheat_of(i):
     return next((k for k, (ids, _) in CHEAT_PAIRS.items() if i in ids), None)
 
 
+# One ordinary in-game action can cross these thresholds. Only offer a
+# matching, live stat and tracker score; never guess a missing progress row.
+CHEAT_GOALS = {
+    0x1c461386: ('headshots', 'enemy', 100),
+    0x93c167e8: ('lifetimemoneyearned', 'soldfence', 250000),
+    0x303291b7: ('totalcaught', 'fish', 100),
+    0x33ac72c7: ('numworkoutscompleted', 0, 100),
+    0x25f5ca4f: ('stuntscompleted', 'stuntjumps', 50),
+    0x5ae6671e: ('totalmeditations', 0, 50),
+    0x5428c585: ('lifetimemoneyearned', 'soldvehicles', 500000),
+}
+
+# These entries changed together when Unlimited Focus and Fast Cash were
+# earned. They are candidates, not identified rewards. Probe one per copy.
+CATALOG_CANDIDATES = {
+    0x6df5d2cf: (0x143011d4, 0x7f287fc1, 0xc0fb2ddc, 0xc52e4fbe, 0xce7d6d3e),
+    0x7f587594: (0x5208eed8, 0x690cea8c, 0x7877ad26, 0x9a77ad5e, 0xa07edf73, 0xc1c5ae31, 0xc8ebd173),
+}
+
+
+def candidate_rows(save):
+    import rangereward as catalog
+    for page, candidates in CATALOG_CANDIDATES.items():
+        if page not in {entry[0] for entry in save.ents}:
+            continue
+        p = fl.payload(save.text(page), page)
+        keys, flags = p.get(catalog.HASHES), p.get(catalog.FLAGS)
+        if not isinstance(keys, dict) or not isinstance(flags, dict):
+            continue
+        ids, values = keys.get('$data', []), flags.get('$data', [])
+        if (p.get(catalog.PAGE) != catalog.PAGES.index(page) or keys.get('$content') != 'int_array'
+                or flags.get('$content') != 'char_array' or len(ids) != len(values) or len(set(ids)) != len(ids)):
+            continue
+        for i, key in enumerate(ids):
+            if key in candidates and type(values[i]) is int and values[i] in (0, 2):
+                yield page, key, i, values[i]
+
+
+def near_goal(t, rec, stats):
+    if rec['done'] or rec['id'] not in CHEAT_GOALS:
+        return
+    base, qual, goal = CHEAT_GOALS[rec['id']]
+    scores = _scores(t, *rec['param'])
+    if len(scores) == 1:
+        a, z, key = scores[0]
+        old = stats.value(*key)
+        if (key == (fl.h(base), fl.h(qual), STORY) and type(old) is int
+                and 0 <= old < goal and t[a:z] == str(old).encode()):
+            return key, old, goal
+
+
+def prepare_cheat(b, wanted):
+    import activities2
+    save = fl.Save(b)
+    text = save.text(SEC)
+    recs = _cheat_records(text)
+    stat = fl.Stats(save.text(fl.STATS))
+    if not isinstance(wanted, str) or not _HEX8.fullmatch(wanted):
+        raise fl.FeatureError('bad_request')
+    key = int(wanted, 16)
+    goal = near_goal(text, recs[key], stat) if key in recs else None
+    if not goal:
+        raise fl.FeatureError('cheats_layout')
+    (base, qual, owner), old, limit = goal
+    if old == limit - 1:
+        return b, []
+    stat.set(base, qual, limit - 1, CHEATS[key][0] or CHEATS[key][1], owner)
+    updated, slog = stat.apply()
+    mirrored, tlog = activities2.mirror_trackers(text, {goal[0]: (old, limit - 1)})
+    if near_goal(mirrored, _cheat_records(mirrored)[key], fl.Stats(updated)) != (goal[0], limit - 1, limit):
+        raise fl.FeatureError('verify_failed')
+    save.set_text(fl.STATS, updated)
+    save.set_text(SEC, mirrored)
+    return save.build(), slog + tlog
+
+
+def probe_catalog(b, wanted):
+    import rangereward as catalog
+    if not isinstance(wanted, str) or not _HEX8.fullmatch(wanted):
+        raise fl.FeatureError('bad_request')
+    save = fl.Save(b)
+    match = next((r for r in candidate_rows(save) if r[1] == int(wanted, 16)), None)
+    if not match:
+        raise fl.FeatureError('cheats_layout')
+    page, key, index, old = match
+    if old == 2:
+        return b, []
+    # A controlled trial pairs this single candidate with just the two
+    # identified tracker completions from the same transition.
+    data, log = apply_cheats(b, {'trackers': ['1c461386', '93c167e8']})
+    save = fl.Save(data)
+    text = save.text(page)
+    pos, _ = fl.walk(text, fl.CODE, fl.key(page), catalog.FLAGS)
+    save.set_text(page, fl.typed_set(text, pos, index, b'0', b'2'))
+    if (page, key, index, 2) not in candidate_rows(save):
+        raise fl.FeatureError('verify_failed')
+    return save.build(), log + [{'what': 'completion', 'label': 'Cheat catalog trial ' + wanted, 'from': 0, 'to': 2}]
+
+
 def read_cheats(b):
-    t = fl.Save(b).text(SEC)
+    save = fl.Save(b)
+    t = save.text(SEC)
     try:
         recs, problem = _cheat_records(t), None
     except fl.FeatureError as e:
         recs, problem = {}, str(e)
     entries = []
     if not problem:
+        stats = fl.Stats(save.text(fl.STATS))
         for key, kind, ids, cheats in _cheat_entries():
-            entries.append({'key': key, 'kind': kind, 'ids': [fl.hexid(i) for i in ids], 'of': len(ids),
+            goal = near_goal(t, recs[ids[0]], stats) if kind == 'single' else None
+            entries.append({'goal': {'score': goal[1], 'limit': goal[2]} if goal else None,
+                            'key': key, 'kind': kind, 'ids': [fl.hexid(i) for i in ids], 'of': len(ids),
                             'done': sum(1 for i in ids if recs[i]['done']), 'cheats': cheats})
     return {'feature': 'cheats', 'set': fl.hexid(CHEAT_SET), 'records': len(recs), 'of': CHEAT_RECORDS,
             'done': sum(1 for r in recs.values() if r['done']), 'entries': entries, 'problem': problem,
+            'candidates': [fl.hexid(k) for _, k, _, value in candidate_rows(save) if value == 0] if not problem else [],
             'matched': len(CHEATS) + 2 * len(CHEAT_PAIRS), 'risk': 'experimental'}
 
 
 def apply_cheats(b, choice):
     """choice: {'trackers': [hex ids] | 'all'} -> (new bytes, log). Each chosen tracker that isn't complete gets
     isComplete true and the empty parameter; nothing else changes. Applying the result again changes nothing."""
+    if isinstance(choice, dict) and set(choice) == {'prepare'}:
+        return prepare_cheat(b, choice['prepare'])
+    if isinstance(choice, dict) and set(choice) == {'candidate'}:
+        return probe_catalog(b, choice['candidate'])
     if not isinstance(choice, dict) or set(choice) != {'trackers'}:
         raise fl.FeatureError('bad_request')
     want = choice['trackers']

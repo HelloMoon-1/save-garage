@@ -70,3 +70,29 @@ class RangeReplay(unittest.TestCase):
         card = RangeCard()
         card.rows['shootingrangesilvermedals', 0, 'griffin'] -= 1
         self.assertIsNone(ranges.range_access(card)['last'])
+
+    def test_reference_gold_prepares_silver_threshold_from_an_empty_card(self):
+        card = RangeCard()
+        for key in list(card.rows):
+            if key[0] != 'unlocked':
+                card.rows[key] = 0
+        info = ranges.range_access(card)['ammo']['infiniteAmmo']
+        self.assertEqual(info['count'], 0)
+        self.assertIsNotNone(info['course'])
+        ranges.prepare_gold(ranges.Edit(card), ranges.gold_recipe(card), medal='infiniteAmmo')
+        updated = ranges.range_access(card)['ammo']['infiniteAmmo']
+        self.assertEqual(updated['count'], 24)
+        self.assertEqual(updated['course'], info['course'])
+        venue, course, tier = info['course']
+        self.assertEqual(card.value('highestmedal', tier, course), 0)
+        self.assertEqual(card.value('shootingrangesilvermedals'), 24)
+        self.assertEqual(card.value('shootingrangegoldmedals'), 24)
+        self.assertEqual(sum(card.value('bestscore', t, r) > 0 for _, r, t in ranges._courses()), 24)
+
+    def test_cheat_threshold_does_not_roll_back_an_existing_card(self):
+        card = RangeCard()
+        before = card.rows.copy()
+        self.assertIsNone(ranges.range_access(card)['ammo']['noReload']['course'])
+        with self.assertRaises(ranges.fl.FeatureError):
+            ranges.prepare_gold(ranges.Edit(card), ranges.gold_recipe(card), medal='noReload')
+        self.assertEqual(card.rows, before)

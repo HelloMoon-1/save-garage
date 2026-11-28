@@ -6,10 +6,10 @@ WHAT IT CHANGES
   Each known region the save lacks is appended as {"$0xbf2c8a79":<id>,"$0x9e96c714":<type>}, the way the game writes
   an entry. Entries already in the list are never changed, removed or moved.
 
-BUILT-IN COVERAGE: the upstream table contains 52 named regions and 670 cells. Merging the additional
-  version-9 cells observed by this fork adds 27 cells. To fill all 889 regions, a full reference
-  must contain every built-in region with matching types and cover every region in the target.
-  Only region IDs are copied, and new entries are appended in the same format as the original.
+BUILT-IN COVERAGE: the legacy 'known' edit adds up to 749 observed regions. The 'full'
+  edit uses a 889-region reference (52 named regions and 837 cells) and requires every
+  existing entry to match the reference. Custom reference edits from earlier versions
+  remain compatible. New entries are appended; existing entries retain their order.
 
 EVIDENCE FROM THE SAVES (20 saves holding 43 to 719 regions)
   * dataVersion is 9, and every entry is exactly {id, type} with type 1 or 2 and an unsigned 32-bit id; no id repeats.
@@ -31,7 +31,7 @@ import re
 
 import featurelib as fl
 import fogdata
-from fog_regions import OBSERVED
+from fog_regions import OBSERVED, FULL_MAP_CELLS
 
 FEATURE = 'fog'
 SEC = 0x6ac593ca
@@ -42,6 +42,7 @@ CELL, NAMED = 1, 2
 NAMED_IDS = tuple(fl.joaat(n) for n in fogdata.NAMED)
 CELL_IDS = tuple(dict.fromkeys((*fogdata.CELLS, *OBSERVED[CELL])))
 KNOWN = {**dict.fromkeys(NAMED_IDS, NAMED), **dict.fromkeys(CELL_IDS, CELL)}
+FULL_MAP = {**KNOWN, **dict.fromkeys(FULL_MAP_CELLS, CELL)}
 _UINT = re.compile(rb'0|[1-9][0-9]{0,9}')
 
 
@@ -98,6 +99,7 @@ def read(b):
     return {'feature': FEATURE, 'regions': len(have), 'named': sum(1 for _, k in have if k == NAMED),
             'cells': sum(1 for _, k in have if k == CELL), 'unknown': sum(1 for i in ids if i not in KNOWN),
             'known': len(KNOWN), 'knownNamed': len(NAMED_IDS), 'knownCells': len(CELL_IDS), 'mapTotal': MAP_TOTAL,
+            'fullMapCompatible': problem is None and all(FULL_MAP.get(i) == k for i, k in have),
             'missing': 0 if problem else sum(1 for i in KNOWN if i not in ids), 'problem': problem, 'risk': 'caution'}
 
 
@@ -124,6 +126,8 @@ def complete_reference(text):
 
 
 def catalog(choice):
+    if choice == 'full':
+        return FULL_MAP
     if choice == 'known':
         return KNOWN
     if not isinstance(choice, dict) or set(choice) != {'referenceCells'}:

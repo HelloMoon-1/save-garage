@@ -42,7 +42,7 @@ def locate(save):
 def status(data):
     try:
         _, _, value = locate(fl.Save(data))
-        return 'set' if value in (14, 15) else 'available'
+        return 'set' if value == 15 else 'available'
     except (KeyError, TypeError, ValueError, IndexError, fl.savedit.SaveError):
         return 'unavailable'
 
@@ -50,19 +50,19 @@ def status(data):
 def apply(data):
     save = fl.Save(data)
     sec, idx, old = locate(save)
-    if old in (14, 15):
+    if old == 15:
         return data, []
     text = save.text(sec)
-    for key, new in ((HASHES, TARGET), (FLAGS, 14)):
+    for key, new in ((HASHES, TARGET), (FLAGS, 15)):
         start, _ = fl.walk(text, fl.CODE, fl.key(sec), key)
         if old is None:
             (begin, end), tokens = fl.typed_values(text, start)
             tokens.insert(idx, str(new).encode())
             text = fl.splice(text, begin, end, b','.join(tokens))
         elif key == FLAGS:
-            text = fl.typed_set(text, start, idx, b'0', b'14')
+            text = fl.typed_set(text, start, idx, str(old).encode(), b'15')
     save.set_text(sec, text)
     result = save.build()
-    if locate(fl.Save(result)) != (sec, idx, 14):
+    if locate(fl.Save(result)) != (sec, idx, 15):
         raise fl.FeatureError('verify_failed')
-    return result, [{'what': 'completion', 'label': 'Hillinger M306 TMR shop entry', 'from': old, 'to': 14}]
+    return result, [{'what': 'completion', 'label': 'Hillinger M306 TMR shop entry', 'from': old, 'to': 15}]

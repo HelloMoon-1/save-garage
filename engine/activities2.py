@@ -304,18 +304,21 @@ def gold_recipe(st):
         for group in ((0, r), (t, v)):
             groups.setdefault(group, []).append(code)
     codes = sorted({row[3] for row in records} - {0})
-    if not 1 <= len(codes) <= 3:
+    if len(codes) > 3:
         return None
     solutions = []
     for levels in permutations((1, 2, 3), len(codes)):
         mapping = {0: 0, **dict(zip(codes, levels))}
-        if 3 not in levels:
-            continue
         for (qual, owner), rows in groups.items():
             if any(sum(mapping[c] >= rank for c in rows) != st.value('shootingrange' + name + 'medals', qual, owner)
                    for rank, name in enumerate(('bronze', 'silver', 'gold'), 1)):
                 break
         else:
+            if 3 not in levels:
+                # Complete v3 story saves record 4 on all 42 gold courses.
+                if 4 in mapping:
+                    continue
+                mapping[4] = 3
             solutions.append(mapping)
     if len(solutions) != 1:
         return None
@@ -341,15 +344,55 @@ def gold_recipe(st):
     return ranks, [row for row in missing if row != keep], keep
 
 
-def prepare_gold(ed, recipe, complete=False):
+# Per-course personal bests observed alongside golds in both reference slots.
+GOLD_SCORES = {
+    'griffin3pointrange': {'beginner': 25346, 'intermediate': 25848, 'advanced': 39105},
+    'griffinhookrange': {'beginner': 21880, 'intermediate': 34672, 'advanced': 34359},
+    'griffinlooprange': {'beginner': 29520, 'intermediate': 36053, 'advanced': 41834},
+    'griffincompoundrange': {'intermediate': 42993, 'advanced': 39767, 'master': 43885},
+    'griffinmazerange': {'intermediate': 32044, 'advanced': 33813, 'master': 30610},
+    'griffinvillarange': {'intermediate': 42231, 'advanced': 43204, 'master': 62832},
+    'rodgersalienrange': {'beginner': 9750, 'intermediate': 10450, 'advanced': 6050, 'master': 14750},
+    'rodgerscopsandrobbersrange': {'beginner': 1500, 'intermediate': 2400, 'advanced': 3400, 'master': 5200},
+    'rodgershuntingrange': {'beginner': 2625, 'intermediate': 5475, 'advanced': 9000, 'master': 11125},
+    'rodgersmarketrange': {'beginner': 1300, 'intermediate': 6958, 'advanced': 9060, 'master': 11027},
+    'rodgerssaloonrange': {'beginner': 4650, 'intermediate': 8200, 'advanced': 6875, 'master': 9325},
+    'rodgersundeadrange': {'beginner': 7825, 'intermediate': 6500, 'advanced': 11400, 'master': 11425},
+}
+
+MEDAL_REWARDS = {'maxAmmo': (1, 'bronze'), 'infiniteAmmo': (2, 'silver'), 'noReload': (3, 'gold')}
+
+
+def medal_prerequisite(recipe, rank):
+    ranks, targets, keep = recipe
+    candidates = [row for row in [keep, *targets] if ranks[row[3]] < rank]
+    count = 42 - len(candidates)
+    if count >= 25:
+        return count, [], None
+    last = candidates[0]
+    return count, candidates[1:1 + 24 - count], last
+
+
+def prepare_gold(ed, recipe, complete=False, medal=None):
     ranks, targets, keep = recipe
     gold_code = next(c for c, rank in ranks.items() if rank == 3)
-    if complete and ranks[keep[3]] < 3:
+    if medal:
+        rank, counter = MEDAL_REWARDS[medal]
+        _, targets, keep = medal_prerequisite(recipe, rank)
+        if not keep:
+            raise fl.FeatureError('range_access')
+    elif complete and ranks[keep[3]] < 3:
         targets = [*targets, keep]
     for venue, course, tier, old in targets:
         if ed.get('unlocked', tier, course) is not True:
             raise fl.FeatureError('range_access')
         ed.put('highestmedal', tier, course, gold_code, course + ' / ' + tier)
+        if gold_code == 4:
+            score = GOLD_SCORES[course][tier]
+            if ed.get('bestscore', tier, course) < score:
+                ed.put('bestscore', tier, course, score, course)
+            if ed.get('recentscore', tier, course) == 0:
+                ed.put('recentscore', tier, course, score, course)
         if ed.get('timescompleted', tier, course) == 0:
             ed.put('timescompleted', tier, course, 1, course)
             for owner in (course, venue):
@@ -362,7 +405,7 @@ def prepare_gold(ed, recipe, complete=False):
                 ed.add(stat, qual, owner, 1, course)
                 ed.add(TOTAL_MEDALS, qual, owner, 1, course)
     venue, course, tier, previous = keep
-    if not complete and ranks[previous] == 3:
+    if not medal and not complete and ranks[previous] == 3:
         # Keep lifetime play counts. Clear just this medal and its score threshold.
         for field in ('highestmedal', 'bestscore', 'recentscore'):
             ed.put(field, tier, course, 0, course + ' / ' + tier)
@@ -372,6 +415,10 @@ def prepare_gold(ed, recipe, complete=False):
             ed.add(TOTAL_MEDALS, qual, owner, -3, course)
     expected = gold_code if complete else (0 if ranks[previous] == 3 else previous)
     _percent(ed, 'shootingranges', ed.get('shootingrangegoldmedals'))
+    if medal:
+        if ed.get('shootingrange' + counter + 'medals') != 24 or ed.get('highestmedal', tier, course) != previous:
+            raise fl.FeatureError('verify_failed')
+        return
     if ed.get('shootingrangegoldmedals') != (42 if complete else 41) or ed.get('highestmedal', keep[2], keep[1]) != expected:
         raise fl.FeatureError('verify_failed')
 
@@ -399,9 +446,14 @@ def range_access(st):
             break
         counts.append(sum(detailed))
     recorded = sum(counts) if len(counts) == len(VENUES) else None
-    recipe = gold_recipe(st) if recorded and all(v['valid'] for v in venues) else None
+    recipe = gold_recipe(st) if recorded is not None and all(v['valid'] for v in venues) else None
     last = list(recipe[2][:3]) if recipe else None
-    return {'venues': venues, 'recorded': recorded, 'checklist': st.value(gold, 0, ST), 'last': last,
+    ammo = {}
+    if recipe:
+        for reward, (rank, _) in MEDAL_REWARDS.items():
+            count, _, trigger = medal_prerequisite(recipe, rank)
+            ammo[reward] = {'count': count, 'course': list(trigger[:3]) if trigger else None}
+    return {'ammo': ammo, 'venues': venues, 'recorded': recorded, 'checklist': st.value(gold, 0, ST), 'last': last,
             'lastLocked': bool(last and not st.value('unlocked', last[2], last[1]))}
 
 
@@ -413,14 +465,14 @@ def apply_range_access(b, choice):
             or type(repair) is not bool or type(choice['prepare']) is not bool):
         raise fl.FeatureError('bad_request')
     reward = choice.get('reward')
-    if reward not in (None, 'shop', 'skip') or (reward == 'skip' and choice['prepare']):
+    if reward not in (None, 'shop', 'skip', *MEDAL_REWARDS) or (reward in ('skip', *MEDAL_REWARDS) and choice['prepare']):
         raise fl.FeatureError('bad_request')
     s = fl.Save(b)
     st = fl.Stats(s.text(fl.STATS))
     ed = Edit(st)
     info = range_access(st)
     recipe = None
-    if choice['prepare'] or reward == 'skip':
+    if choice['prepare'] or reward in ('skip', *MEDAL_REWARDS):
         if not info['last'] or info['checklist'] is None:
             raise fl.FeatureError('range_access')
         recipe = gold_recipe(st)
@@ -454,9 +506,9 @@ def apply_range_access(b, choice):
         ed.put('shootingrangegoldmedals', 0, ST, recorded, 'Shooting range gold medals')
         _percent(ed, 'shootingranges', recorded)
     if recipe:
-        prepare_gold(ed, recipe, complete=reward == 'skip')
+        prepare_gold(ed, recipe, complete=reward == 'skip', medal=reward if reward in MEDAL_REWARDS else None)
     result, log = finish(s, st, ed.moved, []) if ed.moved else (b, [])
-    if reward:
+    if reward in ('shop', 'skip'):
         import rangereward
         result, changes = rangereward.apply(result)
         log += changes

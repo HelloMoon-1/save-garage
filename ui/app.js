@@ -1199,7 +1199,7 @@
     const last = data.last;
     const replay = data.recorded === 42;
     const prepare = last && (data.recorded !== 41 || data.lastLocked)
-      ? control('prepare', replay ? 'Reset this gold for replay' : 'Prepare 41 gold medals', choice?.prepare, data.checklist == null || choice?.reward === 'skip') : '';
+      ? control('prepare', replay ? 'Reset this gold for replay' : 'Prepare 41 gold medals', choice?.prepare, data.checklist == null || (choice?.reward === 'skip' || Object.hasOwn(ammoRewards, choice?.reward))) : '';
     const venues = data.venues.map(v => `<div class="field"><div class="name">${esc(v.label)} <small>${v.available} / ${v.total}</small></div>
       ${control(v.id, v.open ? 'Open all difficulties here' : 'Open venue and difficulties (experimental)', choice?.venues.includes(v.id), !v.valid || (v.open && v.available === v.total) || choice?.prepare)}</div>`).join('');
     return `<div class="group"><div class="section-head"><h3>Hillinger M306 TMR</h3>${riskTag('experimental')}</div>
@@ -1245,26 +1245,45 @@
       <details class="more-opts" data-keep="compLeft" ${S.keep.compLeft ? 'open' : ''}><summary>What’s left to play in the game</summary>${leftToPlay(s) || '<p class="note">Not available for this save.</p>'}</details>`;
   }
 
-  // ---- cheats: the cheat unlock trackers (challenges.py, set d6d53427), shown read-only. Tested on a PS5, completing a
-  // tracker doesn't unlock its cheat: when the game unlocks one it also sets the cheat's entry in the unlock catalog
-  // (block 6df5d2cf) from 0 to 2, and that entry is known for only one cheat so far (dev_scratch/cheats). A tracker
-  // completed without it might also keep the game from unlocking the cheat later, so the page doesn't offer it.
+  const ammoRewards = {maxAmmo: 'Max ammo', infiniteAmmo: 'Infinite ammo', noReload: 'No reload'};
+  const nearGoalLabel = 'Prepare the last action';
   const cheatText = c => `${c.name ? `<span class="cheat-name" data-no-i18n>${esc(c.name)}</span>` : ''}<span class="${c.name ? 'effect' : 'cheat-name'}">${esc(c.effect)}</span>
     <span class="help"><b>To unlock:</b> ${esc(c.unlock)}</span>`;
   function cheatParts(s) {
     const C = S.comp[s.file].cheats;
     if (!C) return '<p class="note">This part of the save can’t be read yet.</p>';
     if (C.problem) return `<div class="callout">${esc(ERR['save_' + C.problem] || ERR.save_layout_changed)}</div>`;
+    const d = draftOf(s.file).completion;
+    const access = S.comp[s.file].activities2?.lines?.find(l => l.key === 'shootingranges')?.access;
     const head = `<div class="section-head"><h3>Cheat unlocks</h3>
-        <p>The game unlocks a cheat when you meet its condition, and keeps a tracker for each one in the save. ${nf.format(C.done)} of ${nf.format(C.of)} are complete in this save. Tested on a PS5, completing a tracker isn’t enough: the game also marks the unlock in a list, and the entry for most cheats isn’t known yet. So cheats can’t be unlocked here for now.</p></div>`;
-    const ctl = e => e.done >= e.of ? '<span class="done-mark">Unlocked</span>' : '';
+      <p><span>Completed trackers</span> · ${C.done} / ${C.of}</p>
+      <p>Prepare a condition, save the edits, then perform the last action in story mode and check the Cheats menu.</p></div>`;
+    const ammo = Object.entries(access?.ammo || {}).map(([key, row]) => {
+      const on = d.rangeAccess?.reward === key;
+      const course = row.course;
+      return `<div class="field"><div class="name">${esc(T(ammoRewards[key]))} · ${row.count} / 25
+        <small>${esc(T({maxAmmo:'Bronze or better', infiniteAmmo:'Silver or better', noReload:'Gold medal'}[key]))}</small>
+        ${course ? `<small>${esc(T('Earn medal 25 here'))} · ${esc((course[0] === 'griffin' ? 'Griffin' : 'Rodgers') + ' / ' + course[1].slice(course[0].length, -5) + ' / ' + T(course[2]))}</small>` : ''}</div>
+        ${course && (on || row.count < 24 || access.lastLocked || !access.venues.every(v => v.open && v.available === v.total)) ? `<button class="btn small" data-act="range-access" data-value="${key}" ${d.rangeAccess?.prepare ? 'disabled' : ''}>${esc(T(on ? 'Undo' : 'Prepare 24 qualifying medals'))}</button>` : (course ? '<span>Ready for the last action</span>' : '<span>Medal threshold reached</span>')}</div>`;
+    }).join('');
+    const trial = C.candidates?.length ? `<details><summary>Test a catalog candidate</summary>
+      <p>Use a separate manual slot. This marks the Unlimited Focus and Fast Cash trackers complete and changes one unidentified catalog entry. It may affect an unrelated reward. Compare each trial with the same untouched slot.</p>
+      <label><span>Candidate ID</span> <select data-cheat-candidates>${C.candidates.map(k => `<option ${d.cheats?.candidate === k ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></label>
+      <button class="btn small" data-act="cheat-catalog">${esc(T(d.cheats?.candidate ? 'Undo' : 'Stage one candidate'))}</button></details>` : '';
+    const ctl = e => {
+      if (e.done >= e.of) return '<span class="done-mark">Tracker complete</span>';
+      if (!e.goal) return '';
+      const on = d.cheats?.prepare === e.key;
+      return `<small>${e.goal.score} / ${e.goal.limit}</small> ${e.goal.score === e.goal.limit - 1 ? '<span>Ready for the last action</span>' :
+        `<button class="btn small" data-act="cheat-prepare" data-value="${esc(e.key)}">${esc(T(on ? 'Undo' : nearGoalLabel))}</button>`}`;
+    };
     const rows = C.entries.map(e => {
       if (e.kind === 'single') return `<div class="field cheat"><div class="name">${cheatText(e.cheats[0])}</div><div class="inputs">${ctl(e)}</div></div>`;
       const note = e.kind === 'pair' ? '' : `<span class="help">Save Garage hasn’t seen these ${nf.format(e.of)} trackers hold any progress in a save, so it can’t tell which cheat each one is.</span>`;
       return `<div class="field cheat ${e.kind}"><div class="name">${note}<ul class="cheats">${e.cheats.map(c => `<li>${cheatText(c)}</li>`).join('')}</ul></div>
         <div class="inputs">${ctl(e)}</div></div>`;
     }).join('');
-    return `<div class="group">${head}<div class="fields">${rows}</div></div>`;
+    return `<div class="group">${head}${ammo ? `<p>Preparation promotes courses to gold until 24 qualify. Load the slot and earn the next qualifying medal in the listed course.</p>${ammo}` : ''}<div class="fields">${rows}</div>${trial}</div>`;
   }
 
   function compParts(s) {
@@ -1492,11 +1511,11 @@
     if (F?.problem) help = ERR['save_' + F.problem] || ERR.save_layout_changed;
     else if (F) {
       help = [T('Regions uncovered in this save'), F.regions + ' / ' + F.mapTotal,
-        T('Additional regions in the built-in map'), F.missing].join(' · ');
+        T('Additional regions in the built-in map'), F.fullMapCompatible ? F.mapTotal - F.regions : F.missing].join(' · ');
       ctl = d.fog ? '<span class="note">Will be revealed. Save edits to apply it.</span> <button class="btn small" data-act="world-undo" data-what="fog">Undo</button>'
-        : `<button class="btn small" data-act="world-fill" data-what="fog" ${F.missing ? '' : 'disabled'}>${F.missing ? 'Reveal the map' : 'All known regions revealed'}</button>`;
+        : `<button class="btn small" data-act="world-fill" data-what="fog" ${(F.fullMapCompatible ? F.regions < F.mapTotal : F.missing) ? '' : 'disabled'}>${F.fullMapCompatible ? T('Reveal all 889 regions') : T(F.missing ? 'Reveal the map' : 'All known regions revealed')}</button>`;
     }
-    if (F && !F.problem && F.regions < F.mapTotal) {
+    if (F && !F.problem && !F.fullMapCompatible && F.regions < F.mapTotal) {
       ctl += d.fog?.referenceCells ? '<p>Full reference map selected.</p>'
         : '<p><label>Import a fully explored map <input type="file" data-map-reference></label><br><small>Choose the decrypted SARC file or memory.dat from a fully explored save. Only the map section is read.</small></p>';
     }
@@ -2102,7 +2121,7 @@
       w.armour && {label: 'Armour', value: now ? now.armour : '', newValue: 'full'},
       ...Object.entries(w).filter(([k]) => /^(jason|lucia)_/.test(k)).map(([k,v]) => ({
         label: k.split('_')[0] + ' / ' + T(now?.capacities?.[k]?.label || k), value: now?.capacities?.[k]?.value ?? '', newValue: v})),
-      w.fog && {label: 'Map regions uncovered', value: F ? F.regions : '', newValue: w.fog.referenceCells ? F?.mapTotal || 889 : F ? F.regions + F.missing : 'all known'},
+      w.fog && {label: 'Map regions uncovered', value: F ? F.regions : '', newValue: (w.fog === 'full' || w.fog.referenceCells) ? F?.mapTotal || 889 : F ? F.regions + F.missing : 'all known'},
       ...['lucia', 'jason'].flatMap(k => {
         const e = w[k], c = who(k), name = c?.name || (k === 'lucia' ? 'Lucia' : 'Jason');
         return !e ? [] : [e.meter && {label: `Special meter (${name})`, value: c?.meter ?? '', newValue: P?.meterFull ?? 100},
@@ -2122,7 +2141,7 @@
     }
     const cp = d.completion || {};
     const rangeGolds = S.comp[s.file]?.activities2?.lines?.find(l => l.key === 'shootingranges')?.access?.recorded;
-    const compList = [cp.rangeAccess && {label: T('Shooting range progress'), value: '', newValue: [cp.rangeAccess.reward && T(cp.rangeAccess.reward === 'skip' ? 'Skip remaining courses and try the TMR unlock' : 'Try unlocking the TMR without playing the ranges'), cp.rangeAccess.prepare && T(rangeGolds === 42 ? 'Reset this gold for replay' : 'Prepare 41 gold medals'), ...cp.rangeAccess.venues, cp.rangeAccess.repair && T('Repair checklist from course medals')].filter(Boolean).join(' · ')}, cp.skipTask && {label: T('Optional task') + ' 0xad8c8a22', value: '', newValue: T('Complete')}, cp.awards && {label: T('Award records'), value: '', newValue: cp.awards.ids.length}, cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
+    const compList = [cp.rangeAccess && {label: T('Shooting range progress'), value: '', newValue: [cp.rangeAccess.reward && T(ammoRewards[cp.rangeAccess.reward] || (cp.rangeAccess.reward === 'skip' ? 'Skip remaining courses and try the TMR unlock' : 'Try unlocking the TMR without playing the ranges')), cp.rangeAccess.prepare && T(rangeGolds === 42 ? 'Reset this gold for replay' : 'Prepare 41 gold medals'), ...cp.rangeAccess.venues, cp.rangeAccess.repair && T('Repair checklist from course medals')].filter(Boolean).join(' · ')}, cp.skipTask && {label: T('Optional task') + ' 0xad8c8a22', value: '', newValue: T('Complete')}, cp.awards && {label: T('Award records'), value: '', newValue: cp.awards.ids.length}, cp.compendium && {label: 'Compendium: ' + cp.compendium.groups.join(' and '), value: '', newValue: 'discovered'},
       cp.discovery && {label: 'Map: every shop and place', value: '', newValue: 'discovered'},
       cp.challenges && {label: 'Challenges: ' + (cp.challenges.categories === 'all' ? 'every category' : cp.challenges.categories.join(', ')), value: '', newValue: 'completed'},
       cp.gyms && {label: 'Gym memberships: ' + (cp.gyms.gyms === 'all' ? 'all' : cp.gyms.gyms.length), value: '', newValue: 'owned'},
@@ -2133,7 +2152,7 @@
       cp.hoops && {label: 'Basketball hoops: all', value: '', newValue: 'scored'},
       cp.vehicles && {label: 'Vehicle compendium: up to 200 base models', value: '', newValue: 'discovered'},
       cp.collectibles && {label: 'Collectibles: ' + cp.collectibles.categories.join(', '), value: '', newValue: 'found'},
-      cp.cheats && {label: 'Cheat trackers', value: '', newValue: `${cp.cheats.trackers.length} completed`}].filter(Boolean);
+      cp.cheats && {label: T('Cheat unlocks'), value: '', newValue: cp.cheats.candidate ? T('Candidate ID') + ' ' + cp.cheats.candidate : cp.cheats.prepare ? T(nearGoalLabel) + ' · ' + (S.comp[s.file]?.cheats?.entries.find(e => e.key === cp.cheats.prepare)?.cheats[0]?.name || cp.cheats.prepare) : T('Completed trackers')}].filter(Boolean);
     const gunList = Object.entries(d.guns || {}).filter(([, v]) => (v || []).length)
       .map(([k, v]) => ({label: `Guns added (${k === 'lucia' ? 'Lucia' : 'Jason'})`, value: '', newValue: v.length}));
     const statList = Object.values(d.stats).map(change => {
@@ -2316,12 +2335,25 @@
       if (input) { input.value = b.dataset.to; onEdit(input); }
       return;
     }
+    if (a === 'cheat-prepare' || a === 'cheat-catalog') {
+      const d = draftOf(S.slot).completion;
+      if (a === 'cheat-prepare') {
+        if (d.cheats?.prepare === b.dataset.value) delete d.cheats;
+        else d.cheats = {prepare: b.dataset.value};
+      } else if (d.cheats?.candidate) delete d.cheats;
+      else {
+        const candidate = b.closest('details').querySelector('[data-cheat-candidates]').value;
+        if (!confirm(T('Stage the two tracker completions and this catalog candidate in your test slot?') + ' ' + candidate)) return;
+        d.cheats = {candidate};
+      }
+      S.mainKey = ''; renderMain(); renderPending(); renderCounts(); return;
+    }
     if (a === 'range-access') {
       const d = draftOf(S.slot).completion;
       const edit = d.rangeAccess || {venues: [], repair: false, prepare: false};
       const value = b.dataset.value;
       if (value === 'prepare') edit.prepare = !edit.prepare;
-      else if (value === 'shop' || value === 'skip') {
+      else if (value === 'shop' || value === 'skip' || Object.hasOwn(ammoRewards, value)) {
         if (edit.reward === value) delete edit.reward;
         else edit.reward = value;
       }
@@ -2481,7 +2513,7 @@
         else if (what === 'skills') { const to = Number(b.dataset.to); if (to > Math.min(...c.skills)) ch.skills = to; else delete ch.skills; }
         else ch[what] = what === 'meter' ? 'full' : true;
         if (Object.keys(ch).length) d[who] = ch; else delete d[who];
-      } else if (what === 'fog') { if (a === 'world-fill') d.fog = 'known'; else delete d.fog; }
+      } else if (what === 'fog') { if (a === 'world-fill') d.fog = S.world[S.slot]?.fog?.fullMapCompatible ? 'full' : 'known'; else delete d.fog; }
       else if (what === 'health') d.health = w.healthMax;
       else if (a === 'world-fill') d.armour = 'full';
       else delete d.armour;
