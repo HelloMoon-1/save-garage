@@ -52,23 +52,23 @@ OWNERS = {'lucia': 0xb3634b85, 'jason': 0x25350e5c}
 
 
 def growth_rows(character, stats):
-    """Expose a capacity only when both player-array copies agree with points and rank."""
+    """Locate all four copies, including old saves in which their values disagree."""
     rows = {}
     prefix = _code(CHARACTER) + [fl.key('attributeSet')]
     players = json.loads(character)[CODE][fl.key(CHARACTER)].get(fl.key('attributeSet'), [])
+    names = [p.get(fl.key('Name'), {}).get('$data') for p in players]
     for i, player in enumerate(players):
         for name, owner in OWNERS.items():
-            if player.get(fl.key('Name'), {}).get('$data') != fl.key(name)[1:]:
+            if names[i] != fl.key(name)[1:] or names.count(names[i]) != 1:
                 continue
             values = player.get(fl.key('attributes'), {}).get('$data', [])
             for qual, (index, label) in CAPACITY.items():
                 if len(values) <= index + 30:
                     continue
-                value = values[index]
-                if not (type(value) is int and 0 <= value <= 100 and value == values[index + 30]
-                        and all(stats.value(k, qual, owner) == value for k in ('points', 'rank'))):
+                copies = (values[index], values[index + 30], stats.value('points', qual, owner), stats.value('rank', qual, owner))
+                if not all(type(v) is int and 0 <= v <= 100 for v in copies):
                     continue
-                rows[name + '_' + qual] = (value, label, prefix + [i, fl.key('attributes'), '$data'], index, qual, owner)
+                rows[name + '_' + qual] = (copies, label, prefix + [i, fl.key('attributes'), '$data'], index, qual, owner)
     return rows
 
 
@@ -90,7 +90,7 @@ def read(b):
     capacities = growth_rows(sec(CHARACTER), stats)
     parts_phys = [secs[i] for i, entry in enumerate(ents) if entry[0] == physique.SECTION]
     levels = physique.read(parts_phys[0], stats) if len(parts_phys) == 1 else []
-    return {'attributeLevels': levels, 'capacities': {k: {'value': v[0], 'label': v[1]} for k, v in capacities.items()}, 'clock': clock, 'health': health, 'healthMax': HEALTH_MAX,
+    return {'attributeLevels': levels, 'capacities': {k: {'value': v[0][0], 'copies': v[0], 'label': v[1]} for k, v in capacities.items()}, 'clock': clock, 'health': health, 'healthMax': HEALTH_MAX,
             'armour': sum(x['armour'] for x in parts), 'armourMax': sum(x['max'] for x in parts)}
 
 
@@ -143,13 +143,13 @@ def apply(b, edit):
             if key not in available or type(value) is not int or not 0 <= value <= 100:
                 raise WorldError('bad_request')
             old, label, path, index, qual, owner = available[key]
-            if value == old:
+            if all(v == value for v in old):
                 continue
             for offset in (index, index + 30):
                 secs[ci] = je.put(secs[ci], path + [offset], je.fmt_int(value))
             for field in ('points', 'rank'):
                 stats.set(field, qual, value, label, owner)
-            log.append({'what': 'world', 'label': key.split('_')[0].title() + ' / ' + label, 'from': old, 'to': value})
+            log.append({'what': 'world', 'label': key.split('_')[0].title() + ' / ' + label, 'from': ' / '.join(map(str, old)), 'to': value})
         secs[si], _ = stats.apply()
     if not log:
         return b, log

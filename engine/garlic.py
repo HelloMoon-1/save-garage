@@ -613,6 +613,25 @@ class Garlic:
             f.write(data)
         return out_path
 
+    def resign(self, image_path, account_id_hex, out_path, on_status=None):
+        """An encrypted save image -> the same save signed for another PSN account (GarlicSaves' resign job), written to
+        out_path. account_id_hex is in the order param.sfo stores it, the same as encrypt takes."""
+        jid = self._submit({'operation': 'resign', 'account_id': account_id_hex, 'platform': 'ps5'}, image_path, os.path.basename(image_path))
+        self._wait(jid, on_status=on_status)
+        z = out_path + '.zip'
+        self._result(jid, z)
+        with zipfile.ZipFile(z) as zf:
+            files = [i for i in zf.infolist() if not i.is_dir()]
+            if len(files) != 1:
+                raise GarlicError('unexpected resign result')
+            data = zf.read(files[0])
+        os.remove(z)
+        if len(data) < 0x1000 or data[:2] == b'PK':
+            raise GarlicError('resign result is not a save image')
+        with open(out_path, 'wb') as f:
+            f.write(data)
+        return out_path
+
     # ---- the sign-in: GarlicSaves' device authorisation ----
     def _device(self, path, obj):
         """POST obj as JSON to one of GarlicSaves' device endpoints, without the worker key. Returns (HTTP status,

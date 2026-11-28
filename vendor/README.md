@@ -16,5 +16,9 @@ Changes made for Save Garage:
   the data address at 56) with the computer's IPv6 link-local address on the adapter carrying the connection (found
   with psutil), an IPv6 data listener and oracle keys on that data channel. Every other console gets the original
   reply, byte for byte. The data accept loop keeps running after any failed connection.
+  When the adapter has no link-local IPv6 address, the source prints a `[network]` line naming the adapter and keeps
+  waiting for the PS5 to connect again (1.31.1, pull request #14).
+  On Windows, when psutil can't be loaded, the adapter's addresses come from PowerShell's `Get-NetIPAddress` instead
+  (1.31.2, pull request #18).
 - Modules this app doesn't use (`dt_export_zip.py`, `dt_ftp_server.py`, `dt_save_editor.py`) and the `local_worker`
   and `ncdt_oracle` folders for jailbroken consoles are not included.

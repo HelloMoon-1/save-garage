@@ -26,11 +26,11 @@ your browser, and the PS5 takes it back the same way.
 | | What | Status |
 |---|---|---|
 | **Money** | Bank account, Family Savings and cash for Lucia and Jason. Family Savings goes up to about $2,000,000. The bank goes up to what its own money boxes hold at your point in the story, because shops spend from those. An experimental option goes past them with $85,000 stacks, up to about $230 million, but the game may not let you spend that money. Cash goes up to $20,000. | Tested on PS5; the $85,000 stacks are experimental, and a player couldn't spend them (issue #8) |
-| **Ammo** | Every ammo type each character is carrying, named the way the game names it, with one click to refill to a full load (for example 300 assault rifle rounds) or to set the maximum of 9,999. Also lists the weapons each character carries, and adds guns a character doesn't have yet: 15 for Lucia plus the grenade and sticky bomb, and 16 for Jason, each with the kit and default parts the game gives a gun you buy. | Ammo tested on PS5 up to a full load, and a save with more loads fine; adding guns is experimental and not tested on a PS5 yet |
-| **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. | Tested on PS5, except times, distances and the story and styles percentages |
+| **Ammo** | Every ammo type each character is carrying, named the way the game names it, with one click to refill to a full load (for example 300 assault rifle rounds), the most the game keeps; where the full load isn't known yet (grenades, sticky bombs, RPG and speargun ammo), up to 9,999. Also lists the weapons each character carries, and adds guns a character doesn't have yet: 15 for Lucia plus the grenade and sticky bomb, and 16 for Jason, each with the kit and default parts the game gives a gun you buy. | Ammo tested on PS5: the game keeps up to a full load and cuts larger amounts back to it. Adding guns tested on PS5: they show up in the loadout, as bought guns do |
+| **Stats** | 90 stats named the way the game's own stats screens name them: 100% completion, time played, health, stamina and focus overpowers and buffs, distance, money earned, wanted stars, kills, shots fired, vehicles stolen, fish caught and more. Each one has a sensible maximum: the game's own total where there is one (130 stunt jumps, 80 challenges, 8 vaults), otherwise a cap far above a long playthrough. Times stop at 596 hours per character, because the game's clock wraps past about 1,193 hours for both together. | Tested on PS5, except distances and the story and styles percentages; a PS5 showed 9,999 hours as 454 |
 | **Trophy counters** | Stunts, challenges, discoverables, collectibles, collectible cards and vaults robbed. | Tested on PS5 |
-| **Completion** | Marks every stunt done (jumps, base jumps, under-the-bridge flights and knife flights), discovers every animal and seen weapon in the compendium and every kind of shop and place on the map, completes challenges by category, adds all 8 gym memberships, completes the meditation spots, marks every robbery location and vault fully hit, records the fencing still missing, completes races, ranges, video games, pool, mini golf, drone trials and Bret's decks, scores all 100 basketball hoops, fills the vehicle compendium to 200 base models and marks every collectible card, luxury watch and identified magazine found (book swaps, magazine styles and cocaine flamingos as experimental options), each with the counters the 100% checklist reads, then works out the 100% figure the way the game does. Shows the game's whole 100% checklist, what each line can be set to, and the new 100% figure before you save. Also unlocks the cheats you pick, each shown with what it does and how the game says to unlock it (experimental). | A save with every option loads and plays on PS5; gym memberships, map discoveries, meditation and fencing confirmed in game, the rest not checked yet; cheats not tested on a PS5 yet |
-| **World** | The time of day (the date stays the same), health up to overpowered, and full armour for both characters. Reveals the map: clears the fog of war from the regions known so far, about 722 of the map's 889. For Lucia and Jason: fills the special meter, raises the skills (to 60, the most the game itself wrote, to 99, or to a value you pick; never lowered), sets the criminal profile, and puts on a vest a character owns but isn't wearing. Sets their relationship within the limits the story allows at that point. | Not tested yet; skills, criminal profile, vest and relationship are experimental |
+| **Completion** | Marks every stunt done (jumps, base jumps, under-the-bridge flights and knife flights), discovers every animal and seen weapon in the compendium and every kind of shop and place on the map, completes challenges by category, adds all 8 gym memberships, completes the meditation spots, marks every robbery location and vault fully hit, records the fencing still missing, completes races, ranges, video games, pool, mini golf, drone trials and Bret's decks, scores all 100 basketball hoops, fills the vehicle compendium to 200 base models and marks every collectible card, luxury watch and identified magazine found (book swaps, magazine styles and cocaine flamingos as experimental options), each with the counters the 100% checklist reads, then works out the 100% figure the way the game does. Shows the game's whole 100% checklist, what each line can be set to, and the new 100% figure before you save. Also lists the game's cheats, with what each does, how the game says to unlock it and whether this save has it. | A save with every option loads and plays on PS5; gym memberships, map discoveries, meditation and fencing confirmed in game, the rest not checked yet; unlocking cheats didn't work on a PS5, so it's off |
+| **World** | The time of day (the date stays the same), health up to overpowered, and full armour for both characters. Reveals the map: clears the fog of war from the regions known so far, about 722 of the map's 889. For Lucia and Jason: fills the special meter, raises the skills (to 60, the most the game itself wrote, to 99, or to a value you pick; never lowered), sets the criminal profile, sets the strength (1 to 5), cardio and focus (1 to 4) levels, and puts on a vest a character owns but isn't wearing. Sets their relationship within the limits the story allows at that point. | Not tested yet; skills, criminal profile, levels, vest and relationship are experimental |
 | **All stats** | Every one of the 23,760 stats in the save, searchable, with the game's own wording for the stats it shows and recovered names for most of the rest. Where a real name is still unknown, a plain description of what the stat holds is shown instead, so 99% of the rows in a full-story save read as words. | Can break your save |
 | **Save data** | Every section of the save, with names for 64 of the 82 sections and 610 of the 843 keys. Values that are the ID of a known item, stat, place, mission, news article or social media post show its name or opening words. Any number or true/false value can be changed; text, the story flow, heists, vehicle records and the map's fog stay read-only, and the fields the World tab edits keep to its limits. | Can break your save |
 | **Trophies** | Not editable. The Trophies page in the app explains what a save edit can and can't do for them. | |
@@ -68,9 +68,10 @@ your original save, and the original is backed up on your computer before anythi
    Software, then Data Transfer, and pick **Save Garage Pairing**. The PS5 says it can't transfer data. That's
    expected: pairing has already happened.
 5. **Download.** In GTA VI, save your game and go back to the PS5 home screen. Click Download save. When the app
-   asks, press the PS5 power button once and let go at the beep. The console restarts into transfer mode, and
-   again when the download is done. If more than one account on the PS5 has a GTA VI save, the app asks which
-   account's save to edit; pick one straight away, while the PS5 waits in transfer mode.
+   asks, hold the PS5 power button for about one second, then let go (it beeps after you let go; holding it longer
+   turns the PS5 off). The console restarts into transfer mode, and again when the download is done. If more than one
+   account on the PS5 has a GTA VI save, the app asks which account's save to edit; pick one straight away, while the
+   PS5 waits in transfer mode.
 6. **Edit.** Pick a save (the autosave is what Continue loads), change what you want and click Save edits.
 7. **Send back.** Delete the GTA VI save on the PS5 (it won't overwrite an existing one): Settings, then Saved
    Data and Game/App Settings, then Saved Data (PS5), then Console Storage, then Delete. Then click Send save to
@@ -211,14 +212,16 @@ backups or GarlicSaves sign-in.
   Past its boxes, the bank can also take $85,000 stacks under its $85,000 box, which BuckMe shows in the balance.
   Versions 1.26.0 to 1.30.0 put anything past the boxes in such stacks, but they may not be spendable: a player on
   1.30.0 with about $2,000,000 in the bank couldn't make a $150,000 phone payment (issue #8). Since 1.30.1 the stacks
-  are an experimental option on the Money tab, off by default, until a PS5 shows the game spends them. Each stack takes
-  one inventory slot, and Save Garage always leaves 300 free, so their limit depends on the save (about $230 million in
-  a late save, and at most $999,999,999). An early save, before the story gives the bank its $85,000 box, has no
-  stacks. A bank already past its boxes shows how much of it is in stacks, and **Make it spendable** sets it to what
-  its boxes hold, emptying the stacks. Cash stays at the $20,000 wallet.
+  are an experimental option on the Money tab, off by default, until a PS5 shows the game spends them. Since 1.32.1
+  Save Garage adds at most 100 stacks ($8,500,000 on top of the boxes): a player who filled the bank to $273,630,000,
+  3,218 stacks, found the game nearly froze whenever it paid, until the bank went back to its own boxes (issue #21).
+  Each stack also takes one inventory slot, and Save Garage always leaves 300 free. An early save, before the story
+  gives the bank its $85,000 box, has no stacks. A bank already past its boxes shows how much of it is in stacks, and
+  **Make it spendable** sets it to what its boxes hold, emptying the stacks; that also fixes a save with thousands of
+  them. Cash stays at the $20,000 wallet.
 - **A balance of 0 can't be edited.** The game doesn't store it. Get a little money in the game, save and download again.
 - **Only ammo you carry is listed.** Pick some up in the game first to add a new type.
-- **Adding guns is experimental.** A gun is built row for row the way the game wrote guns that were bought in a save:
+- **Adding guns works like buying them.** A gun is built row for row the way the game wrote guns that were bought in a save:
   the weapon, its standard kit and default parts, and its place in the list of weapons a character has owned. Only
   guns the game wrote with nothing but their default parts in a save Save Garage was built from are offered: 15 for
   Lucia plus the grenade and sticky bomb, and 16 for Jason. The others were only ever seen with bought mods or mission
@@ -229,14 +232,12 @@ backups or GarlicSaves sign-in.
   refill it on the Ammo tab); the grenade and sticky bomb come with 5 and 4. A gun the compendium doesn't list yet is
   added to it too, as the game does, which can raise STANDARD ISSUE WEAPONS and the 100% figure. Nothing a character
   has is changed, each gun takes a few inventory slots (300 are always left free), and an inventory that already
-  breaks one of the game's rules is left alone. Not tested on a PS5 yet.
-- **Cheats are experimental, and using one in the game turns off trophies and saving for the rest of that session.**
-  The game says so when you use one; unlocking a cheat in Save Garage doesn't use it. GTA VI keeps a tracker for each
-  of its 62 cheats in the save, and Save Garage completes the trackers you pick the way the game does when you meet a
-  cheat's condition. Whether the cheat then shows in the game's Progress menu isn't known yet: not tested on a PS5.
-  The two cheats of each challenge category (5 challenges and all of them) can't be told apart in the save, so they
-  are completed together, and 23 trackers that held no progress in any save checked can only be completed all at
-  once. Trophies, the 100% figure, the profile-wide awards and anything else are left alone.
+  breaks one of the game's rules is left alone. Tested on a PS5: the guns show up in the loadout, as guns you buy do.
+- **Cheats can't be unlocked yet.** GTA VI keeps a tracker for each of its 62 cheats in the save. Completing the
+  trackers the way the game does when you meet a cheat's condition was tested on a PS5 and isn't enough: the cheats
+  didn't unlock. When the game unlocks a cheat it also marks it in an unlock list, and that entry is known for only one
+  cheat so far. Until the others are, the Completion tab lists the cheats and which ones the save has, without
+  changing them.
 - **The map reveal is partial.** Save Garage knows 722 of the map's 889 regions: the 52 named regions and the 670
   smaller areas found in game saves. The rest stay covered until you explore them. Regions are only ever added, and
   none the save already has is changed.
@@ -246,6 +247,10 @@ backups or GarlicSaves sign-in.
   Irredeemable); which score gives which profile isn't known yet, and a new game starts Lucia at -25. A vest is put on
   only for a character who owns one and wears no armour. The relationship can be changed only when the story hasn't
   locked it, and only within the limits it sets. None of these has been tested on a PS5 yet.
+- **Strength, cardio and focus levels are experimental.** The game keeps each level twice, in the stats and in the
+  character's physique record, and the copy in the stats alone doesn't last: the game reads the other one when the save
+  loads (found by ShujiJaeger, HelloMoon-1/save-garage#4). Save Garage sets both, and a level it changes starts from
+  the beginning of that level. Not tested on a PS5 yet.
 - **Turn off PS Plus auto-sync for GTA VI** while you test an edited save, so it can't replace your cloud backup.
 - **Trophies can't be written by a save editor.** Spending money you added still unlocks money trophies the normal way.
   Trophy-hunting sites such as PSNProfiles may flag trophies earned with a save editor.
@@ -259,7 +264,7 @@ backups or GarlicSaves sign-in.
 | Pairing or sending fails at once with a permission error | On Linux, ports below 1024 need permission. See [Linux notes](#linux-notes). |
 | Ports 1004 to 1006 are in use | Close any other save-transfer tool or second copy of Save Garage. |
 | The PS5 says there's nothing to transfer | A GTA VI save is still on the console. Delete it, then open Data Transfer again. |
-| Sending back stops with "This PS5 sends saves back over IPv6" | Some PS5 consoles on 14.23 fetch the save over IPv6, even when everything else uses IPv4. Turn on IPv6 for the network adapter the computer uses for the PS5 (it's on by default on most computers), then send back again. Nothing needs to change on the router. |
+| Sending back shows "This transfer needs IPv6 on the local network" | Some PS5 consoles on 14.23 fetch the save over IPv6, even when everything else uses IPv4. The page names the network adapter the computer uses for the PS5 and says how to turn IPv6 on for it (it's on by default on most computers). Leave the page open, turn it on, then search again on the PS5 and select Save Garage. Nothing needs to change on the router. |
 | A download says some saves couldn't be read | GarlicSaves now and then sends back a damaged copy of one save. Save Garage asks for it again twice; if it's still damaged, that save is left out and stays on the PS5 as it is, and the others can be edited. Downloading again later usually reads it. |
 | Decryption service offline | Check your internet connection. GarlicSaves may also be down for a while. |
 | A download stops with "GarlicSaves' key service didn't answer in time" | The GarlicSaves consoles that work out the transfer keys were busy. Before the power prompt, Save Garage tries once more by itself; if that fails too, wait a minute and download again. Nothing is wrong with your PS5. Show details lists how long the key service took and why, for example no worker free or a worker that took too long. |
@@ -268,7 +273,7 @@ backups or GarlicSaves sign-in.
 | Signing in says the code expired | Click Sign in to GarlicSaves again for a new code, and enter it on GarlicSaves before the time shown runs out. |
 | Version 1.29.1 or older stops with "GarlicSaves isn't accepting key requests from Save Garage's shared key" | GarlicSaves revoked that key. Update to 1.30.0 or newer and sign in to GarlicSaves. |
 | A download stops with "The PS5 didn't answer" | Go back to the PS5 home screen, close any other save-transfer tool so Data Transfer is free, and try again. |
-| A download stops with "The power-button wait timed out" | Download again, and when the app asks, press the PS5 power button once within about 5 minutes and let go at the beep. |
+| A download stops with "The power-button wait timed out" | Download again, and when the app asks, hold the PS5 power button for about one second within about 5 minutes, then let go. It beeps after you let go; holding it longer turns the PS5 off. |
 | The bottom of the page says "Update failed" | Nothing changed: Save Garage stays on the version you have. A download that didn't finish or failed a check is tried again at the next check (or click Check for updates); a version that didn't start isn't tried again. You can always download the new version yourself from [Releases](../../releases/latest). `update/update.log` in the data folder says what happened. |
 | The Linux `MoonSlot` folder is gone after a power cut during an update | Rename `.MoonSlot.backup` (named after your folder), next to where it was, back to `MoonSlot`. |
 

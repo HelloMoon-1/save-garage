@@ -22,9 +22,9 @@ The whole app state, polled about once a second by the UI.
   "slots": [{
     "file": "sdimg_SAVEDATASARC0001",                 // or sdimg_sce_sdmemory, the autosave
     "subtitle": "Mission name",
-    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 231933844, "spendable": 85000,
-               "stuck": 0, "boxMax": 223844, "stacks": 0}],
-    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 9999}],
+    "items": [{"inv": 0, "idx": 384, "kind": "bank", "value": 85000, "max": 223844, "maxStacks": 8723844, "spendable": 85000,
+               "stuck": 0, "boxMax": 223844, "stacks": 0, "stackCap": 100}],
+    "ammo": [{"inv": 0, "idx": 120, "type": "rifle", "label": "Assault rifle ammo", "value": 280, "full": 300, "max": 300}],
     "modified": false,
     "changes": [{"kind": "bank", "from": 5000, "to": 85000}],
     "applied": {"money": [], "ammo": [], "stats": []} | null
@@ -32,8 +32,9 @@ The whole app state, polled about once a second by the UI.
   "job": {"id": 3, "kind": "download", "status": "running", "stage": "need_power", "needPower": true,
           "progress": {"files": 2, "total": 5} | null, "hint": null, "error": null, "wait": null, "log": [], "serviceQueue": []},
   "skipped": [{"file": "sdimg_SAVEDATASARC0003", "subtitle": "Mission name", "why": "damaged"}],   // story saves left out: "damaged" or "layout"
+  "users": [{"id": "1447854d", "name": "Name"}],   // the users of the PS5 the session came from (its transfer data)
   "fileCount": 11,                                    // saves of the downloaded account, all of which go back to the PS5
-  "version": "1.31.0",
+  "version": "1.32.1",
   "canQuit": false,                                   // true in the desktop builds
   "update": {"auto": true, "mode": "install", "why": null, "flavour": "windows", "status": "ready", "current": "1.30.0",
              "latest": "1.30.1", "error": null, "progress": null, "total": null, "checked": 1795651200, "installed": null,
@@ -52,13 +53,16 @@ Editor data for one save: featured stats with the exact rows to edit, ammo and t
 For the bank, `max` is what the bank's own money boxes hold at this point in the story, which shops spend from; an edit
 goes no higher unless it asks for the extra stacks (`stacks`, under `/api/patch` below). `maxStacks` is the limit with
 them: a $85,000 stack under the bank's $85,000 box for every inventory slot left above the 300 kept free, at most
-$999,999,999, and equal to `max` when the save has no $85,000 box yet. The stacks are experimental and may not be
-spendable (issue #8). `stacks` counts the extra stacks the bank already has, and `boxMax`, kept for compatibility, is
+`stackCap` (100) stacks in all, and equal to `max` when the save has no $85,000 box yet. The stacks are experimental
+and may not be spendable (issue #8), and thousands of them made the game nearly freeze whenever it paid (issue #21);
+stacks past the cap that a bank already has don't count, so `value` can be above `maxStacks` until it is edited.
+`stacks` counts the extra stacks the bank already has, and `boxMax`, kept for compatibility, is
 where new stacks would start: `max` plus $85,000 for each of them (equal to `max` without any). `stuck` is money an older
 version left in Family Savings boxes under the bank (shown by BuckMe, not spendable; editing the bank moves it), and
 `spendable` is the rest of `value`, extra stacks included. Without `stuck` money, a `value` above `max` is money in extra
-stacks, as versions 1.26.0 to 1.30.0 wrote it.
-For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes.
+stacks, as versions 1.26.0 to 1.30.0 wrote it, or as the experimental option wrote it since 1.30.1.
+For ammo, `full` is a full load in the game (`null` where it isn't known) and `max` is the most Save Garage writes: the
+full load where it's known (a PS5 cut larger amounts back to it), otherwise 9,999.
 Each weapon is
 `{"inv": 0, "id": "5dd5e66d", "name": "weaponspec_autorifle_assault_default", "label": "Kozlov KZ-59", "kind": "Assault rifle"}`:
 `label` is what the game calls it (empty while the weapon isn't identified) and `kind` is the type of weapon when the
@@ -110,6 +114,9 @@ and `errors` says why:
   `level`, `locked`, `disabled` and `problem`, a refusal code
   while it can't be changed); and the limits: `meterFull` (100), `skillMin` and `skillMax` (1 and 99),
   `skillChoices` (60 and 99), `profileMin` and `profileMax` (-100 and 0.25), `profileNewGame` (-25), `vestArmour` (150).
+- `levels`: `characters`, one per character (`key`, `name` and `levels`: `muscle` (strength), `cardio` and `focus`, each
+  `{"value", "stat", "max"}`, counted from 0 as the save keeps them: `value` is the level the game reads, `stat` the
+  copy in the stats, `max` 4 for strength and 3 for the others); `max` and `problem` (a refusal code).
 - `fog`: the map's fog of war. `regions` uncovered in the save (`named` and `cells`), `known` (the 722 regions Save
   Garage knows: `knownNamed` 52, `knownCells` 670), `mapTotal` (889), `missing` (known regions the save still lacks),
   `unknown` (regions in the save that Save Garage doesn't know, kept as they are) and `problem` (a refusal code).
@@ -124,7 +131,7 @@ the same limits the World tab keeps to: maximum health is read-only; health is 1
 to 0.25; the relationship uses 0–100 and updates its estimated level. It is read-only while the story has it locked or switched
 off, and those caps and flags are read-only themselves; the skill slots of a character's attributes go up to 99 and
 slot 24 to 100; an armour part's fArmour goes up to its fMaxArmour, and fMaxArmour up to 150. FogOfWar is read-only
-(the World tab reveals the map).
+(the World tab reveals the map), and so is ScriptCharacterPhysique (the World tab sets the levels in it).
 
 ## POST endpoints
 
@@ -191,9 +198,22 @@ Each story save is decrypted and checked: a copy that isn't a JSAV save (GarlicS
 then, GitHub issue #11) is asked for again, up to three decrypts in all. A save that still can't be read is left out and
 listed in `state.skipped` (`why` is `damaged`, or `layout` for a JSAV save the reader can't follow); its file goes back
 to the PS5 unchanged. When no story save can be read the download ends with `decrypt_bad` (a damaged copy among them) or
-`save_layout_changed`. Sending back ends with `ipv6_needed` when the PS5 asked for its data over IPv6 (a console that
-sends `01000000` at bytes 52-55 of its power request, issue #7) and the computer's network adapter for it has no IPv6
-address.
+`save_layout_changed`. While sending back, a PS5 that asked for its data over IPv6 (a console that sends `01000000` at
+bytes 52-55 of its power request, issue #7) when the computer's network adapter for it has no link-local IPv6 address
+sets `job.hint` to `{"code": "local_ipv6", "adapter": "<adapter name, or empty>", "platform": "win32" | "darwin" | "linux"}`
+(pull request #14); the job keeps waiting (stage `waiting_console`), and the next connection from the PS5 clears it.
+The adapter's addresses come from psutil; on Windows, when psutil can't be loaded, from Windows itself (PowerShell's
+`Get-NetIPAddress`, pull request #18). Sending back ends with `adapter_query_failed` when that fails too, and with
+`tool_failed` when psutil is missing on another system.
+
+`/api/upload` takes `{"to": "<user ID>"}` (one of `state.users`) to send the session's saves to another account on the same
+PS5. Every file of the save is re-signed for that account's PSN account ID (from the PS5's transfer data) with
+GarlicSaves' `resign` job, one job a file (stage `resigning`, with `progress`), and one copy is decrypted again to
+check it carries the new account (stage `resign_check`). The copy becomes a new library entry under the other
+user's save folder, keeping the PS5's own file headers with only the entry ID and the user in the path changed,
+and is sent like any other save. A copy made earlier in the session from the same files is used again. With `to`
+the upload doesn't need edits. It ends with `resign_failed` when GarlicSaves can't sign the saves or the copy
+doesn't check out; nothing is sent then.
 
 The details (`job.log`, `job.error.detail`) show the data folder as `<data>`, the home folder as `~` and a PS5's ID in a
 path as `<console>`, since they get pasted into bug reports.
@@ -216,7 +236,8 @@ counts and reasons only: never the worker key, key material, the client or serve
   "fog": "known",                           // reveal every map region Save Garage knows
   "lucia": {"meter": "full", "skills": 99, "profile": -25.0, "vest": true},
   "jason": {"skills": 60},                  // any of the four, for either character
-  "relationship": 69                        // 0–100, updates the stored level
+  "relationship": 69,                       // 0–100, updates the stored level
+  "levels": {"lucia": {"muscle": 4, "cardio": 3, "focus": 3}, "jason": {"cardio": 1}}   // counted from 0
 }
 ```
 
@@ -234,6 +255,11 @@ Every key may be left out, and every edit is checked against the save before any
   character who already wears armour is left as is.
 - `relationship` is refused while the story has it locked (`relationship_locked`) or switched off
   (`relationship_disabled`), and outside 0–100 (`out_of_range`). The editor writes the score and level together using the estimated thresholds in `player.relationship.levelStarts`. The script bounds are preserved.
+- `levels` sets strength (`muscle`, 0 to 4), `cardio` and `focus` (0 to 3), counted from 0 as the save keeps them (the
+  game shows them from 1). Both copies are written: the character's record in ScriptCharacterPhysique, which the game
+  reads when the save loads, and `currentlevel` in the stats, with `numlevelups` for cardio and focus so that ups minus
+  downs still gives the level. A level that changes has its progress points set to 0. Refused when a record or stat
+  isn't where Save Garage expects (`levels_layout`).
 
 Out-of-range values are `out_of_range`, wrong types `bad_value`, and unknown keys in a character's object
 `bad_request` (other keys of `world` are ignored); in the job's error they carry the `save_` prefix. Applying the
@@ -271,8 +297,9 @@ character), `bad_request`, `verify_failed` (the result isn't the old inventory p
 Each chosen cheat tracker that isn't complete is completed the way the game completes one when its condition is met:
 `isComplete` true and the empty parameter, nothing else. No counter or 100% line counts these trackers, so the
 checklist and the 100% figure stay as they are; the profile-wide awards, the goals and the unlock catalogs aren't
-touched. Whether the cheat then shows in the game's Progress menu isn't known yet. Using a cheat in the game turns off
-trophies and saving for the rest of that session. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
+touched. Tested on a PS5, that doesn't unlock the cheats: when the game unlocks one it also sets the cheat's entry in
+the unlock catalog (block 6df5d2cf) from 0 to 2, and that entry is known for only one cheat so far. So the page lists
+the cheats read-only and doesn't send this edit; the API keeps it for research. Refused: `cheats_layout` (the set isn't the 62 known trackers, or a
 record isn't shaped as the game writes it), `not_editable` (a record of another challenge set), `unknown_challenge`,
 `bad_request`, `verify_failed`. Errors carry the `save_` prefix in the job's error.
 

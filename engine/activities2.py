@@ -383,7 +383,7 @@ def range_access(st):
         flags = [st.value('unlocked', t, r) for r, t in tiers]
         venues.append({'id': venue, 'label': label, 'open': st.value('unlocked', 0, venue) is True,
                        'available': sum(x is True for x in flags), 'total': len(flags),
-                       'valid': all(type(x) is bool for x in flags)})
+                       'valid': type(st.value('unlocked', 0, venue)) is bool and all(type(x) is bool for x in flags)})
     # The old checklist preset changed the global gold count and percentage only.
     # Cross-check three independent breakdowns before offering a repair.
     gold = 'shootingrangegoldmedals'
@@ -399,7 +399,7 @@ def range_access(st):
             break
         counts.append(sum(detailed))
     recorded = sum(counts) if len(counts) == len(VENUES) else None
-    recipe = gold_recipe(st) if recorded and all(v['open'] and v['valid'] for v in venues) else None
+    recipe = gold_recipe(st) if recorded and all(v['valid'] for v in venues) else None
     last = list(recipe[2][:3]) if recipe else None
     return {'venues': venues, 'recorded': recorded, 'checklist': st.value(gold, 0, ST), 'last': last,
             'lastLocked': bool(last and not st.value('unlocked', last[2], last[1]))}
@@ -429,8 +429,9 @@ def apply_range_access(b, choice):
         venue = item['id']
         if venue not in venues:
             continue
-        if not item['open'] or not item['valid']:
+        if not item['valid']:
             raise fl.FeatureError('range_access')
+        ed.put('unlocked', 0, venue, True, venue)
         for v, name, tiers in RANGES:
             if v != venue:
                 continue
@@ -442,6 +443,7 @@ def apply_range_access(b, choice):
         ed.put('challengesunlocked', 0, venue, item['total'], venue)
         ed.put('shootingrangecoursesunlocked', 0, venue, sum(v == venue for v, _, _ in RANGES), venue)
     if venues:
+        ed.put('shootingrangelocationsunlocked', 0, ST, sum(ed.get('unlocked', 0, v) for v, _ in VENUES), 'Range locations')
         for global_key, local_key in [('shootingrangechallengesunlocked', 'challengesunlocked'),
                                       ('shootingrangecoursesunlocked', 'shootingrangecoursesunlocked')]:
             ed.put(global_key, 0, ST, sum(ed.get(local_key, 0, v) for v, _ in VENUES), global_key)
@@ -536,6 +538,13 @@ def _apply_videogames(ed, level):
     return _counter(ed, 'videogames', new), new
 
 
+def _detail_total(ed, key, total):
+    _, label, (base, qual, owner), _, _, _ = LINE[key]
+    ed.put(base, qual, owner, total, label)
+    _percent(ed, key, total)
+    return total
+
+
 def _apply_races(ed, level):
     if level == 'counter':
         new = max(0, LINE['races'][4] - ed.get('uniqueraceswon'))
@@ -556,7 +565,7 @@ def _apply_races(ed, level):
         for base, what in (('raceswon', 'races won'), ('racesplayed', 'races entered'), ('racescompleted', 'races completed'),
                            ('firstplacereached', 'first places')):
             ed.add(base, g, ST, k, '%s: %s' % (lab, what))
-    return _counter(ed, 'races', new_rows), new_rows
+    return _detail_total(ed, 'races', len(RACES)), new_rows
 
 
 def _apply_racechallenges(ed, level):
@@ -568,7 +577,7 @@ def _apply_racechallenges(ed, level):
         if ed.get('highestmedal', c) < GOLD:
             new += 1
             ed.put('highestmedal', c, ST, GOLD, 'Race challenge %s: gold medal' % (lab or _name(c)))
-    return _counter(ed, 'racechallenges', new), new
+    return _detail_total(ed, 'racechallenges', len(RACE_CHALLENGES)), new
 
 
 def _apply_shootingranges(ed, level):
@@ -612,10 +621,9 @@ def _apply_drones(ed, level):
     if level == 'counter':
         new = max(0, LINE['drones'][4] - ed.get('droneracesroutescompleted'))
         return _counter(ed, 'drones', new), new
-    new_routes = new_found = 0
+    new_routes = 0
     for v in DRONE_VENUES:
         if not ed.get('found', 0, v):
-            new_found += 1
             ed.put('found', 0, v, True, 'Top Fun Drones %s: unlocked' % v)
         k = 0
         for r in DRONE_ROUTES:
@@ -624,10 +632,10 @@ def _apply_drones(ed, level):
                 ed.put('completionstate', r, v, 1, 'Drone time trial %s %s: completed' % (v, r))
             if ed.get('attempts', r, v) < 1:
                 ed.put('attempts', r, v, 1, 'Drone time trial %s %s: attempts' % (v, r))
-        ed.add('routescompleted', 0, v, k, 'Top Fun Drones %s: routes completed' % v)
+        ed.put('routescompleted', 0, v, len(DRONE_ROUTES), 'Top Fun Drones %s: routes completed' % v)
         new_routes += k
-    ed.add('droneracesfound', 0, ST, new_found, 'Top Fun Drones unlocked')
-    return _counter(ed, 'drones', new_routes), new_routes
+    ed.put('droneracesfound', 0, ST, len(DRONE_VENUES), 'Top Fun Drones unlocked')
+    return _detail_total(ed, 'drones', len(DRONE_VENUES) * len(DRONE_ROUTES)), new_routes
 
 
 def _apply_bret(ed, level):
@@ -714,6 +722,6 @@ def apply(b, choice=None):
         if new:
             log.append({'what': 'line', 'line': k, 'level': levels[k], 'added': new, 'counter': value, 'of': LINE[k][4],
                         'confidence': LINE[k][5]})
-    if not log:
+    if not log and not ed.moved:
         return b, []
     return finish(s, st, ed.moved, log)

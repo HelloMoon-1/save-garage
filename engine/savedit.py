@@ -283,7 +283,9 @@ SLOT_AMMO = joaat('slotid_ammo')
 # standard type leaves in a real save. The full amount of grenades, sticky bombs, RPG and speargun ammo isn't known.
 AMMO_FULL = {'pistol': 100, 'shotgun': 100, 'marksman': 120, 'rifle': 300, 'sniper': 80,
              'revolver': 100, 'smg': 300, 'mg': 200, 'minigun': 300, 'sporting': 200}
-AMMO_MAX = 9999          # the most Save Garage writes. Amounts above a full load haven't been tried on a PS5.
+# The most Save Garage writes where the full load isn't known. Where it is, the full load is the limit: tested on a PS5,
+# the game cut 9,999 rounds back to a full load when it loaded the save.
+AMMO_MAX = 9999
 
 
 def ammo(sec_txt):
@@ -296,7 +298,7 @@ def ammo(sec_txt):
             if item & M32 in AMMO_ITEMS and v['slot'][r] & M32 == SLOT_AMMO:
                 t = AMMO_ITEMS[item & M32]
                 out.append({'inv': n, 'idx': r, 'type': t, 'label': AMMO_LABELS[t], 'value': v['qty'][r],
-                            'full': AMMO_FULL.get(t), 'max': AMMO_MAX})
+                            'full': AMMO_FULL.get(t), 'max': AMMO_FULL.get(t) or AMMO_MAX})
     return out
 
 
@@ -311,7 +313,7 @@ def _apply_ammo(txt, changes):
         if isinstance(nv, bool) or not isinstance(nv, (int, float)) or (isinstance(nv, float) and not nv.is_integer()):
             raise SaveError('bad_value')
         nv = int(nv)
-        if not 1 <= nv <= AMMO_MAX:
+        if not 1 <= nv <= a['max']:
             raise SaveError('out_of_range')
         if nv == a['value']:
             continue
@@ -325,7 +327,7 @@ def apply(b, edits, *, task_reference=None):
     """edits: {'money': [...], 'ammo': [...], 'stats': [...], 'guns': {...}, 'completion': {...}, 'world': {...}} applied to
     the original file -> (bytes, log). 'guns' is guns.py's choice ({'lucia': [...], 'jason': [...]}); 'completion' holds
     one choice per Completion part, 'cheats' (challenges.apply_cheats) among them; 'world' holds world.py's time, health
-    and armour, player.py's 'lucia', 'jason' and 'relationship', and fog.py's 'fog'."""
+    and armour, player.py's 'lucia', 'jason' and 'relationship', levels.py's 'levels' and fog.py's 'fog'."""
     b, log = _apply_core(b, edits)
     if edits.get('raw'):
         import savebrowse
@@ -379,7 +381,7 @@ def apply(b, edits, *, task_reference=None):
             b, clog = checklist.apply(b, {'overall': 'recompute'})     # the 100% figure, as the game works it out
             log += [dict(x, what='completion', step=x.get('what'), label='100% completion') for x in clog]
     if edits.get('world'):
-        import world, player, fog
+        import world, player, levels, fog
         w = edits['world']
         try:
             known = {k: v for k, v in w.items() if k.startswith('research_')}
@@ -391,8 +393,8 @@ def apply(b, edits, *, task_reference=None):
         except (world.WorldError, KeyError, ValueError, TypeError) as e:
             raise SaveError(str(e) if isinstance(e, world.WorldError) else 'bad_request') from e
         log += wlog
-        # the characters (attributes, criminal profile, relationship, vest) and the map, on the same tab
-        for mod, choice in ((player, {k: w[k] for k in player.KEYS if w.get(k) is not None}), (fog, w.get('fog'))):
+        # the characters (attributes, criminal profile, relationship, vest), their levels and the map, on the same tab
+        for mod, choice in ((player, {k: w[k] for k in player.KEYS if w.get(k) is not None}), (levels, w.get('levels')), (fog, w.get('fog'))):
             if choice:
                 try:
                     b, plog = mod.apply(b, choice)
@@ -596,7 +598,9 @@ FEATURED = [s if s.id not in TESTED_ON_PS5 else s._replace(
 # 100% checklist), otherwise a limit far above what a long playthrough reaches and far below where a counter could
 # overflow as the game keeps adding to it. Raw units: milliseconds, metres, dollars or a count.
 HOUR, KM = 3600000, 1000
-DEFAULT_MAX = {'percent': 100, 'ms': 9999 * HOUR, 'distance': 99999 * KM, 'money': 99999999, 'count': 99999}
+# Time is the exception: the game counts it in 32-bit milliseconds, which wraps past 1,193 hours (9,999 hours came back
+# from a PS5 as 454:37:42). Each character gets at most 596 hours, so the game-wide total, Lucia's plus Jason's, still fits.
+DEFAULT_MAX = {'percent': 100, 'ms': 596 * HOUR, 'distance': 99999 * KM, 'money': 99999999, 'count': 99999}
 SPEC_MAX = {
     'side_tasks': (100, 'the number of optional tasks in the game'),
     'overpowers_health': (999, ''), 'overpowers_stamina': (999, ''), 'overpowers_focus': (999, ''),

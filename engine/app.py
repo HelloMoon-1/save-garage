@@ -1,7 +1,7 @@
 # Save Garage - Copyright (C) 2026 CoreyLyu76 (gta6-save-editor) and NotHGM - GNU GPL v3; NotHGM's parts also carry
 # the additional terms in NOTICE. See LICENSE.
 """Save Garage local service. The web UI only talks to the /api endpoints here; see docs/API.md."""
-import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math, secrets
+import json, os, sys, subprocess, threading, time, shutil, struct, zipfile, sqlite3, mimetypes, re, traceback, ipaddress, math, secrets, hashlib
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from contextlib import contextmanager, ExitStack
@@ -26,7 +26,7 @@ else:
 DATA = APP_SUPPORT / 'MoonSlot' if DESKTOP else ROOT / 'data'
 # GarlicTransfer (Electron) user-data folder, used to reuse a pairing it already made.
 GT_DIR = Path.home() / 'Library' / 'Application Support' / 'garlic-transfer' if MAC else Path(os.environ.get('APPDATA', '')) / 'garlic-transfer'
-VERSION = '1.31.2'
+VERSION = '1.32.1'
 PORT = int(os.environ.get('SAVEGARAGE_PORT', '7283'))          # 7283 spells SAVE on a phone keypad
 # The UI listens on this computer only unless SAVEGARAGE_HOST says otherwise. SAVEGARAGE_ALLOW lists the client
 # networks that may use the UI and API (default: this computer). The Host and Origin checks below also accept
@@ -35,8 +35,9 @@ BIND = os.environ.get('SAVEGARAGE_HOST', '127.0.0.1')
 ALLOW_NETS = [ipaddress.ip_network(n.strip(), strict=False) for n in os.environ.get('SAVEGARAGE_ALLOW', '127.0.0.0/8').split(',') if n.strip()]
 OK_HOSTS = ['127.0.0.1', 'localhost'] + ([BIND] if BIND not in ('', '0.0.0.0', '127.0.0.1', 'localhost') else [])
 GTA_TITLES = ['PPSA01547', 'PPSA38500', 'PPSA29660']   # GTA VI title IDs (regions); PPSA29660: GarlicSaves treats it as GTA VI too
-# the World tab's edits: world.py (time, health, armour), player.py (each character and the relationship), fog.py (the map)
-WORLD_KEYS = ('time', 'health', 'armour', 'lucia', 'jason', 'relationship', 'fog')
+# the World tab's edits: world.py (time, health, armour), player.py (each character and the relationship), levels.py
+# (strength, cardio and focus), fog.py (the map)
+WORLD_KEYS = ('time', 'health', 'armour', 'lucia', 'jason', 'relationship', 'levels', 'fog')
 NOWIN = 0x08000000 if os.name == 'nt' else 0
 PY = sys.executable
 LAST_SEEN = {'t': time.time()}
@@ -166,7 +167,7 @@ RESTART = threading.Event()                                 # set by /api/update
 SRV = {'s': None}
 
 STATE = {'console': None, 'paired': False, 'session': None, 'user': None, 'entryId': None, 'title': None, 'fileCount': 0,
-         'slots': [], 'skipped': [], 'readyToUpload': False, 'network': None}
+         'slots': [], 'skipped': [], 'users': [], 'readyToUpload': False, 'network': None}
 JOB = {'id': 0, 'kind': None, 'status': 'idle', 'stage': None, 'needPower': False, 'progress': None, 'error': None, 'hint': None, 'accounts': None,
        'wait': None, 'log': []}
 CHOICE = {'event': threading.Event(), 'owner': None}      # the PS5 account picked on the download page
@@ -732,6 +733,173 @@ def no_readable_slots(skipped):
     return Fail('no_story_slot')
 
 
+# ---------------- sending to another account on the same PS5 ----------------
+def ps5_users(lib):
+    """The users of the PS5 the session came from (its transfer data): [{'id': 8-hex user ID, 'name'}]. No account IDs."""
+    try:
+        db = sqlite3.connect((Path(lib) / 'Transfer-Metadata' / 'metadata.db').as_uri() + '?mode=ro', uri=True)
+        try:
+            rows = db.execute('SELECT user_id, user_name, login_id, online_id FROM user_info_tbl ORDER BY user_id').fetchall()
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return []
+    return [{'id': '%08x' % u, 'name': n or l or o or 'user'} for u, n, l, o in rows if isinstance(u, int)]
+
+
+def sfo_account_of(metadata, user_id):
+    """The PSN account ID of a PS5 user, in the byte order param.sfo stores it (what GarlicSaves' encrypt and resign take).
+    The transfer data holds it as a 64-bit number whose hex digits run the other way."""
+    db = sqlite3.connect(Path(metadata).as_uri() + '?mode=ro', uri=True)
+    try:
+        row = db.execute('SELECT account_id FROM user_info_tbl WHERE user_id = ?', (int(user_id, 16),)).fetchone()
+    finally:
+        db.close()
+    if not row or not isinstance(row[0], int) or not row[0]:
+        raise Fail('resign_failed', 'no account ID for that user')
+    return (row[0] & 0xffffffffffffffff).to_bytes(8, 'big')[::-1].hex()
+
+
+RESIGN_TRIES = 3                        # a resign job GarlicSaves rate-limits is sent again after its wait, this many times
+
+
+def copy_to_user(sess, lib, entry_id, target):
+    """The library entry's saves as another PS5 user's: every file re-signed for that user's account by GarlicSaves (one
+    resign job a file), registered as a new entry under /user/home/<target>/savedata_prospero/<title>/. Each file keeps
+    the PS5's own GFP5 header with only the entry ID and the user in its path changed. Before anything is sent, one
+    re-signed file is decrypted again to check it carries the new account. Returns (new entry ID, {'id', 'name'}). A copy
+    already made in this session from the same files is used again."""
+    users = {u['id']: u for u in ps5_users(lib)}
+    if target not in users:
+        raise Fail('bad_request')
+    meta = Path(lib) / 'Transfer-Metadata' / 'metadata.db'
+    account = sfo_account_of(meta, target)
+    root_manifest = Path(lib) / 'Transfer-Metadata' / 'manifest.json'
+    doc = json.loads(root_manifest.read_text('utf-8'))
+    entry = doc[str(entry_id)]
+    owner, title = STATE['user']['id'], STATE['title']
+    src_dir = Path(lib) / 'Saves' / owner / title
+    sources = [src_dir / it['file'] for it in entry['files']]
+    if not sources or not all(s.is_file() for s in sources):
+        raise Fail('resign_failed', 'a save file of the entry is missing')
+    digests = [hashlib.sha256(s.read_bytes()).hexdigest() for s in sources]
+    work = sess / 'copies' / target
+    marker = work / 'copy.json'
+    if marker.is_file():
+        try:
+            m = json.loads(marker.read_text('utf-8'))
+            if m.get('source') == digests and str(m.get('entry')) in json.loads(root_manifest.read_text('utf-8')):
+                log('copy for %s: using the one made earlier in this session' % users[target]['name'])
+                entry_row(meta, int(m['entry']), target, title, int(m.get('size') or 0))
+                return int(m['entry']), dict(users[target])
+        except (ValueError, KeyError, TypeError):
+            pass
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    out = []
+    for i, src in enumerate(sources):
+        with LOCK:
+            JOB['progress'] = {'files': i, 'total': len(sources)}
+        stage('resigning')
+        dest = work / src.name
+        for attempt in range(RESIGN_TRIES + 1):
+            try:
+                G.resign(str(src), account, str(dest), on_status=lambda s, n=src.name: log('resign %s: %s' % (n, s)))
+                break
+            except garlic.RateLimited as e:
+                if attempt == RESIGN_TRIES:
+                    raise
+                wait = min(e.retry_after or 60, 75)
+                log('resign %s: GarlicSaves is limiting requests, trying again in %d s' % (src.name, wait))
+                if pause(wait):
+                    raise Fail('cancelled')
+            except garlic.GarlicRefused:
+                raise
+            except garlic.GarlicError as e:
+                raise Fail('resign_failed', '%s: %s' % (src.name, e))
+        out.append(dest)
+    with LOCK:
+        JOB['progress'] = {'files': len(sources), 'total': len(sources)}
+    # check one copy: decrypted again, it must carry the new account (the smallest story slot, else the first file)
+    probe = min((d for d in out if SLOT_RE.fullmatch(d.name)), key=lambda d: d.stat().st_size, default=out[0])
+    stage('resign_check')
+    top = Path(G.decrypt(str(probe), str(work / 'check'), on_status=lambda s: log('check %s: %s' % (probe.name, s))))
+    got = sfo_fields(top / 'sce_sys' / 'param.sfo').get('_account')
+    if got != account:
+        raise Fail('resign_failed', 'the copy is still signed for another account')
+    new_id = register_copy(lib, entry_id, entry, target, title, out)
+    marker.write_text(json.dumps({'source': digests, 'entry': new_id, 'size': sum(f.stat().st_size for f in out)}), 'utf-8')
+    log('copy for %s: %d files re-signed and checked, entry %d' % (users[target]['name'], len(out), new_id))
+    return new_id, dict(users[target])
+
+
+def register_copy(lib, entry_id, entry, target, title, files):
+    """Add the re-signed files as a library entry of user target: payloads under Saves/<target>/<title>/, the entry in
+    both manifests (as dt_metadata.persist_manifest_entry writes them) and its row in the transfer data. Returns its ID."""
+    lib = Path(lib)
+    meta = lib / 'Transfer-Metadata' / 'metadata.db'
+    root_manifest = lib / 'Transfer-Metadata' / 'manifest.json'
+    doc = json.loads(root_manifest.read_text('utf-8'))
+    db = sqlite3.connect(str(meta))
+    try:
+        used = {int(k) for k in doc if k.isdigit()} | {r[0] for r in db.execute('SELECT id FROM dir_entry_info_tbl')}
+        new_id = max(used | {99999}) + 1       # above any ID a console browse gives
+        dest = lib / 'Saves' / target / title
+        dest.mkdir(parents=True, exist_ok=True)
+        items, total = [], 0
+        for it, f in zip(entry['files'], files):
+            data = f.read_bytes()
+            (dest / it['file']).write_bytes(data)
+            path = '/user/home/%s/savedata_prospero/%s/%s' % (target, title, it['file'])
+            header = bytearray.fromhex(it['header'])
+            if len(header) != 1304 or header[276:1300].split(b'\0', 1)[0].decode() != it['path']:
+                raise Fail('resign_failed', 'unexpected transfer header for ' + it['file'])
+            struct.pack_into('<I', header, 4, new_id)
+            header[276:1300] = bytes(1024)
+            header[276:276 + len(path)] = path.encode()
+            struct.pack_into('<Q', header, 0x20, len(data))
+            struct.pack_into('<Q', header, 0xF0, len(data))
+            items.append({'path': path, 'file': it['file'], 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                          'header': header.hex()})
+            total += len(data)
+        final = bytearray.fromhex(entry['final_header'])
+        struct.pack_into('<I', final, 4, new_id)
+        new_entry = {'files': items, 'final_header': final.hex()}
+        doc[str(new_id)] = new_entry
+        tmp = root_manifest.with_name(root_manifest.name + '.copy.tmp')
+        tmp.write_text(json.dumps(doc, indent=2) + '\n', 'utf-8')
+        os.replace(tmp, root_manifest)
+        em = lib / 'Transfer-Metadata' / str(new_id)
+        em.mkdir(parents=True, exist_ok=True)
+        (em / 'manifest.json').write_text(json.dumps({'entry_id': new_id, 'files': items, str(new_id): new_entry}, indent=2) + '\n', 'utf-8')
+    finally:
+        db.close()
+    entry_row(meta, new_id, target, title, total)
+    return new_id
+
+
+def entry_row(meta, new_id, target, title, total):
+    """Make the transfer data hold exactly one row for the target user's save folder of this title: dt_metadata's upload
+    builder matches the copy to that row and sends it under the PS5's own entry ID. When the PS5 already listed the folder
+    (the account had a save of this title when the saves were downloaded), its row is the one, and a row of ours for the
+    same folder is taken out again; otherwise the copy gets a row of its own."""
+    path = '/user/home/%s/savedata_prospero/%s/' % (target, title)
+    db = sqlite3.connect(str(meta))
+    try:
+        rows = [r[0] for r in db.execute('SELECT id FROM dir_entry_info_tbl WHERE target_type = 3 AND lower(path) = lower(?)', (path,))]
+        console = [r for r in rows if r != new_id]
+        if console:
+            db.execute('DELETE FROM dir_entry_info_tbl WHERE id = ?', (new_id,))
+        elif not rows:
+            db.execute('INSERT INTO dir_entry_info_tbl (id, path, partition, target_type, target_subtype, title_id, content_id, actual_size, '
+                       'transfer_size, required_size, required_zone_size) VALUES (?, ?, 1, 3, 0, \'\', \'\', ?, ?, ?, 0)',
+                       (new_id, path, total, total, total))
+        db.commit()
+    finally:
+        db.close()
+
+
 # sce_sdmemory is the game's autosave (what Continue loads); its memory.dat has the same format as manual saves
 SLOT_RE = re.compile(r'sdimg_(SAVEDATASARC\d+|sce_sdmemory)')
 
@@ -1071,7 +1239,7 @@ def restore_session(resume=False):
             s['excluded'] = s['file'] in excluded
     with LOCK:
         STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': names.get(owner.lower(), 'user')}, entryId=entry_id, title=title,
-                     slots=slots, skipped=skipped, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
+                     users=ps5_users(lib), slots=slots, skipped=skipped, readyToUpload=any(s['modified'] for s in slots), fileCount=len(list((lib / 'Saves' / owner / title).glob('sdimg_*'))))
     log('restored session ' + sess.name)
 
 
@@ -1248,7 +1416,7 @@ def job_download():
     remember_skipped(sess, skipped)
     slots.sort(key=lambda s: s['file'])
     with LOCK:
-        STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], slots=slots, skipped=skipped, readyToUpload=False, fileCount=len(imgs))
+        STATE.update(session=str(sess), selectionId=secrets.token_hex(12), resumeDownload=None, user={'id': owner, 'name': uname}, entryId=e['id'], title=e['title'], users=ps5_users(lib), slots=slots, skipped=skipped, readyToUpload=False, fileCount=len(imgs))
     stage('ready')
 
 
@@ -1367,6 +1535,9 @@ def job_restore():
 
 
 def upload_network_hint(line):
+    """job.hint for a [network] line of the transfer code: a PS5 asked for IPv6 data (issue #7) and the adapter carrying
+    its connection has no link-local IPv6 address. The upload keeps waiting, so the player can turn IPv6 on and pick Save
+    Garage on the PS5 again; the next connection clears the hint."""
     if not line.startswith('[network] '):
         return None
     try:
@@ -1380,7 +1551,9 @@ def upload_network_hint(line):
             'platform': sys.platform}
 
 
-def job_upload():
+def job_upload(target=None):
+    """Send the session's saves back to the PS5: to the account they came from, or, with target (another user on this PS5,
+    an 8-hex user ID), as that account's saves, signed for it first (copy_to_user)."""
     c = STATE['console']; sess = Path(STATE['session']); lib = sess / 'lib'; up = sess / 'upload'; up.mkdir(exist_ok=True)
     stage('preparing')
     excludes = []
@@ -1388,9 +1561,12 @@ def job_upload():
         if slot.get('excluded'):
             check_slot_backup(sess, slot['file'])
             excludes.extend(['--exclude-slot', slot['file']])
-    run_tool(['poc.dt_metadata', '--output', str(up / 'generated-metadata.db'), '--user-id', STATE['user']['id'], '--assets', str(lib),
-              '--user-name', STATE['user']['name'], '--manifest-output', str(up / 'generated-upload-manifest.json'),
-              '--source', str(lib / 'Transfer-Metadata' / 'metadata.db'), '--entry-id', str(STATE['entryId']), *excludes])
+    user, entry_id = STATE['user'], STATE['entryId']
+    if target and target.lower() != str(user['id']).lower():
+        entry_id, user = copy_to_user(sess, lib, entry_id, target.lower())
+    run_tool(['poc.dt_metadata', '--output', str(up / 'generated-metadata.db'), '--user-id', user['id'], '--assets', str(lib),
+              '--user-name', user['name'], '--manifest-output', str(up / 'generated-upload-manifest.json'),
+              '--source', str(lib / 'Transfer-Metadata' / 'metadata.db'), '--entry-id', str(entry_id), *excludes])
     manifest = json.loads((up / 'generated-upload-manifest.json').read_text('utf-8'))
     total = sum(len(entry['files']) for entry in manifest.values())
     env = {'DT_METADATA': str(up / 'generated-metadata.db'), 'DT_ASSETS': str(lib), 'DT_MANIFEST': str(up / 'generated-upload-manifest.json'),
@@ -1403,6 +1579,9 @@ def job_upload():
     p = spawn(['poc.dt_source'], env=env)
     stage('waiting_console')
     files = 0; finished = False
+    waiting_for_data = False
+    data_seen = False
+    disconnects = 0
     for line in p.stdout:
         line = line.rstrip(); low = line.lower()
         hint = upload_network_hint(line)
@@ -1420,8 +1599,21 @@ def job_upload():
             raise Fail('adapter_query_failed', line)
         if 'psutil package is missing' in low:
             raise Fail('tool_failed', line)     # a source checkout that predates the psutil requirement
-        if '[tcp] connection from' in low:
+        if '[compat] the ps5 asked for the newer console info' in low:
+            waiting_for_data = not data_seen
+        elif '[data] connection from' in low:
+            data_seen = True
+            waiting_for_data, disconnects = False, 0
             stage('console_connected', hint=None)
+        elif waiting_for_data and not files and '[cmd] session ended: connection closed' in low:
+            waiting_for_data = False
+            disconnects += 1
+            if disconnects >= 2:
+                stage('waiting_console', hint={'code': 'ipv6_data_unreached', 'platform': sys.platform})
+                log('The console reconnected without opening the IPv6 data connection (TCP 1005).')
+        if '[tcp] connection from' in low:
+            if disconnects < 2:
+                stage('console_connected', hint=None)
         elif 'gfp5 id=' in low and files == 0:
             stage('transferring')
         elif 'gfp5 file complete' in low:
@@ -1544,18 +1736,18 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, savebrowse.node(b, int(q['section'][0], 16), p, int((q.get('offset') or ['0'])[0]), 200))
             except Exception as e:
                 return self._send(400, {'error': 'bad_request', 'detail': repr(e)[:300]})
-        if path == '/api/world':                        # time of day, health and armour, the characters and the map
+        if path == '/api/world':                        # time of day, health and armour, the characters, their levels and the map
             slot = slot_by_file((parse_qs(url.query).get('file') or [''])[0]) if STATE['session'] else None
             if not slot:
                 return self._send(404, {'error': 'no_slot'})
             try:
-                import world, player, fog
+                import world, player, levels, fog
                 b = slot_bytes(slot)
                 out = world.read(b)
             except Exception as e:
                 return self._send(500, {'error': 'internal', 'detail': repr(e)[:300]})
             out['errors'] = {}
-            for key, mod in (('player', player), ('fog', fog)):   # each on its own: one that can't be read leaves the rest working
+            for key, mod in (('player', player), ('levels', levels), ('fog', fog)):   # each on its own: one that can't be read leaves the rest working
                 try:
                     out[key] = mod.read(b)
                 except Exception as e:
@@ -1626,7 +1818,7 @@ class H(BaseHTTPRequestHandler):
                     raise Fail('console_not_found')
                 with LOCK:
                     STATE['console'] = {'host': c['host'], 'name': c['name'], 'hostId': c['hostId'], 'firmware': c['firmware']}
-                    STATE.update(session=None, resumeDownload=None, slots=[], skipped=[], readyToUpload=False, user=None, entryId=None)
+                    STATE.update(session=None, resumeDownload=None, users=[], slots=[], skipped=[], readyToUpload=False, user=None, entryId=None)
                     refresh_paired()
                     try:
                         restore_session()
@@ -1748,9 +1940,16 @@ class H(BaseHTTPRequestHandler):
             if path == '/api/restore':
                 return self._send(200, {'job': start_job('restore', job_restore)})
             if path == '/api/upload':
-                if not (STATE['readyToUpload'] or pending_slot_changes()):
+                to = body.get('to') if isinstance(body, dict) else None
+                if to is not None:              # another account on this PS5: the copy itself is the change
+                    if not isinstance(to, str) or not re.fullmatch(r'[0-9a-fA-F]{8}', to) or \
+                            to.lower() not in [u['id'] for u in STATE.get('users') or []]:
+                        raise Fail('bad_request')
+                    if not STATE['session'] or to.lower() == str((STATE['user'] or {}).get('id', '')).lower():
+                        to = None
+                if not to and not (STATE['readyToUpload'] or pending_slot_changes()):
                     raise Fail('nothing_to_upload')
-                return self._send(200, {'job': start_job('upload', job_upload)})
+                return self._send(200, {'job': start_job('upload', lambda: job_upload(to))})
             self._send(404, {'error': 'not_found'})
         except Fail as e:
             self._send(409, {'error': e.code, 'detail': str(e.detail)})

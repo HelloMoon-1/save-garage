@@ -29,6 +29,13 @@ class RangeCard:
 
 
 class RangeReplay(unittest.TestCase):
+    def test_closed_venue_keeps_gold_calibration_from_the_played_courses(self):
+        card = RangeCard()
+        card.rows['unlocked', 0, 'rodgers'] = False
+        info = ranges.range_access(card)
+        self.assertFalse(info['venues'][1]['open'])
+        self.assertIsNotNone(info['last'])
+
     def test_full_card_leaves_exactly_one_replay_and_preserves_other_scores(self):
         card = RangeCard()
         recipe = ranges.gold_recipe(card)
